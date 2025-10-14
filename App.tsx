@@ -1,649 +1,515 @@
-import React, { useState, useRef } from 'react';
+// Fix: Removed invalid file marker that was causing a parsing error.
+import React, { useState, useEffect, useCallback } from 'react';
 import { Header } from './components/Header';
 import UploadPage from './components/UploadPage';
 import InventoryDashboard from './components/InventoryDashboard';
 import ItemDetailView from './components/ItemDetailView';
-import ClaimStrategyGuide from './components/ClaimStrategyGuide';
-import RoomScanView from './components/RoomScanView';
+import ProcessingPage from './components/ProcessingPage';
+import BulkReviewPage from './components/BulkReviewPage';
 import ActivityLogView from './components/ActivityLogView';
-import { InventoryItem, ParsedPolicy, DraftClaim, AccountHolder, Proof, ProofSuggestion, ActivityLogEntry, SyncStatus, ActivityLogAction } from './types';
-import { 
-    analyzeImageWithGemini, 
-    findMarketPrice, 
-    enrichAssetFromWeb,
-    identifyApparel,
-    selectBestCoverage,
-    assembleDraftClaim,
-    findHighestRCV,
-    extractSerialNumber,
-    calculateProofStrength,
-    calculateACV,
-    fuzzyMatchProofs,
-    parsePolicyDocument,
-    SCENARIO_ACCOUNT_HOLDER,
-    SCENARIO_INVENTORY_ITEMS,
-    SCENARIO_POLICY,
-    UNLINKED_PROOFS,
-} from './services/geminiService';
-import { fileToDataUrl, extractFramesFromVideo } from './utils/fileUtils';
+import ClaimStrategyGuide from './components/ClaimStrategyGuide';
+import UndoToast from './components/UndoToast';
+import SaveModal from './components/SaveModal';
+import RoomScanView from './components/RoomScanView';
 
-function App() {
-  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>(SCENARIO_INVENTORY_ITEMS);
-  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isUploadingProof, setIsUploadingProof] = useState(false);
-  const [parsedPolicy, setParsedPolicy] = useState<ParsedPolicy | null>(SCENARIO_POLICY);
-  const [isParsingPolicy, setIsParsingPolicy] = useState(false);
-  const [accountHolder] = useState<AccountHolder>(SCENARIO_ACCOUNT_HOLDER);
-  const [draftClaims, setDraftClaims] = useState<DraftClaim[]>([]);
-  const [showClaimGuide, setShowClaimGuide] = useState(false);
-  const [isRoomScanning, setIsRoomScanning] = useState(false);
-  const [unlinkedProofs, setUnlinkedProofs] = useState<Proof[]>(UNLINKED_PROOFS);
-  const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([]);
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
-  const [isActivityLogVisible, setIsActivityLogVisible] = useState(false);
-  const syncTimeoutRef = useRef<number | null>(null);
+import * as geminiService from './services/geminiService';
+import { InventoryItem, AccountHolder, ParsedPolicy, Proof, AppView, ActivityLogEntry, UndoableAction, ClaimDetails, ItemStatus, ProofSuggestion, UploadProgress } from './types';
+import { fileToDataUrl, urlToDataUrl, sanitizeFileName, dataUrlToBlob, exportToCSV, exportToZip } from './utils/fileUtils';
 
-  const handleSync = () => {
-    if (syncTimeoutRef.current) {
-        clearTimeout(syncTimeoutRef.current);
-    }
-    setSyncStatus('syncing');
+// Mock data initialization
+const INITIAL_INVENTORY: InventoryItem[] = geminiService.SCENARIO_INVENTORY_ITEMS;
+const INITIAL_ACCOUNT_HOLDER: AccountHolder = geminiService.SCENARIO_ACCOUNT_HOLDER;
+const INITIAL_POLICY: ParsedPolicy = geminiService.SCENARIO_POLICY;
+const INITIAL_UNLINKED_PROOFS: Proof[] = geminiService.UNLINKED_PROOFS;
+
+const App: React.FC = () => {
+    // Core State
+    const [inventory, setInventory] = useState<InventoryItem[]>(INITIAL_INVENTORY);
+    const [policy, setPolicy] = useState<ParsedPolicy | null>(INITIAL_POLICY);
+    const [unlinkedProofs, setUnlinkedProofs] = useState<Proof[]>(INITIAL_UNLINKED_PROOFS);
+    const [accountHolder, setAccountHolder] = useState<AccountHolder>(INITIAL_ACCOUNT_HOLDER);
+    const [claimDetails, setClaimDetails] = useState<ClaimDetails>({
+        name: "Burglary Claim - 312 W 43rd St",
+        dateOfLoss: "2024-07-20",
+        incidentType: "Burglary",
+        location: "312 W 43rd Street, Apt 14J, New York, NY 10036",
+        policeReport: "NYPD-2024-845123",
+        propertyDamageDetails: "Front door lock was forcibly broken and requires replacement.\nWindow in the living room was shattered.\nEstimated cost for door repair: $450\nEstimated cost for window replacement: $600"
+    });
+
+    // UI State
+    const [currentView, setCurrentView] = useState<AppView>('dashboard');
+    const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+    const [processingProgress, setProcessingProgress] = useState({ stage: '', current: 0, total: 0, fileName: '' });
+    const [newlyProcessedItems, setNewlyProcessedItems] = useState<InventoryItem[]>([]);
+    const [isParsingPolicy, setIsParsingPolicy] = useState(false);
+    const [showLog, setShowLog] = useState(false);
+    const [showGuide, setShowGuide] = useState(false);
+    const [showSaveModal, setShowSaveModal] = useState(false);
+    const [undoAction, setUndoAction] = useState<UndoableAction | null>(null);
+    const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
+
+    // Filter State
+    const [searchTerm, setSearchTerm] = useState('');
+    const [categoryFilter, setCategoryFilter] = useState('all');
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [coverageFilter, setCoverageFilter] = useState('all');
     
-    // Simulate API call
-    setTimeout(() => {
-        setSyncStatus('synced');
-        // After showing "synced" for a few seconds, return to idle
-        syncTimeoutRef.current = window.setTimeout(() => {
-            setSyncStatus('idle');
-            syncTimeoutRef.current = null;
-        }, 2000);
-    }, 500); // Short delay for syncing
-  };
+    // Activity Log State
+    const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([]);
 
-  const logActivity = (action: ActivityLogAction, details: string) => {
-    const newEntry: ActivityLogEntry = {
-        id: `log-${Date.now()}`,
-        timestamp: new Date().toISOString(),
-        app: 'VeritasVault',
-        action,
-        details,
-    };
-    setActivityLog(prev => [...prev, newEntry]);
-    handleSync(); // Auto-save/sync on every action
-  };
+    const logActivity = useCallback((action: string, details: string, app: 'VeritasVault' | 'Gemini' = 'VeritasVault') => {
+        const newEntry: ActivityLogEntry = {
+            id: `log-${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            app,
+            action,
+            details,
+        };
+        setActivityLog(prev => [...prev, newEntry]);
+    }, []);
 
-  const handleFilesSelected = async (files: FileList | File[], createdBy: InventoryItem['createdBy'] = 'User - Manual') => {
-    setIsLoading(true);
-    const newItems: { item: InventoryItem, file: File }[] = [];
-    const now = new Date().toISOString();
-
-    for (const file of Array.from(files)) {
-      const id = `${Date.now()}-${file.name}-${Math.random()}`;
-      const dataUrl = await fileToDataUrl(file);
-
-      const newProof: Proof = {
-        id: `proof-${id}`,
-        type: file.type.startsWith('image/') ? 'image' : 'document',
-        fileName: file.name,
-        dataUrl,
-      };
-
-      const placeholderItem: InventoryItem = {
-        id,
-        linkedProofs: [newProof],
-        status: 'processing',
-        itemName: file.name,
-        itemDescription: 'Analyzing with Gemini...',
-        itemCategory: 'Other',
-        originalCost: 0,
-        claims: [],
-        createdAt: now,
-        createdBy: createdBy,
-      };
-      newItems.push({ item: placeholderItem, file });
-    }
+     const updateItem = useCallback((updatedItem: InventoryItem) => {
+        setInventory(prev => prev.map(item => item.id === updatedItem.id ? updatedItem : item));
+        logActivity('ITEM_UPDATED', `Updated item: ${updatedItem.itemName}`);
+    }, [logActivity]);
     
-    setInventoryItems(prev => [...prev, ...newItems.map(ni => ni.item)]);
-    
-    if (newItems.length > 0) {
-        logActivity('ITEM_ADDED', `Added ${newItems.length} new item(s) for processing.`);
-    }
+    const handleFindProductImage = useCallback(async (item: InventoryItem) => {
+        logActivity('AI_ACTION_START', `Searching for web image for ${item.itemName}`, 'Gemini');
+        try {
+            const imageResult = await geminiService.findProductImageFromWeb(item);
+            if (imageResult && imageResult.imageUrl) {
+                const dataUrl = await urlToDataUrl(imageResult.imageUrl);
+                const blob = dataUrlToBlob(dataUrl);
+                
+                const newProof: Proof = {
+                    id: `proof-web-${Date.now()}`,
+                    type: 'image',
+                    fileName: sanitizeFileName(`web_image_${item.itemName}.jpg`),
+                    dataUrl: dataUrl,
+                    mimeType: blob.type || 'image/jpeg',
+                    createdBy: 'AI',
+                };
 
-    const processingPromises = newItems.map(({ item, file }) =>
-      file.type.startsWith('image/') ?
-      analyzeImageWithGemini(file)
-        .then(result => {
-          setInventoryItems(prev =>
-            prev.map(i =>
-              i.id === item.id
-                ? {
-                    ...i,
+                const newSuggestion: ProofSuggestion = {
+                    proofId: newProof.id,
+                    confidence: 90, // High confidence as it was a targeted search
+                    reason: `Found on web at ${new URL(imageResult.source).hostname}`
+                };
+                
+                setUnlinkedProofs(prev => [...prev, newProof]);
+                setInventory(prev => prev.map(i => {
+                    if (i.id === item.id) {
+                        const existingSuggestion = i.suggestedProofs?.find(s => s.proofId === newProof.id);
+                        if (existingSuggestion) return i;
+                        return { ...i, suggestedProofs: [...(i.suggestedProofs || []), newSuggestion] };
+                    }
+                    return i;
+                }));
+
+                logActivity('AI_ACTION_SUCCESS', `Found and suggested a web image for ${item.itemName}`, 'Gemini');
+            } else {
+                 logActivity('AI_ACTION_SUCCESS', `No suitable web image found for ${item.itemName}`, 'Gemini');
+            }
+        } catch (error) {
+            console.error('Finding product image failed:', error);
+            logActivity('AI_ACTION_ERROR', `Failed to find web image for ${item.itemName}.`);
+        }
+    }, [logActivity]);
+     
+     const runAutonomousEnrichment = useCallback(async (item: InventoryItem) => {
+        // --- Fuzzy Match Proofs ---
+        if (unlinkedProofs.length > 0) {
+            logActivity('AI_ACTION_START', `Fuzzy matching proofs for ${item.itemName}`, 'Gemini');
+            try {
+                const { suggestions } = await geminiService.fuzzyMatchProofs(item, unlinkedProofs);
+                if (suggestions && suggestions.length > 0) {
+                    const currentLinkedProofIds = new Set(item.linkedProofs.map(p => p.id));
+                    const newSuggestions = suggestions.filter(s => !currentLinkedProofIds.has(s.proofId));
+
+                    if (newSuggestions.length > 0) {
+                        setInventory(prev => prev.map(i => i.id === item.id ? { ...i, suggestedProofs: [...(i.suggestedProofs || []), ...newSuggestions] } : i));
+                        logActivity('AI_ACTION_SUCCESS', `Found ${newSuggestions.length} potential proof(s) for ${item.itemName}.`, 'Gemini');
+                    }
+                }
+            } catch (error) {
+                console.error('Fuzzy matching failed:', error);
+                logActivity('AI_ACTION_ERROR', `Fuzzy matching failed for ${item.itemName}.`);
+            }
+        }
+        
+        // --- Find Web Image if Lacking Visual Proof ---
+        const hasVisualProof = item.linkedProofs.some(p => p.type === 'image');
+        if (!hasVisualProof) {
+            logActivity('AI_ACTION_START', `Item lacks visual proof. Searching web for image for ${item.itemName}.`, 'VeritasVault');
+            await handleFindProductImage(item);
+        }
+
+        // Mark as complete
+        setInventory(prev => prev.map(i => i.id === item.id ? { ...i, status: 'active' } : i));
+        logActivity('ITEM_ENRICHED', `Autonomous enrichment complete for ${item.itemName}. Item is now active.`);
+    }, [unlinkedProofs, logActivity, handleFindProductImage]);
+    
+    const processFiles = useCallback(async (files: File[], isProof: boolean) => {
+        // Stage 1: Reading files with progress reporting
+        const initialProgress: UploadProgress = {};
+        files.forEach(f => initialProgress[f.name] = { loaded: 0, total: f.size });
+        setUploadProgress(initialProgress);
+
+        const filesWithDataUrl = await Promise.all(files.map(async file => {
+            const dataUrl = await fileToDataUrl(file, (event) => {
+                setUploadProgress(prev => prev ? { ...prev, [file.name]: { loaded: event.loaded, total: event.total } } : null);
+            });
+            return { file, dataUrl };
+        }));
+
+        setUploadProgress(null); // Uploading finished, now start processing
+        setCurrentView('processing');
+
+        // Stage 2: AI analysis
+        const tempItems: InventoryItem[] = [];
+        for (let i = 0; i < filesWithDataUrl.length; i++) {
+            const { file, dataUrl } = filesWithDataUrl[i];
+            setProcessingProgress({ stage: 'Analyzing with Gemini', current: i + 1, total: files.length, fileName: file.name });
+            logActivity('FILE_UPLOADED', `User uploaded file: ${file.name}`);
+            
+            try {
+                let analysisResult;
+                if (file.type.startsWith('image/')) {
+                    analysisResult = isProof ? await geminiService.analyzeProofImageWithGemini(file) : await geminiService.analyzeImageWithGemini(file);
+                } else if (file.type === 'application/pdf') {
+                    analysisResult = await geminiService.analyzeDocumentWithGemini(file);
+                } else {
+                    continue; // Skip unsupported file types
+                }
+                logActivity('AI_ANALYSIS_COMPLETE', `Gemini analyzed ${file.name}`, 'Gemini');
+
+                const proof: Proof = {
+                    id: `proof-${Date.now()}-${i}`,
+                    type: file.type.startsWith('image/') ? 'image' : 'document',
+                    fileName: file.name,
+                    dataUrl: dataUrl,
+                    mimeType: file.type,
+                    createdBy: 'User',
+                };
+                
+                const newItem: InventoryItem = {
+                    id: `item-${Date.now()}-${i}`,
                     status: 'needs-review',
-                    itemName: result.itemName,
-                    itemDescription: result.description,
-                    itemCategory: result.category,
-                    originalCost: result.estimatedValue,
-                    brand: result.brand,
-                    model: result.model,
-                    aiNotes: [`Initial analysis complete. Gemini suggested category: ${result.category} and value: $${result.estimatedValue}`],
-                  }
-                : i
-            )
-          );
-        })
-        .catch(error => {
-          console.error(`Error processing file ${file.name}:`, error);
-          setInventoryItems(prev =>
-            prev.map(i =>
-              i.id === item.id
-                ? { ...i, status: 'error', error: error.message }
-                : i
-            )
-          );
-        })
-        : Promise.resolve().then(() => { // Handle non-image files gracefully
-          setInventoryItems(prev =>
-              prev.map(i =>
-                  i.id === item.id
-                  ? {
-                      ...i,
-                      status: 'needs-review',
-                      itemName: file.name,
-                      itemDescription: '',
-                      itemCategory: 'Documents',
-                      originalCost: 0,
-                      aiNotes: ['Document ready for review. Please add details manually.'],
-                  }
-                  : i
-              )
-          );
-        })
-    );
-
-    await Promise.all(processingPromises);
-    setIsLoading(false);
-  };
-
-  const handleAddProofs = async (itemId: string, files: FileList) => {
-    setIsUploadingProof(true);
-    const itemToUpdate = inventoryItems.find(i => i.id === itemId);
-    if (!itemToUpdate) {
-        setIsUploadingProof(false);
-        console.error("Item not found for adding proofs");
-        return;
-    }
-
-    const newProofs: Proof[] = [];
-    for (const file of Array.from(files)) {
-        const dataUrl = await fileToDataUrl(file);
-        const newProof: Proof = {
-            id: `proof-${Date.now()}-${file.name}-${Math.random()}`,
-            type: file.type.startsWith('image/') ? 'image' : 'document',
-            fileName: file.name,
-            dataUrl,
-        };
-        newProofs.push(newProof);
-    }
-
-    setInventoryItems(prev =>
-        prev.map(item =>
-            item.id === itemId
-            ? { ...item, linkedProofs: [...item.linkedProofs, ...newProofs] }
-            : item
-        )
-    );
-
-    if (newProofs.length > 0) {
-        logActivity('PROOF_LINKED', `Added ${newProofs.length} proof(s) to item: ${itemToUpdate.itemName}`);
-    }
-    
-    // Also update the selected item if it's the one being modified
-    if (selectedItemId === itemId) {
-        const updatedSelectedItem = inventoryItems.find(i => i.id === itemId);
-        if (updatedSelectedItem) {
-            setSelectedItemId(itemId); // This forces a re-render of the detail view with new proofs
+                    itemName: analysisResult.itemName,
+                    itemDescription: analysisResult.description,
+                    itemCategory: analysisResult.category,
+                    originalCost: analysisResult.estimatedValue,
+                    replacementCostValueRCV: analysisResult.estimatedValue,
+                    brand: analysisResult.brand,
+                    model: analysisResult.model,
+                    linkedProofs: [proof],
+                    createdAt: new Date().toISOString(),
+                    createdBy: 'AI Assisted',
+                    proofStrengthScore: 60, // Default score
+                };
+                tempItems.push(newItem);
+            } catch (error) {
+                console.error(`Failed to process file ${file.name}:`, error);
+                logActivity('PROCESSING_ERROR', `Error processing ${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            }
         }
-    }
+        setNewlyProcessedItems(tempItems);
+        setCurrentView('bulk-review');
 
-
-    setIsUploadingProof(false);
-  };
-
-  const handleReset = () => {
-    setInventoryItems([]);
-    setSelectedItemId(null);
-    setIsLoading(false);
-    setDraftClaims([]);
-    setParsedPolicy(null);
-    setUnlinkedProofs(UNLINKED_PROOFS);
-    setActivityLog([]);
-    setSyncStatus('idle');
-  };
-
-  const handleApproveItem = (itemId: string) => {
-    setInventoryItems(prev =>
-      prev.map(item =>
-        item.id === itemId ? { ...item, status: 'active' } : item
-      )
-    );
-  };
-
-  const handleRejectItem = (itemId: string) => {
-    setInventoryItems(prev =>
-      prev.map(item =>
-        item.id === itemId ? { ...item, status: 'rejected' } : item
-      )
-    );
-  };
-
-  const handleSelectItem = (itemId: string) => {
-    setSelectedItemId(itemId);
-  };
-  
-  const handleCloseDetailView = () => {
-    setSelectedItemId(null);
-  };
-
-  const handleUpdateItem = (updatedItem: InventoryItem) => {
-    logActivity('ITEM_UPDATED', `Saved changes for item: ${updatedItem.itemName}`);
-    setInventoryItems(prev =>
-      prev.map(item => (item.id === updatedItem.id ? { ...updatedItem, lastModifiedAt: new Date().toISOString() } : item))
-    );
-    setSelectedItemId(null);
-  };
-  
-  const handleDeleteItem = (itemId: string) => {
-    const itemToDelete = inventoryItems.find(i => i.id === itemId);
-    if (itemToDelete) {
-        logActivity('ITEM_DELETED', `Deleted item: ${itemToDelete.itemName}`);
-    }
-    setInventoryItems(prev => prev.filter(item => item.id !== itemId));
-    setDraftClaims(prev => prev.filter(claim => claim.assetId !== itemId));
-    setSelectedItemId(null);
-  };
-  
-  const handleFindMarketPrice = async (item: InventoryItem) => {
-    logActivity('AI_ANALYSIS_PERFORMED', `Requested Market Valuation for ${item.itemName}`);
-    const results = await findMarketPrice(item);
-    setInventoryItems(prev =>
-        prev.map(i =>
-            i.id === item.id
-            ? { 
-                ...i, 
-                replacementCostValueRCV: results.rcv, 
-                aiNotes: [
-                    ...(i.aiNotes || []),
-                    `Market valuation found RCV: $${results.rcv}, ACV: $${results.acv}. Sources: ${results.sources.map(s => s.url).join(', ')}`
-                ]
-              }
-            : i
-        )
-    );
-  };
-
-  const handleFindHighestRCV = async (item: InventoryItem) => {
-    logActivity('AI_ANALYSIS_PERFORMED', `Requested Highest RCV for ${item.itemName}`);
-    const result = await findHighestRCV(item);
-    setInventoryItems(prev =>
-        prev.map(i =>
-            i.id === item.id
-            ? { 
-                ...i, 
-                replacementCostValueRCV: result.price, 
-                aiNotes: [
-                    ...(i.aiNotes || []),
-                    `Highest RCV found: $${result.price} from ${result.source}`
-                ]
-            }
-            : i
-        )
-    );
-  };
-
-  const handleExtractSerialNumber = async (itemId: string, proofId: string) => {
-    const item = inventoryItems.find(i => i.id === itemId);
-    const proof = item?.linkedProofs.find(p => p.id === proofId);
-
-    if (!item || !proof || proof.type !== 'image') return;
+    }, [logActivity]);
     
-    logActivity('AI_ANALYSIS_PERFORMED', `Requested Serial Number Extraction for ${item.itemName}`);
+    // Background task to categorize unlinked proofs on startup
+    useEffect(() => {
+        const categorizeProofs = async () => {
+            const proofsToCategorize = unlinkedProofs.filter(p => !p.predictedCategory);
+            if (proofsToCategorize.length === 0) return;
 
-    const result = await extractSerialNumber(proof.dataUrl);
-    if (result.serialNumber) {
-        logActivity('ITEM_UPDATED', `Extracted serial number for ${item.itemName}`);
-        setInventoryItems(prev =>
-            prev.map(i =>
-                i.id === itemId
-                ? { ...i, serialNumber: result.serialNumber }
-                : i
-            )
-        );
-    }
-  };
+            logActivity('AI_ACTION_START', `Categorizing ${proofsToCategorize.length} unlinked proofs.`, 'Gemini');
 
-  const handleEnrichData = async (item: InventoryItem) => {
-      logActivity('AI_ANALYSIS_PERFORMED', `Requested Web Intelligence for ${item.itemName}`);
-      const results = await enrichAssetFromWeb(item);
-      setInventoryItems(prev =>
-        prev.map(i =>
-            i.id === item.id
-            ? { 
-                ...i,
-                aiNotes: [
-                    ...(i.aiNotes || []),
-                    ...results.facts.map(f => `${f.fact} (Source: ${f.source})`)
-                ]
-            }
-            : i
-        )
-      );
-  };
-  
-  const handleIdentifyApparel = async (itemId: string, proofId: string) => {
-    const item = inventoryItems.find(i => i.id === itemId);
-    const proof = item?.linkedProofs.find(p => p.id === proofId);
+            const categorizedProofs = await Promise.all(proofsToCategorize.map(async proof => {
+                try {
+                    const result = await geminiService.categorizeUnlinkedProof(proof);
+                    return { ...proof, predictedCategory: result.category, predictedCategoryReasoning: result.reasoning };
+                } catch (error) {
+                    console.error(`Failed to categorize proof ${proof.fileName}:`, error);
+                    return proof; // Return original proof if categorization fails
+                }
+            }));
 
-    if (!item || !proof || proof.type !== 'image') return;
-    logActivity('AI_ANALYSIS_PERFORMED', `Requested Apparel Identification for ${item.itemName}`);
+            // Create a map for efficient updates
+            const categorizedMap = new Map(categorizedProofs.map(p => [p.id, p]));
 
-    const result = await identifyApparel(proof.dataUrl);
-    setInventoryItems(prev =>
-        prev.map(i =>
-            i.id === itemId
-            ? { 
-                ...i, 
-                itemName: `${result.brand} ${result.model}`, 
-                originalCost: result.msrp,
-                brand: result.brand,
-                model: result.model,
-                itemDescription: `${result.brand} ${result.model}. MSRP: $${result.msrp}` 
-            }
-            : i
-        )
-    );
-  };
-
-  const handleCalculateProofStrength = async (itemId: string) => {
-    const item = inventoryItems.find(i => i.id === itemId);
-    if (!item) return;
-    logActivity('AI_ANALYSIS_PERFORMED', `Calculated Proof Strength for ${item.itemName}`);
-    const result = await calculateProofStrength(item);
-    setInventoryItems(prev =>
-        prev.map(i =>
-            i.id === itemId
-            ? { ...i, proofStrengthScore: result.score, proofStrengthFeedback: result.feedback }
-            : i
-        )
-    );
-  };
-
-  const handleCalculateACV = async (itemId: string) => {
-    const item = inventoryItems.find(i => i.id === itemId);
-    if (!item) return;
-
-    logActivity('AI_ANALYSIS_PERFORMED', `Calculated ACV & Depreciation for ${item.itemName}`);
-    try {
-        const result = await calculateACV(item);
-        setInventoryItems(prev =>
-            prev.map(i =>
-                i.id === itemId
-                ? { ...i, acvDepreciation: { acv: result.acv, reasoning: result.reasoning } }
-                : i
-            )
-        );
-    } catch (error) {
-        console.error("Error calculating ACV:", error);
-        alert(`Could not calculate ACV: ${error.message}`);
-    }
-  };
-  
-  const handleUploadPolicy = async (file: File) => {
-    setIsParsingPolicy(true);
-    logActivity('POLICY_UPLOADED', `Uploaded policy document: ${file.name}`);
-    try {
-        const result = await parsePolicyDocument(file);
-        const policyData: ParsedPolicy = {
-            ...result,
-            isVerified: result.confidenceScore >= 85, // Auto-verify if confidence is high
-        };
-        setParsedPolicy(policyData);
-        logActivity('POLICY_PARSED', `Successfully parsed policy ${result.policyNumber}`);
-    } catch (error) {
-        console.error("Error parsing policy:", error);
-        alert(`Could not parse the policy document: ${error.message}`);
-    } finally {
-        setIsParsingPolicy(false);
-    }
-  };
-  
-  const handleUpdateParsedPolicy = (updatedPolicy: ParsedPolicy) => {
-    setParsedPolicy(updatedPolicy);
-  };
-
-  const handleVerifyPolicy = () => {
-    if (parsedPolicy) {
-        logActivity('POLICY_VERIFIED', `User verified policy details for ${parsedPolicy.policyNumber}`);
-        setParsedPolicy({ ...parsedPolicy, isVerified: true });
-    }
-  };
-
-
-  const handleSelectCoverage = (itemId: string) => {
-    if (!parsedPolicy) {
-        alert("Please upload and parse an insurance policy first.");
-        return;
-    }
-    const item = inventoryItems.find(i => i.id === itemId);
-    if (!item) return;
-
-    const bestCoverage = selectBestCoverage(item.itemCategory, parsedPolicy);
-    
-    if (bestCoverage) {
-        setInventoryItems(prev =>
-            prev.map(i =>
-                i.id === itemId ? { ...i, recommendedCoverage: bestCoverage } : i
-            )
-        );
-    } else {
-        alert(`No specific coverage found for category "${item.itemCategory}" in your policy. It will fall under your main personal property limit.`);
-        const mainCoverage = parsedPolicy.coverage.find(c => c.type === 'main');
-         if (mainCoverage) {
-            setInventoryItems(prev =>
-                prev.map(i =>
-                    i.id === itemId ? { ...i, recommendedCoverage: mainCoverage } : i
-                )
+            setUnlinkedProofs(prevProofs =>
+                prevProofs.map(p => categorizedMap.get(p.id) || p)
             );
+             logActivity('AI_ACTION_SUCCESS', `Successfully categorized ${proofsToCategorize.length} proofs.`, 'Gemini');
+        };
+
+        categorizeProofs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // Run only once on mount
+
+    const handlePolicyUpload = async (file: File) => {
+        setIsParsingPolicy(true);
+        logActivity('POLICY_UPLOAD', `User uploaded policy: ${file.name}`);
+        try {
+            const parsed = await geminiService.parsePolicyDocument(file);
+            logActivity('AI_POLICY_PARSE', `Gemini parsed the policy with ${parsed.confidenceScore}% confidence.`, 'Gemini');
+            setPolicy({ ...parsed, isVerified: false }); // Set to unverified for review
+        } catch (error) {
+            console.error(error);
+            logActivity('ERROR', `Failed to parse policy: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        } finally {
+            setIsParsingPolicy(false);
         }
-    }
-  };
+    };
 
-  const handleDraftClaim = async (itemId: string) => {
-    const item = inventoryItems.find(i => i.id === itemId);
-    if (!item || !item.recommendedCoverage || !parsedPolicy) return;
-    
-    logActivity('CLAIM_DRAFTED', `Drafted a new claim for item: ${item.itemName}`);
-    const newClaim = await assembleDraftClaim(item, parsedPolicy, accountHolder);
-    setDraftClaims(prev => [...prev, newClaim]);
-    setInventoryItems(prev =>
-      prev.map(i =>
-        i.id === itemId
-          ? { ...i, claims: [...(i.claims || []), newClaim], isClaimed: true, status: 'claimed' }
-          : i
-      )
-    );
-  };
-
-  const handleFileClaim = (claimId: string) => {
-    const updateStatus = (claims: DraftClaim[]) =>
-      claims.map(c => c.id === claimId ? { ...c, status: 'submitted' as const } : c);
-
-    setDraftClaims(prev => updateStatus(prev));
-    setInventoryItems(prev =>
-      prev.map(item =>
-        item.claims?.some(c => c.id === claimId)
-          ? { ...item, claims: updateStatus(item.claims) }
-          : item
-      )
-    );
-  };
-  
-  const handleShowGuide = () => setShowClaimGuide(true);
-  const handleCloseGuide = () => setShowClaimGuide(false);
-
-  const handleStartRoomScan = () => setIsRoomScanning(true);
-  const handleCloseRoomScan = () => setIsRoomScanning(false);
-  
-  const handleProcessRoomScanVideo = async (videoBlob: Blob) => {
-    handleCloseRoomScan();
-    setIsLoading(true); // Use the global loader
-    try {
-        const frames = await extractFramesFromVideo(videoBlob, 1); // 1 frame per second
-        if (frames.length > 0) {
-            await handleFilesSelected(frames, 'AI - Room Scan');
-        } else {
-            setIsLoading(false);
+    // Item CRUD
+    const deleteItem = (itemId: string) => {
+        const itemToDelete = inventory.find(i => i.id === itemId);
+        if (itemToDelete) {
+            setInventory(prev => prev.filter(item => item.id !== itemId));
+            logActivity('ITEM_DELETED', `Deleted item: ${itemToDelete.itemName}`);
+            setUndoAction({ type: 'DELETE_ITEM', payload: { item: itemToDelete } });
         }
-    } catch (error) {
-        console.error("Error processing room scan video:", error);
-        alert("There was an error processing the video. Please try again.");
-        setIsLoading(false);
-    }
-  };
-
-  const handleFuzzyMatch = async (itemId: string) => {
-    const item = inventoryItems.find(i => i.id === itemId);
-    if (!item) return;
-
-    logActivity('AI_ANALYSIS_PERFORMED', `Searched for matching proofs for ${item.itemName}`);
-
-    const proofsToScan = unlinkedProofs.filter(up => 
-        !item.suggestedProofs?.some(sp => sp.proofId === up.id)
-    );
-
-    if (proofsToScan.length === 0) {
-        return;
-    }
-
-    const result = await fuzzyMatchProofs(item, proofsToScan);
+    };
     
-    setInventoryItems(prev =>
-        prev.map(i =>
-            i.id === itemId
-            ? { ...i, suggestedProofs: [...(i.suggestedProofs || []), ...result.suggestions] }
-            : i
-        )
-    );
-  };
+    const handleAddProofs = async (itemId: string, files: File[]) => {
+        const initialProgress: UploadProgress = {};
+        files.forEach(f => initialProgress[f.name] = { loaded: 0, total: f.size });
+        setUploadProgress(initialProgress);
 
-  const handleApproveProofSuggestion = (itemId: string, suggestion: ProofSuggestion) => {
-    const proofToMove = unlinkedProofs.find(p => p.id === suggestion.proofId);
-    const item = inventoryItems.find(i => i.id === itemId);
-    if (!proofToMove || !item) return;
+        const newProofs = await Promise.all(files.map(async (file, i) => {
+            const dataUrl = await fileToDataUrl(file, (event) => {
+                setUploadProgress(prev => prev ? { ...prev, [file.name]: { loaded: event.loaded, total: event.total } } : null);
+            });
+            const newProof: Proof = {
+                id: `proof-detail-${Date.now()}-${i}`,
+                type: file.type.startsWith('image/') ? 'image' : 'document',
+                fileName: file.name,
+                dataUrl: dataUrl,
+                mimeType: file.type,
+                createdBy: 'User',
+            };
+            return newProof;
+        }));
+
+        setUploadProgress(null);
+        setInventory(prev => prev.map(item =>
+            item.id === itemId
+                ? { ...item, linkedProofs: [...item.linkedProofs, ...newProofs] }
+                : item
+        ));
+        logActivity('PROOFS_ADDED', `Added ${newProofs.length} proof(s) to item.`);
+    };
+
+    const handleDownloadVault = () => {
+        const date = new Date().toISOString().split('T')[0];
+        let filename = `VeritasVault_Export_${date}.csv`;
+        let itemsToExport = filteredItems;
+
+        // Create a more descriptive filename if filters are active
+        if (categoryFilter !== 'all' || statusFilter !== 'all' || searchTerm) {
+            const cat = categoryFilter !== 'all' ? `_${categoryFilter}` : '';
+            const stat = statusFilter !== 'all' ? `_${statusFilter}` : '';
+            const search = searchTerm ? `_search-${sanitizeFileName(searchTerm)}` : '';
+            if(itemsToExport.length === 1) {
+                filename = `VeritasVault_Export_${sanitizeFileName(itemsToExport[0].itemName)}.csv`
+            } else {
+                filename = `VeritasVault_Export${cat}${stat}${search}_${date}.csv`;
+            }
+        }
+        
+        exportToCSV(itemsToExport, filename);
+        logActivity('EXPORT_CSV', `Exported ${itemsToExport.length} items to CSV.`);
+    };
     
-    logActivity('SUGGESTED_PROOF_APPROVED', `Approved and linked proof '${proofToMove.fileName}' to item '${item.itemName}'`);
+    // AI Actions
+    const runAiAction = async <T,>(
+        item: InventoryItem, 
+        action: (item: InventoryItem) => Promise<T>,
+        updateLogic: (item: InventoryItem, result: T) => Partial<InventoryItem>,
+        actionName: string,
+        details: (result: T) => string
+    ) => {
+        try {
+            logActivity(`AI_ACTION_START`, `Running "${actionName}" for ${item.itemName}`, 'Gemini');
+            const result = await action(item);
+            const updates = updateLogic(item, result);
+            updateItem({ ...item, ...updates });
+            logActivity(`AI_ACTION_SUCCESS`, `"${actionName}" successful. ${details(result)}`, 'Gemini');
+        } catch(error) {
+            console.error(`Error with ${actionName}:`, error);
+            logActivity(`AI_ACTION_ERROR`, `Error with ${actionName} on ${item.itemName}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    };
 
-    setInventoryItems(prev =>
-        prev.map(item =>
-            item.id === itemId
-            ? { 
-                ...item, 
-                linkedProofs: [...item.linkedProofs, proofToMove],
-                suggestedProofs: item.suggestedProofs?.filter(s => s.proofId !== suggestion.proofId)
-              }
-            : item
-        )
+    const handleLinkProof = (itemId: string, proofId: string) => {
+        const itemToUpdate = inventory.find(i => i.id === itemId);
+        const proofToLink = unlinkedProofs.find(p => p.id === proofId);
+
+        if (itemToUpdate && proofToLink) {
+            const updatedItem = {
+                ...itemToUpdate,
+                linkedProofs: [...itemToUpdate.linkedProofs, proofToLink],
+                suggestedProofs: itemToUpdate.suggestedProofs?.filter(s => s.proofId !== proofId)
+            };
+            setInventory(prev => prev.map(i => i.id === itemId ? updatedItem : i));
+            setUnlinkedProofs(prev => prev.filter(p => p.id !== proofId));
+            logActivity('PROOF_LINKED', `Linked proof '${proofToLink.fileName}' to item '${itemToUpdate.itemName}'.`);
+        }
+    };
+
+    const handleRejectSuggestion = (itemId: string, proofId: string) => {
+        const itemToUpdate = inventory.find(i => i.id === itemId);
+        if (itemToUpdate) {
+            const updatedItem = {
+                ...itemToUpdate,
+                suggestedProofs: itemToUpdate.suggestedProofs?.filter(s => s.proofId !== proofId)
+            };
+            updateItem(updatedItem);
+            logActivity('SUGGESTION_REJECTED', `Rejected proof suggestion for item '${itemToUpdate.itemName}'.`);
+        }
+    };
+
+    // Rendering Logic
+    const selectedItem = inventory.find(item => item.id === selectedItemId);
+
+    const filteredItems = inventory.filter(item => {
+        const searchMatch = searchTerm ? 
+            item.itemName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+            item.itemDescription.toLowerCase().includes(searchTerm.toLowerCase()) : true;
+        const categoryMatch = categoryFilter !== 'all' ? item.itemCategory === categoryFilter : true;
+        const statusMatch = statusFilter !== 'all' ? item.status === statusFilter : true;
+        const coverageMatch = coverageFilter !== 'all' && policy?.isVerified ? geminiService.selectBestCoverage(item.itemCategory, policy!)?.category === coverageFilter : true;
+
+        return searchMatch && categoryMatch && statusMatch && coverageMatch;
+    });
+    
+    const renderContent = () => {
+        if (currentView === 'upload' && uploadProgress) {
+             return <UploadPage onItemPhotosSelected={() => {}} onProofDocumentsSelected={() => {}} uploadProgress={uploadProgress} />;
+        }
+
+        switch (currentView) {
+            case 'upload':
+                return <UploadPage onItemPhotosSelected={(f) => processFiles(Array.from(f), false)} onProofDocumentsSelected={(f) => processFiles(Array.from(f), true)} uploadProgress={uploadProgress} />;
+            case 'processing':
+                return <ProcessingPage progress={processingProgress} onCancel={() => setCurrentView('dashboard')} />;
+            case 'bulk-review':
+                return <BulkReviewPage items={newlyProcessedItems} onFinalize={(approved, rejected) => {
+                    const enrichedApproved = approved.map(item => ({ ...item, status: 'enriching' as ItemStatus }));
+                    setInventory(prev => [...prev, ...enrichedApproved]);
+                    logActivity('BULK_ADD', `Added ${approved.length} new items to vault for enrichment.`);
+                    if (rejected.length > 0) logActivity('BULK_REJECT', `Rejected ${rejected.length} items.`);
+                    
+                    enrichedApproved.forEach(item => runAutonomousEnrichment(item));
+
+                    setNewlyProcessedItems([]);
+                    setCurrentView('dashboard');
+                }} />;
+            case 'item-detail':
+                return selectedItem ? <ItemDetailView 
+                    item={selectedItem}
+                    unlinkedProofs={unlinkedProofs}
+                    policy={policy}
+                    accountHolder={accountHolder}
+                    onBack={() => setSelectedItemId(null)}
+                    onUpdateItem={updateItem}
+                    onDeleteItem={deleteItem}
+                    // AI Actions
+                    onFindMarketPrice={item => runAiAction(item, geminiService.findMarketPrice, (i, r) => ({ replacementCostValueRCV: r.rcv, actualCashValueACV: r.acv }), 'Market Price', r => `RCV: $${r.rcv}, ACV: $${r.acv}`)}
+                    onEnrichAsset={item => runAiAction(item, geminiService.enrichAssetFromWeb, (i, r) => ({ itemDescription: `${i.itemDescription}\n\nWeb Intelligence:\n${r.facts.map(f => `- ${f.fact}`).join('\n')}` }), 'Enrich Data', r => `Found ${r.facts.length} facts.`)}
+                    onCalculateProofStrength={item => runAiAction(item, geminiService.calculateProofStrength, (i, r) => ({ proofStrengthScore: r.score }), 'Proof Strength', r => `Score: ${r.score}`)}
+                    onCalculateACV={item => runAiAction(item, geminiService.calculateACV, (i, r) => ({ actualCashValueACV: r.acv }), 'Calculate ACV', r => `ACV: $${r.acv}`)}
+                    onFindHighestRCV={item => runAiAction(item, geminiService.findHighestRCV, (i, r) => ({ replacementCostValueRCV: r.price }), 'Find Max RCV', r => `Price: $${r.price}`)}
+                    onDraftClaim={item => runAiAction(item, (i) => geminiService.assembleDraftClaim(i, policy!, accountHolder), (i, r) => ({ status: 'claimed' }), 'Draft Claim', r => `Draft created with ID ${r.id}`)}
+                    onFuzzyMatch={() => {}} // Now autonomous
+                    onFindProductImage={handleFindProductImage}
+                    onLinkProof={handleLinkProof}
+                    onUnlinkProof={() => {}} // Placeholder
+                    onRejectSuggestion={handleRejectSuggestion}
+                    onAddProof={handleAddProofs}
+                    uploadProgress={uploadProgress}
+                /> : null;
+            case 'room-scan':
+                return <RoomScanView onClose={() => setCurrentView('dashboard')} onProcessVideo={() => {}} />;
+            case 'dashboard':
+            default:
+                return <InventoryDashboard
+                    items={inventory}
+                    filteredItems={filteredItems}
+                    accountHolder={accountHolder}
+                    policy={policy}
+                    claimDetails={claimDetails}
+                    onUpdateClaimDetails={setClaimDetails}
+                    isParsingPolicy={isParsingPolicy}
+                    onUploadPolicy={handlePolicyUpload}
+                    onUpdatePolicy={(p) => setPolicy(p)}
+                    onVerifyPolicy={() => {
+                        if (policy) {
+                            setPolicy({ ...policy, isVerified: true });
+                            logActivity('POLICY_VERIFIED', 'User verified the insurance policy.');
+                        }
+                    }}
+                    onSelectItem={(id) => setSelectedItemId(id)}
+                    onItemPhotosSelected={(f) => processFiles(Array.from(f), false)}
+                    onProofDocumentsSelected={(f) => processFiles(Array.from(f), true)}
+                    onStartRoomScan={() => setCurrentView('room-scan')}
+                    searchTerm={searchTerm}
+                    onSearchTermChange={setSearchTerm}
+                    categoryFilter={categoryFilter}
+                    onCategoryFilterChange={setCategoryFilter}
+                    statusFilter={statusFilter}
+                    onStatusFilterChange={setStatusFilter}
+                    coverageFilter={coverageFilter}
+                    onCoverageFilterChange={setCoverageFilter}
+                />;
+        }
+    };
+    
+    useEffect(() => {
+        if (selectedItemId) {
+            setCurrentView('item-detail');
+        } else if (currentView === 'item-detail') {
+            setCurrentView('dashboard');
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedItemId]);
+
+    return (
+        <div className="bg-slate-50 min-h-screen font-sans">
+            <Header 
+                onReset={() => {
+                    setInventory([]);
+                    setPolicy(null);
+                    setUnlinkedProofs([]);
+                    setActivityLog([]);
+                    setCurrentView('upload');
+                }}
+                onShowGuide={() => setShowGuide(true)}
+                onShowLog={() => setShowLog(true)}
+                onDownloadVault={handleDownloadVault}
+                showDownload={inventory.length > 0}
+                onSaveToFile={() => setShowSaveModal(true)}
+                onLoadFromFile={() => {}}
+            />
+            <main className="container mx-auto p-4 md:p-8">
+                {renderContent()}
+            </main>
+            {showLog && <ActivityLogView log={activityLog} onClose={() => setShowLog(false)} />}
+            {showGuide && <ClaimStrategyGuide onClose={() => setShowGuide(false)} />}
+            {showSaveModal && <SaveModal onClose={() => setShowSaveModal(false)} onQuickBackup={() => {}} onForensicExport={() => exportToZip(inventory, unlinkedProofs)} />}
+            {undoAction && <UndoToast action={undoAction} onDismiss={() => setUndoAction(null)} onUndo={() => {
+                if (undoAction.type === 'DELETE_ITEM') {
+                    setInventory(prev => [...prev, undoAction.payload.item].sort((a,b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)));
+                    logActivity('UNDO_DELETE', `Restored item: ${undoAction.payload.item.itemName}`);
+                }
+                setUndoAction(null);
+            }} />}
+        </div>
     );
-
-    setUnlinkedProofs(prev => prev.filter(p => p.id !== suggestion.proofId));
-  };
-
-  const handleRejectProofSuggestion = (itemId: string, suggestion: ProofSuggestion) => {
-    const proof = unlinkedProofs.find(p => p.id === suggestion.proofId);
-    const item = inventoryItems.find(i => i.id === itemId);
-    if (proof && item) {
-        logActivity('SUGGESTED_PROOF_REJECTED', `Rejected suggested proof '${proof.fileName}' for item '${item.itemName}'`);
-    }
-
-    setInventoryItems(prev =>
-        prev.map(item =>
-            item.id === itemId
-            ? { 
-                ...item, 
-                suggestedProofs: item.suggestedProofs?.filter(s => s.proofId !== suggestion.proofId)
-              }
-            : item
-        )
-    );
-  };
-
-  const handleShowLog = () => setIsActivityLogVisible(true);
-  const handleCloseLog = () => setIsActivityLogVisible(false);
-
-
-  const selectedItem = inventoryItems.find(item => item.id === selectedItemId);
-  const showDashboard = inventoryItems.length > 0 || parsedPolicy !== null;
-
-  return (
-    <div className="bg-light min-h-screen font-sans">
-      <Header 
-        onReset={handleReset} 
-        onShowGuide={handleShowGuide} 
-        onShowLog={handleShowLog}
-        onSync={handleSync}
-        syncStatus={syncStatus}
-      />
-      <main className="container mx-auto px-4 md:px-8 py-8">
-        {!showDashboard ? (
-          <UploadPage onFilesSelected={(files) => handleFilesSelected(files)} isLoading={isLoading} />
-        ) : (
-          <InventoryDashboard
-            items={inventoryItems}
-            accountHolder={accountHolder}
-            policy={parsedPolicy}
-            isParsingPolicy={isParsingPolicy}
-            onUploadPolicy={handleUploadPolicy}
-            onUpdatePolicy={handleUpdateParsedPolicy}
-            onVerifyPolicy={handleVerifyPolicy}
-            onSelectItem={handleSelectItem}
-            onApproveItem={handleApproveItem}
-            onRejectItem={handleRejectItem}
-            onFilesSelected={(files) => handleFilesSelected(files)}
-            onStartRoomScan={handleStartRoomScan}
-            isLoading={isLoading}
-          />
-        )}
-      </main>
-      {showClaimGuide && <ClaimStrategyGuide onClose={handleCloseGuide} />}
-      {isRoomScanning && <RoomScanView onClose={handleCloseRoomScan} onProcessVideo={handleProcessRoomScanVideo} />}
-      {isActivityLogVisible && <ActivityLogView log={activityLog} onClose={handleCloseLog} />}
-      {selectedItem && (
-        <ItemDetailView
-          item={selectedItem}
-          policy={parsedPolicy}
-          unlinkedProofs={unlinkedProofs}
-          onClose={handleCloseDetailView}
-          onUpdate={handleUpdateItem}
-          onDelete={handleDeleteItem}
-          onFindMarketPrice={handleFindMarketPrice}
-          onEnrichData={handleEnrichData}
-          onIdentifyApparel={handleIdentifyApparel}
-          onSelectCoverage={handleSelectCoverage}
-          onDraftClaim={handleDraftClaim}
-          onFileClaim={handleFileClaim}
-          onFindHighestRCV={handleFindHighestRCV}
-          onExtractSerialNumber={handleExtractSerialNumber}
-          onCalculateProofStrength={handleCalculateProofStrength}
-          onCalculateACV={handleCalculateACV}
-          onAddProofs={handleAddProofs}
-          isUploadingProof={isUploadingProof}
-          onFuzzyMatch={handleFuzzyMatch}
-          onApproveProofSuggestion={handleApproveProofSuggestion}
-          onRejectProofSuggestion={handleRejectProofSuggestion}
-        />
-      )}
-    </div>
-  );
-}
+};
 
 export default App;

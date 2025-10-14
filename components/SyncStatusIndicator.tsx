@@ -1,5 +1,6 @@
 import React from 'react';
-import { SyncStatus } from '../types';
+// Fix: Added .ts extension to file path
+import { SyncStatus } from '../types.ts';
 import { SpinnerIcon, CloudArrowUpIcon, CheckCircleIcon, ExclamationCircleIcon } from './icons';
 
 interface SyncStatusIndicatorProps {

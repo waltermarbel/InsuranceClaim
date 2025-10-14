@@ -1,7 +1,9 @@
 import React from 'react';
-import { InventoryItem, ItemStatus } from '../types';
+// Fix: Added .ts extension to file path
+import { InventoryItem, ItemStatus } from '../types.ts';
 import { SpinnerIcon, CheckCircleIcon, ExclamationIcon, PencilIcon, XCircleIcon, DocumentTextIcon } from './icons';
 import { ScoreIndicator } from './ScoreIndicator';
+import { CATEGORY_COLORS } from '../constants';
 
 interface ItemCardProps {
   item: InventoryItem;
@@ -11,6 +13,7 @@ interface ItemCardProps {
 const StatusIndicator: React.FC<{ status: ItemStatus }> = ({ status }) => {
   const statusConfig = {
     processing: { Icon: SpinnerIcon, text: 'Analyzing...', bg: 'bg-primary/10', text_color: 'text-primary/80' },
+    enriching: { Icon: SpinnerIcon, text: 'Enriching...', bg: 'bg-primary/10', text_color: 'text-primary/80' },
     'needs-review': { Icon: PencilIcon, text: 'Needs Review', bg: 'bg-amber-100', text_color: 'text-amber-800' },
     active: { Icon: CheckCircleIcon, text: 'Active', bg: 'bg-success/10', text_color: 'text-success' },
     claimed: { Icon: CheckCircleIcon, text: 'Claimed', bg: 'bg-blue-100', text_color: 'text-blue-800' },
@@ -32,6 +35,7 @@ const StatusIndicator: React.FC<{ status: ItemStatus }> = ({ status }) => {
 
 const ItemCard: React.FC<ItemCardProps> = ({ item, onSelect }) => {
   const primaryProof = item.linkedProofs && item.linkedProofs.length > 0 ? item.linkedProofs[0] : null;
+  const categoryColor = CATEGORY_COLORS[item.itemCategory] || '#94a3b8';
 
   return (
     <div
@@ -68,6 +72,12 @@ const ItemCard: React.FC<ItemCardProps> = ({ item, onSelect }) => {
           {item.status === 'processing' ? '...' : item.itemDescription}
         </p>
       </div>
+      <div 
+        className="h-1.5 w-full"
+        style={{ backgroundColor: categoryColor }}
+        aria-hidden="true"
+        title={`Category: ${item.itemCategory}`}
+      />
     </div>
   );
 };

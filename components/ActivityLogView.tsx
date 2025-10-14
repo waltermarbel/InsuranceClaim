@@ -1,5 +1,6 @@
 import React from 'react';
-import { ActivityLogEntry } from '../types';
+// Fix: Added .ts extension to file path
+import { ActivityLogEntry } from '../types.ts';
 import { XIcon, CubeIcon } from './icons';
 
 interface ActivityLogViewProps {

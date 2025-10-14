@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 const iconProps = {
@@ -230,4 +231,10 @@ export const WrenchScrewdriverIcon: React.FC<React.SVGProps<SVGSVGElement>> = (p
     <svg {...iconProps} {...props}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.83-5.83M11.42 15.17L15.17 11.42M5.25 12a.75.75 0 01.75-.75h.01a.75.75 0 01.75.75v.01a.75.75 0 01-.75.75H6a.75.75 0 01-.75-.75V12zm3.007-3.75a.75.75 0 10-1.5 0v.01a.75.75 0 001.5 0V8.25zm5.25 5.25a.75.75 0 10-1.5 0v.01a.75.75 0 001.5 0v-.01zM12 9a.75.75 0 100-1.5.75.75 0 000 1.5zm.75 4.5a.75.75 0 10-1.5 0v.01a.75.75 0 001.5 0v-.01zm-3-3a.75.75 0 10-1.5 0v.01a.75.75 0 001.5 0v-.01zm-3-3a.75.75 0 10-1.5 0v.01a.75.75 0 001.5 0V6zm6 0a.75.75 0 10-1.5 0v.01a.75.75 0 001.5 0V6z" />
     </svg>
+);
+
+export const CheckIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+  <svg {...iconProps} {...props} strokeWidth={2.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+  </svg>
 );

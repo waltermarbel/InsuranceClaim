@@ -1,6 +1,8 @@
 import React, { useRef, useState } from 'react';
-import { ParsedPolicy } from '../types';
-import { ShieldCheckIcon, SpinnerIcon, UploadIcon, ShieldExclamationIcon, DocumentTextIcon, PencilIcon, InformationCircleIcon, CheckCircleIcon } from './icons';
+// Fix: Added .ts extension to file path
+import { ParsedPolicy } from '../types.ts';
+import { ShieldCheckIcon, SpinnerIcon, UploadIcon, ShieldExclamationIcon, DocumentTextIcon, PencilIcon, InformationCircleIcon, CheckCircleIcon, PlusIcon, TrashIcon } from './icons';
+import { CurrencyInput } from './CurrencyInput';
 
 interface InsuranceSectionProps {
   policy: ParsedPolicy | null;
@@ -14,25 +16,85 @@ const PolicyDisplay: React.FC<{
     policy: ParsedPolicy, 
     onUpdate: (policy: ParsedPolicy) => void,
     onVerify: () => void,
-}> = ({ policy, onUpdate, onVerify }) => {
+}> = ({ policy: initialPolicy, onUpdate, onVerify }) => {
     
-    const isReviewMode = !policy.isVerified;
+    const [isEditing, setIsEditing] = useState(false);
+    const [policy, setPolicy] = useState(initialPolicy);
+
+    const isReviewMode = !initialPolicy.isVerified;
+
+    const handleEdit = () => {
+        setPolicy(initialPolicy);
+        setIsEditing(true);
+    };
+
+    const handleCancel = () => {
+        setIsEditing(false);
+        setPolicy(initialPolicy); // Revert changes
+    };
+
+    const handleSave = () => {
+        onUpdate(policy);
+        setIsEditing(false);
+    };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
-        onUpdate({ ...policy, [name]: value });
+        setPolicy(prev => ({ ...prev, [name]: value }));
     };
 
     const handleNumericChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
-        onUpdate({ ...policy, [name]: parseFloat(value) || 0 });
+        setPolicy(prev => ({ ...prev, [name]: parseFloat(value) || 0 }));
+    };
+
+    const handleSubLimitChange = (index: number, field: 'category' | 'limit', value: string | number) => {
+        const updatedCoverage = [...policy.coverage];
+        const subLimits = updatedCoverage.filter(c => c.type === 'sub-limit');
+        const mainCoverage = updatedCoverage.find(c => c.type === 'main');
+        
+        const targetLimit = subLimits[index];
+        if (targetLimit) {
+            (targetLimit[field] as any) = value;
+        }
+
+        const newSubLimits = [...subLimits];
+        
+        setPolicy(prev => ({
+            ...prev,
+            coverage: mainCoverage ? [mainCoverage, ...newSubLimits] : newSubLimits
+        }));
+    };
+
+    const handleAddSubLimit = () => {
+        const newLimit = { category: '', limit: 0, type: 'sub-limit' as const };
+        setPolicy(prev => ({
+            ...prev,
+            coverage: [...prev.coverage, newLimit]
+        }));
+    };
+
+    const handleRemoveSubLimit = (indexToRemove: number) => {
+        const subLimits = policy.coverage.filter(c => c.type === 'sub-limit');
+        const updatedSubLimits = subLimits.filter((_, index) => index !== indexToRemove);
+        const mainCoverage = policy.coverage.find(c => c.type === 'main');
+        
+        setPolicy(prev => ({
+            ...prev,
+            coverage: mainCoverage ? [mainCoverage, ...updatedSubLimits] : updatedSubLimits
+        }));
     };
 
     const mainCoverage = policy.coverage.find(c => c.type === 'main');
     const subLimits = policy.coverage.filter(c => c.type === 'sub-limit');
+    
+    const displayPolicy = isEditing ? policy : initialPolicy;
+    const displaySubLimits = displayPolicy.coverage.filter(c => c.type === 'sub-limit');
 
     const renderField = (label: string, name: keyof ParsedPolicy, type: 'text' | 'date' | 'number' | 'select' = 'text', options?: string[]) => {
-        if (isReviewMode) {
+        const isEditable = isReviewMode || isEditing;
+
+        if (isEditable) {
              if (type === 'select') {
                 return (
                     <div className="grid grid-cols-3 gap-2 items-center">
@@ -40,7 +102,7 @@ const PolicyDisplay: React.FC<{
                         <select 
                             id={name} 
                             name={name} 
-                            value={policy[name] as string}
+                            value={displayPolicy[name] as string}
                             onChange={handleChange}
                             className="col-span-2 mt-1 block w-full px-3 py-1.5 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
                         >
@@ -56,17 +118,24 @@ const PolicyDisplay: React.FC<{
                         id={name} 
                         name={name} 
                         type={type} 
-                        value={policy[name] as string | number}
+                        value={displayPolicy[name] as string | number}
                         onChange={type === 'number' ? handleNumericChange : handleChange}
                         className="col-span-2 mt-1 block w-full px-3 py-1.5 bg-white border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
                     />
                 </div>
             );
         }
+        
+        const value = displayPolicy[name];
+
+        if (Array.isArray(value)) {
+            return null;
+        }
+
         return (
             <div className="flex justify-between py-1">
                 <span className="text-sm text-medium">{label}:</span>
-                <span className="text-sm font-semibold text-dark">{policy[name]}</span>
+                <span className="text-sm font-semibold text-dark">{value}</span>
             </div>
         );
     };
@@ -81,7 +150,7 @@ const PolicyDisplay: React.FC<{
                         </div>
                         <div className="ml-3">
                             <p className="text-sm font-bold">
-                                Review Required (AI Confidence: {policy.confidenceScore}%)
+                                Review Required (AI Confidence: {initialPolicy.confidenceScore}%)
                             </p>
                             <p className="mt-1 text-xs">
                                 Please verify the details extracted by the AI. Make any necessary corrections below and then click "Confirm & Save Policy".
@@ -93,16 +162,13 @@ const PolicyDisplay: React.FC<{
             <div className="flex justify-between items-start">
                 <div>
                     <h3 className="text-xl font-bold tracking-tight text-dark font-heading flex items-center gap-2">
-                        <ShieldCheckIcon className={`h-6 w-6 ${policy.isVerified ? 'text-success' : 'text-amber-500'}`}/>
+                        <ShieldCheckIcon className={`h-6 w-6 ${initialPolicy.isVerified ? 'text-success' : 'text-amber-500'}`}/>
                         <span>{isReviewMode ? 'Reviewing Policy' : 'Policy Details'}</span>
                     </h3>
-                     {isReviewMode ? renderField('Provider', 'provider') : <p className="text-sm text-medium mt-1">{policy.provider}</p>}
+                     {renderField('Provider', 'provider')}
                 </div>
                  <div className="text-right">
-                    {isReviewMode ? renderField('Deductible', 'deductible', 'number') : <>
-                        <p className="text-sm text-medium">Deductible</p>
-                        <p className="text-lg font-bold text-dark">${policy.deductible.toLocaleString()}</p>
-                    </>}
+                    {renderField('Deductible', 'deductible', 'number')}
                  </div>
             </div>
 
@@ -126,34 +192,83 @@ const PolicyDisplay: React.FC<{
                         <span className="font-bold text-dark">${mainCoverage.limit.toLocaleString()}</span>
                     </div>
                 )}
-                {subLimits.length > 0 && (
-                    <div className="mt-2 space-y-2 text-sm">
-                        <h4 className="font-semibold text-medium">Special Limits</h4>
-                        {subLimits.map(limit => (
-                             <div key={limit.category} className="flex justify-between items-center py-1 px-3 bg-slate-50 rounded-md">
-                                <span className="text-medium">{limit.category}</span>
-                                <span className="font-medium text-dark">${limit.limit.toLocaleString()}</span>
-                            </div>
-                        ))}
-                    </div>
-                )}
+                
+                <div className="mt-2 space-y-2 text-sm">
+                    <h4 className="font-semibold text-medium">Special Limits</h4>
+                    {isEditing ? (
+                        <div className="space-y-3">
+                            {subLimits.map((limit, index) => (
+                                <div key={index} className="flex items-center gap-2 p-2 bg-slate-50 rounded-md">
+                                    <input
+                                        type="text"
+                                        placeholder="Category Name"
+                                        value={limit.category}
+                                        onChange={(e) => handleSubLimitChange(index, 'category', e.target.value)}
+                                        className="flex-grow block w-full px-2 py-1 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
+                                    />
+                                     <CurrencyInput
+                                        value={limit.limit}
+                                        onChange={(val) => handleSubLimitChange(index, 'limit', val)}
+                                        className="w-32 block px-2 py-1 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
+                                     />
+                                    <button onClick={() => handleRemoveSubLimit(index)} className="p-1 text-danger hover:bg-danger/10 rounded-md">
+                                        <TrashIcon className="h-4 w-4"/>
+                                    </button>
+                                </div>
+                            ))}
+                             <button onClick={handleAddSubLimit} className="w-full flex items-center justify-center gap-2 mt-2 px-3 py-1.5 text-xs font-semibold bg-white text-medium border border-slate-300 rounded-md shadow-sm hover:bg-slate-50 transition">
+                                <PlusIcon className="h-4 w-4" />
+                                <span>Add Sub-Limit</span>
+                            </button>
+                        </div>
+                    ) : (
+                        <>
+                            {displaySubLimits.length > 0 && displaySubLimits.map(limit => (
+                                 <div key={limit.category} className="flex justify-between items-center py-1 px-3 bg-slate-50 rounded-md">
+                                    <span className="text-medium">{limit.category}</span>
+                                    <span className="font-medium text-dark">${limit.limit.toLocaleString()}</span>
+                                </div>
+                            ))}
+                        </>
+                    )}
+                </div>
             </div>
-             {policy.exclusions.length > 0 && (
+             {displayPolicy.exclusions.length > 0 && (
                  <div className="mt-4 border-t pt-4 text-sm">
                     <h4 className="font-semibold text-medium mb-2">Key Exclusions</h4>
                     <div className="flex flex-wrap gap-2">
-                        {policy.exclusions.map(ex => (
+                        {displayPolicy.exclusions.map(ex => (
                             <span key={ex} className="text-xs bg-danger/10 text-danger font-medium px-2 py-1 rounded-full border border-danger/20">{ex}</span>
                         ))}
                     </div>
                 </div>
              )}
+            
+            {!isReviewMode && !isEditing && (
+                 <div className="mt-6 border-t pt-4 flex justify-end">
+                    <button onClick={handleEdit} className="flex items-center space-x-2 px-4 py-2 text-sm font-semibold bg-white text-medium border border-slate-300 rounded-md shadow-sm hover:bg-slate-50 transition">
+                        <PencilIcon className="h-4 w-4" />
+                        <span>Edit Policy</span>
+                    </button>
+                </div>
+            )}
 
             {isReviewMode && (
                 <div className="mt-6 border-t pt-4">
                     <button onClick={onVerify} className="w-full flex items-center justify-center space-x-2 px-4 py-2 text-sm font-semibold bg-primary text-white rounded-md shadow-sm hover:bg-primary-dark transition">
                         <CheckCircleIcon className="h-5 w-5" />
                         <span>Confirm & Save Policy</span>
+                    </button>
+                </div>
+            )}
+            {isEditing && (
+                <div className="mt-6 border-t pt-4 flex justify-end space-x-3">
+                    <button onClick={handleCancel} className="px-4 py-2 text-sm font-semibold bg-white text-medium border border-slate-300 rounded-md shadow-sm hover:bg-slate-50 transition">
+                        Cancel
+                    </button>
+                    <button onClick={handleSave} className="flex items-center justify-center space-x-2 px-4 py-2 text-sm font-semibold bg-primary text-white rounded-md shadow-sm hover:bg-primary-dark transition">
+                        <CheckCircleIcon className="h-5 w-5" />
+                        <span>Save Changes</span>
                     </button>
                 </div>
             )}
