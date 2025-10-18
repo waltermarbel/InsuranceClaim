@@ -9,6 +9,23 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+      .accordion-content {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.5s cubic-bezier(0, 1, 0, 1);
+      }
+      .accordion-content.open {
+        max-height: 1000px; /* Adjust as needed */
+        transition: max-height 1s ease-in-out;
+      }
+      .accordion-icon {
+        transition: transform 0.3s ease-in-out;
+      }
+      .accordion-icon.open {
+        transform: rotate(180deg);
+      }
+    </style>
     <script>
       tailwind.config = {
         theme: {

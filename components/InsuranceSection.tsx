@@ -1,284 +1,108 @@
 import React, { useRef, useState } from 'react';
 // Fix: Added .ts extension to file path
 import { ParsedPolicy } from '../types.ts';
-import { ShieldCheckIcon, SpinnerIcon, UploadIcon, ShieldExclamationIcon, DocumentTextIcon, PencilIcon, InformationCircleIcon, CheckCircleIcon, PlusIcon, TrashIcon } from './icons';
+import { ShieldCheckIcon, SpinnerIcon, DocumentTextIcon, PencilIcon, CheckCircleIcon, PlusIcon, TrashIcon, ExclamationTriangleIcon } from './icons';
 import { CurrencyInput } from './CurrencyInput';
 
 interface InsuranceSectionProps {
-  policy: ParsedPolicy | null;
+  policies: ParsedPolicy[];
   onUpload: (file: File) => void;
   onUpdate: (policy: ParsedPolicy) => void;
-  onVerify: () => void;
+  onSetActivePolicy: (policyId: string) => void;
   isLoading: boolean;
 }
 
-const PolicyDisplay: React.FC<{ 
-    policy: ParsedPolicy, 
-    onUpdate: (policy: ParsedPolicy) => void,
-    onVerify: () => void,
-}> = ({ policy: initialPolicy, onUpdate, onVerify }) => {
-    
+const PolicyDetails: React.FC<{ policy: ParsedPolicy, onUpdate: (p: ParsedPolicy) => void }> = ({ policy: initialPolicy, onUpdate }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [policy, setPolicy] = useState(initialPolicy);
 
-    const isReviewMode = !initialPolicy.isVerified;
-
-    const handleEdit = () => {
-        setPolicy(initialPolicy);
-        setIsEditing(true);
-    };
-
-    const handleCancel = () => {
-        setIsEditing(false);
-        setPolicy(initialPolicy); // Revert changes
-    };
+    const mainCoverage = policy.coverage.find(c => c.type === 'main');
+    const subLimits = policy.coverage.filter(c => c.type === 'sub-limit');
 
     const handleSave = () => {
         onUpdate(policy);
         setIsEditing(false);
-    };
+    }
+    const handleCancel = () => {
+        setPolicy(initialPolicy);
+        setIsEditing(false);
+    }
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setPolicy(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleNumericChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { name, value } = e.target;
-        setPolicy(prev => ({ ...prev, [name]: parseFloat(value) || 0 }));
-    };
-
     const handleSubLimitChange = (index: number, field: 'category' | 'limit', value: string | number) => {
-        const updatedCoverage = [...policy.coverage];
-        const subLimits = updatedCoverage.filter(c => c.type === 'sub-limit');
-        const mainCoverage = updatedCoverage.find(c => c.type === 'main');
-        
-        const targetLimit = subLimits[index];
+        const updatedSubLimits = [...subLimits];
+        const targetLimit = updatedSubLimits[index];
         if (targetLimit) {
             (targetLimit[field] as any) = value;
         }
-
-        const newSubLimits = [...subLimits];
-        
-        setPolicy(prev => ({
-            ...prev,
-            coverage: mainCoverage ? [mainCoverage, ...newSubLimits] : newSubLimits
-        }));
+        setPolicy(prev => ({ ...prev, coverage: mainCoverage ? [mainCoverage, ...updatedSubLimits] : updatedSubLimits }));
     };
 
-    const handleAddSubLimit = () => {
-        const newLimit = { category: '', limit: 0, type: 'sub-limit' as const };
-        setPolicy(prev => ({
-            ...prev,
-            coverage: [...prev.coverage, newLimit]
-        }));
-    };
-
-    const handleRemoveSubLimit = (indexToRemove: number) => {
-        const subLimits = policy.coverage.filter(c => c.type === 'sub-limit');
-        const updatedSubLimits = subLimits.filter((_, index) => index !== indexToRemove);
-        const mainCoverage = policy.coverage.find(c => c.type === 'main');
-        
-        setPolicy(prev => ({
-            ...prev,
-            coverage: mainCoverage ? [mainCoverage, ...updatedSubLimits] : updatedSubLimits
-        }));
-    };
-
-    const mainCoverage = policy.coverage.find(c => c.type === 'main');
-    const subLimits = policy.coverage.filter(c => c.type === 'sub-limit');
-    
-    const displayPolicy = isEditing ? policy : initialPolicy;
-    const displaySubLimits = displayPolicy.coverage.filter(c => c.type === 'sub-limit');
-
-    const renderField = (label: string, name: keyof ParsedPolicy, type: 'text' | 'date' | 'number' | 'select' = 'text', options?: string[]) => {
-        const isEditable = isReviewMode || isEditing;
-
-        if (isEditable) {
-             if (type === 'select') {
-                return (
-                    <div className="grid grid-cols-3 gap-2 items-center">
-                        <label htmlFor={name} className="text-sm font-medium text-medium">{label}</label>
-                        <select 
-                            id={name} 
-                            name={name} 
-                            value={displayPolicy[name] as string}
-                            onChange={handleChange}
-                            className="col-span-2 mt-1 block w-full px-3 py-1.5 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
-                        >
-                            {options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                        </select>
-                    </div>
-                );
-            }
-            return (
-                <div className="grid grid-cols-3 gap-2 items-center">
-                    <label htmlFor={name} className="text-sm font-medium text-medium">{label}</label>
-                    <input 
-                        id={name} 
-                        name={name} 
-                        type={type} 
-                        value={displayPolicy[name] as string | number}
-                        onChange={type === 'number' ? handleNumericChange : handleChange}
-                        className="col-span-2 mt-1 block w-full px-3 py-1.5 bg-white border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
-                    />
-                </div>
-            );
-        }
-        
-        const value = displayPolicy[name];
-
-        if (Array.isArray(value)) {
-            return null;
-        }
-
+    if (!isEditing) {
         return (
-            <div className="flex justify-between py-1">
-                <span className="text-sm text-medium">{label}:</span>
-                <span className="text-sm font-semibold text-dark">{value}</span>
+            <div className="p-4 bg-slate-50/70 rounded-b-lg">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                    <div><p className="text-xs text-medium">Policy #</p><p className="font-semibold text-dark">{policy.policyNumber}</p></div>
+                    <div><p className="text-xs text-medium">Type</p><p className="font-semibold text-dark">{policy.policyType || 'N/A'}</p></div>
+                    <div><p className="text-xs text-medium">Holder</p><p className="font-semibold text-dark truncate">{policy.policyHolder}</p></div>
+                    <div><p className="text-xs text-medium">Effective</p><p className="font-semibold text-dark">{policy.effectiveDate}</p></div>
+                    <div><p className="text-xs text-medium">Expires</p><p className="font-semibold text-dark">{policy.expirationDate}</p></div>
+                </div>
+                <div className="mt-4 pt-4 border-t">
+                    <button onClick={() => setIsEditing(true)} className="text-xs font-semibold text-primary hover:underline">View All Details & Edit</button>
+                </div>
             </div>
         );
-    };
+    }
 
     return (
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
-            {isReviewMode && (
-                <div className="p-4 mb-6 bg-amber-50 border-l-4 border-amber-400 text-amber-900">
-                    <div className="flex">
-                        <div className="flex-shrink-0">
-                            <InformationCircleIcon className="h-5 w-5 text-amber-400" />
-                        </div>
-                        <div className="ml-3">
-                            <p className="text-sm font-bold">
-                                Review Required (AI Confidence: {initialPolicy.confidenceScore}%)
-                            </p>
-                            <p className="mt-1 text-xs">
-                                Please verify the details extracted by the AI. Make any necessary corrections below and then click "Confirm & Save Policy".
-                            </p>
-                        </div>
+        <div className="p-4 bg-slate-50/70 rounded-b-lg">
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                <div className="space-y-3">
+                    <h4 className="font-semibold text-dark">Policy Info</h4>
+                    <div><label className="text-xs text-medium">Policy Name</label><input type="text" name="policyName" value={policy.policyName} onChange={handleChange} className="w-full text-sm font-semibold p-1 border rounded-md"/></div>
+                    <div><label className="text-xs text-medium">Policy #</label><input type="text" name="policyNumber" value={policy.policyNumber} onChange={handleChange} className="w-full text-sm font-semibold p-1 border rounded-md"/></div>
+                    <div><label className="text-xs text-medium">Policyholder</label><input type="text" name="policyHolder" value={policy.policyHolder} onChange={handleChange} className="w-full text-sm font-semibold p-1 border rounded-md"/></div>
+                    <div><label className="text-xs text-medium">Provider</label><input type="text" name="provider" value={policy.provider} onChange={handleChange} className="w-full text-sm font-semibold p-1 border rounded-md"/></div>
+                    <div><label className="text-xs text-medium">Policy Type (e.g., HO-4)</label><input type="text" name="policyType" value={policy.policyType || ''} onChange={handleChange} className="w-full text-sm font-semibold p-1 border rounded-md"/></div>
+                    <div className="grid grid-cols-2 gap-2">
+                        <div><label className="text-xs text-medium">Effective Date</label><input type="date" name="effectiveDate" value={policy.effectiveDate || ''} onChange={handleChange} className="w-full text-sm font-semibold p-1 border rounded-md"/></div>
+                        <div><label className="text-xs text-medium">Expiration Date</label><input type="date" name="expirationDate" value={policy.expirationDate || ''} onChange={handleChange} className="w-full text-sm font-semibold p-1 border rounded-md"/></div>
                     </div>
                 </div>
-            )}
-            <div className="flex justify-between items-start">
-                <div>
-                    <h3 className="text-xl font-bold tracking-tight text-dark font-heading flex items-center gap-2">
-                        <ShieldCheckIcon className={`h-6 w-6 ${initialPolicy.isVerified ? 'text-success' : 'text-amber-500'}`}/>
-                        <span>{isReviewMode ? 'Reviewing Policy' : 'Policy Details'}</span>
-                    </h3>
-                     {renderField('Provider', 'provider')}
-                </div>
-                 <div className="text-right">
-                    {renderField('Deductible', 'deductible', 'number')}
-                 </div>
-            </div>
+                <div className="space-y-3">
+                    <h4 className="font-semibold text-dark">Coverage Details</h4>
+                    <div><label className="text-xs text-medium">Deductible</label><CurrencyInput value={policy.deductible} onChange={(v) => setPolicy(p => ({...p, deductible: v}))} className="w-full text-sm font-semibold p-1 border rounded-md"/></div>
+                    <div><label className="text-xs text-medium">Loss of Use (Coverage D)</label><CurrencyInput value={policy.coverageD_limit} onChange={(v) => setPolicy(p => ({...p, coverageD_limit: v}))} className="w-full text-sm font-semibold p-1 border rounded-md"/></div>
+                    <div><label className="text-xs text-medium">Settlement Method</label><select name="lossSettlementMethod" value={policy.lossSettlementMethod} onChange={handleChange} className="w-full text-sm font-semibold p-1 border rounded-md"><option>RCV</option><option>ACV</option></select></div>
 
-            <div className="mt-4 border-t pt-4 space-y-2">
-                {renderField('Policy #', 'policyNumber')}
-                {renderField('Policyholder', 'policyHolder')}
-                <div className="grid grid-cols-2 gap-4">
-                  {renderField('Effective Date', 'effectiveDate', 'date')}
-                  {renderField('Expiration Date', 'expirationDate', 'date')}
-                </div>
-                 <div className="grid grid-cols-2 gap-4">
-                    {renderField('Settlement Method', 'lossSettlementMethod', 'select', ['RCV', 'ACV'])}
-                    {renderField('Loss of Use Limit', 'coverageD_limit', 'number')}
-                </div>
-            </div>
-
-            <div className="mt-4 border-t pt-4">
-                {mainCoverage && (
-                    <div className="flex justify-between items-center py-2">
-                        <span className="font-semibold text-dark">{mainCoverage.category}</span>
-                        <span className="font-bold text-dark">${mainCoverage.limit.toLocaleString()}</span>
-                    </div>
-                )}
-                
-                <div className="mt-2 space-y-2 text-sm">
-                    <h4 className="font-semibold text-medium">Special Limits</h4>
-                    {isEditing ? (
-                        <div className="space-y-3">
-                            {subLimits.map((limit, index) => (
-                                <div key={index} className="flex items-center gap-2 p-2 bg-slate-50 rounded-md">
-                                    <input
-                                        type="text"
-                                        placeholder="Category Name"
-                                        value={limit.category}
-                                        onChange={(e) => handleSubLimitChange(index, 'category', e.target.value)}
-                                        className="flex-grow block w-full px-2 py-1 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
-                                    />
-                                     <CurrencyInput
-                                        value={limit.limit}
-                                        onChange={(val) => handleSubLimitChange(index, 'limit', val)}
-                                        className="w-32 block px-2 py-1 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
-                                     />
-                                    <button onClick={() => handleRemoveSubLimit(index)} className="p-1 text-danger hover:bg-danger/10 rounded-md">
-                                        <TrashIcon className="h-4 w-4"/>
-                                    </button>
-                                </div>
-                            ))}
-                             <button onClick={handleAddSubLimit} className="w-full flex items-center justify-center gap-2 mt-2 px-3 py-1.5 text-xs font-semibold bg-white text-medium border border-slate-300 rounded-md shadow-sm hover:bg-slate-50 transition">
-                                <PlusIcon className="h-4 w-4" />
-                                <span>Add Sub-Limit</span>
-                            </button>
-                        </div>
-                    ) : (
-                        <>
-                            {displaySubLimits.length > 0 && displaySubLimits.map(limit => (
-                                 <div key={limit.category} className="flex justify-between items-center py-1 px-3 bg-slate-50 rounded-md">
-                                    <span className="text-medium">{limit.category}</span>
-                                    <span className="font-medium text-dark">${limit.limit.toLocaleString()}</span>
-                                </div>
-                            ))}
-                        </>
-                    )}
-                </div>
-            </div>
-             {displayPolicy.exclusions.length > 0 && (
-                 <div className="mt-4 border-t pt-4 text-sm">
-                    <h4 className="font-semibold text-medium mb-2">Key Exclusions</h4>
-                    <div className="flex flex-wrap gap-2">
-                        {displayPolicy.exclusions.map(ex => (
-                            <span key={ex} className="text-xs bg-danger/10 text-danger font-medium px-2 py-1 rounded-full border border-danger/20">{ex}</span>
+                    <h4 className="font-semibold text-dark pt-2">Sub-Limits</h4>
+                    <div className="space-y-2">
+                        {subLimits.map((limit, index) => (
+                             <div key={index} className="flex items-center gap-2">
+                                <input type="text" placeholder="Category" value={limit.category} onChange={(e) => handleSubLimitChange(index, 'category', e.target.value)} className="w-full text-sm p-1 border rounded-md"/>
+                                <CurrencyInput value={limit.limit} onChange={(v) => handleSubLimitChange(index, 'limit', v)} className="w-full text-sm p-1 border rounded-md"/>
+                            </div>
                         ))}
+                         <p className="text-xs text-slate-500 italic text-center pt-1">Sub-limits are determined by the AI during policy analysis. To add or remove one, please re-upload an updated policy document.</p>
                     </div>
                 </div>
-             )}
-            
-            {!isReviewMode && !isEditing && (
-                 <div className="mt-6 border-t pt-4 flex justify-end">
-                    <button onClick={handleEdit} className="flex items-center space-x-2 px-4 py-2 text-sm font-semibold bg-white text-medium border border-slate-300 rounded-md shadow-sm hover:bg-slate-50 transition">
-                        <PencilIcon className="h-4 w-4" />
-                        <span>Edit Policy</span>
-                    </button>
-                </div>
-            )}
-
-            {isReviewMode && (
-                <div className="mt-6 border-t pt-4">
-                    <button onClick={onVerify} className="w-full flex items-center justify-center space-x-2 px-4 py-2 text-sm font-semibold bg-primary text-white rounded-md shadow-sm hover:bg-primary-dark transition">
-                        <CheckCircleIcon className="h-5 w-5" />
-                        <span>Confirm & Save Policy</span>
-                    </button>
-                </div>
-            )}
-            {isEditing && (
-                <div className="mt-6 border-t pt-4 flex justify-end space-x-3">
-                    <button onClick={handleCancel} className="px-4 py-2 text-sm font-semibold bg-white text-medium border border-slate-300 rounded-md shadow-sm hover:bg-slate-50 transition">
-                        Cancel
-                    </button>
-                    <button onClick={handleSave} className="flex items-center justify-center space-x-2 px-4 py-2 text-sm font-semibold bg-primary text-white rounded-md shadow-sm hover:bg-primary-dark transition">
-                        <CheckCircleIcon className="h-5 w-5" />
-                        <span>Save Changes</span>
-                    </button>
-                </div>
-            )}
+            </div>
+            <div className="flex justify-end gap-2 mt-4 pt-4 border-t">
+                <button onClick={handleCancel} className="px-3 py-1 text-xs font-semibold bg-white border border-slate-300 rounded-md">Cancel</button>
+                <button onClick={handleSave} className="px-3 py-1 text-xs font-semibold bg-primary text-white rounded-md">Save Changes</button>
+            </div>
         </div>
     );
 };
 
+
 const UploadZone: React.FC<{ onUpload: (file: File) => void, isLoading: boolean }> = ({ onUpload, isLoading }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const [isDraggingOver, setIsDraggingOver] = useState(false);
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         if (event.target.files && event.target.files.length > 0) {
@@ -290,72 +114,85 @@ const UploadZone: React.FC<{ onUpload: (file: File) => void, isLoading: boolean 
         if (!isLoading) fileInputRef.current?.click();
     };
 
-    const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-        e.preventDefault();
-        setIsDraggingOver(true);
-    };
-
-    const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-        e.preventDefault();
-        setIsDraggingOver(false);
-    };
-
-    const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-        e.preventDefault();
-        setIsDraggingOver(false);
-        if (e.dataTransfer.files && e.dataTransfer.files.length > 0 && !isLoading) {
-            onUpload(e.dataTransfer.files[0]);
-        }
-    };
-
     return (
          <div 
-            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                isDraggingOver ? 'border-primary bg-primary/5' : 'border-slate-300'
-            } ${isLoading ? 'cursor-default bg-slate-100' : 'cursor-pointer hover:border-primary/70'}`}
+            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors border-slate-300 ${isLoading ? 'cursor-default bg-slate-100' : 'cursor-pointer hover:border-primary/70'}`}
             onClick={handleClick}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
         >
-             <input
-                type="file"
-                accept="application/pdf"
-                ref={fileInputRef}
-                onChange={handleFileChange}
-                className="hidden"
-                disabled={isLoading}
-            />
+             <input type="file" accept="application/pdf" ref={fileInputRef} onChange={handleFileChange} className="hidden" disabled={isLoading}/>
             {isLoading ? (
                 <div className="flex flex-col items-center justify-center space-y-3 text-medium">
                     <SpinnerIcon className="h-10 w-10 text-primary"/>
-                    <span className="font-semibold">Parsing Policy with Gemini...</span>
-                    <span className="text-sm">This may take a moment.</span>
+                    <span className="font-semibold">Analyzing Policy with Gemini...</span>
                 </div>
             ) : (
                 <div className="flex flex-col items-center justify-center space-y-3 text-medium">
                     <DocumentTextIcon className="h-10 w-10 text-slate-400"/>
                     <p className="font-semibold">
-                        Drag & drop your policy PDF or <span className="text-primary">browse</span>
+                        Drag & drop a policy PDF or <span className="text-primary">browse</span>
                     </p>
-                    <p className="text-sm text-slate-500">The first step to smarter claims is understanding your coverage.</p>
                 </div>
             )}
         </div>
     );
 };
 
-export const InsuranceSection: React.FC<InsuranceSectionProps> = ({ policy, onUpload, onUpdate, onVerify, isLoading }) => {
+export const InsuranceSection: React.FC<InsuranceSectionProps> = ({ policies, onUpload, onUpdate, onSetActivePolicy, isLoading }) => {
+  const [expandedPolicyId, setExpandedPolicyId] = useState<string | null>(policies.find(p => p.isActive)?.id || null);
+
+  const toggleExpand = (policyId: string) => {
+    setExpandedPolicyId(prev => prev === policyId ? null : policyId);
+  }
+
   return (
     <div className="mb-10">
-        <h3 className="text-xl font-bold tracking-tight text-dark font-heading flex items-center gap-2 mb-4">
-            <ShieldExclamationIcon className="h-6 w-6 text-medium"/>
-            Insurance Policy
-        </h3>
-        {policy ? (
-            <PolicyDisplay policy={policy} onUpdate={onUpdate} onVerify={onVerify} />
-        ) : (
+        <div className="flex justify-between items-center mb-4">
+            <h3 className="text-xl font-bold tracking-tight text-dark font-heading flex items-center gap-2">
+                <ShieldCheckIcon className="h-6 w-6 text-medium"/>
+                Insurance Policies
+            </h3>
+            {policies.length > 0 && (
+                <button onClick={() => { (document.querySelector('#policy-upload-button input') as HTMLInputElement)?.click() }} disabled={isLoading} className="flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline disabled:opacity-50">
+                    <PlusIcon className="h-4 w-4"/> Add Policy
+                </button>
+            )}
+        </div>
+
+        {policies.length === 0 ? (
             <UploadZone onUpload={onUpload} isLoading={isLoading} />
+        ) : (
+             <div className="space-y-3">
+                {policies.map(policy => (
+                    <div key={policy.id} className="bg-white rounded-lg shadow-sm border border-slate-200">
+                        <div className="p-4 flex justify-between items-center">
+                            <div className="flex items-center gap-4">
+                                <button onClick={() => onSetActivePolicy(policy.id)} className="flex items-center gap-2 cursor-pointer">
+                                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${policy.isActive ? 'border-primary bg-primary' : 'border-slate-300 bg-white'}`}>
+                                        {policy.isActive && <CheckCircleIcon className="h-3 w-3 text-white" />}
+                                    </div>
+                                    <span className={`font-semibold ${policy.isActive ? 'text-primary' : 'text-dark'}`}>{policy.policyName || `Policy #${policy.policyNumber}`}</span>
+                                </button>
+                                {policy.isVerified ? (
+                                    <span className="text-xs font-semibold text-success bg-success/10 px-2 py-0.5 rounded-full flex items-center gap-1" title="Verified by user">
+                                        <CheckCircleIcon className="h-3 w-3" /> Verified
+                                    </span>
+                                ) : (
+                                    <span className="text-xs font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                        <ExclamationTriangleIcon className="h-3 w-3" /> Review Needed
+                                    </span>
+                                )}
+                            </div>
+                            <button onClick={() => toggleExpand(policy.id)} className="text-sm font-semibold text-medium hover:text-dark">
+                                {expandedPolicyId === policy.id ? 'Hide Details' : 'Show Details'}
+                            </button>
+                        </div>
+                        {expandedPolicyId === policy.id && <PolicyDetails policy={policy} onUpdate={onUpdate} />}
+                    </div>
+                ))}
+                <div id="policy-upload-button" className={policies.length > 0 ? 'hidden' : ''}>
+                    <UploadZone onUpload={onUpload} isLoading={isLoading} />
+                </div>
+             </div>
         )}
     </div>
   );

@@ -60,30 +60,17 @@ export const dataUrlToBlob = (dataUrl: string): Blob => {
 export const urlToDataUrl = (url: string): Promise<string> => {
     return new Promise(async (resolve, reject) => {
         try {
-            // Using a proxy to bypass CORS issues in a web environment.
-            // This is a common pattern for client-side fetching of cross-origin images.
-            const proxyUrl = `https://cors-anywhere.herokuapp.com/${url}`;
-            const response = await fetch(proxyUrl, {
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
-            });
+            // Use a reliable CORS proxy to fetch cross-origin images client-side.
+            const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+            const response = await fetch(proxyUrl);
 
             if (!response.ok) {
-                // Try direct fetch if proxy fails
-                 const directResponse = await fetch(url);
-                 if (!directResponse.ok) {
-                    throw new Error(`Failed to fetch image from both proxy and directly: ${directResponse.status} ${directResponse.statusText}`);
-                 }
-                 const blob = await directResponse.blob();
-                 const reader = new FileReader();
-                 reader.onloadend = () => resolve(reader.result as string);
-                 reader.onerror = reject;
-                 reader.readAsDataURL(blob);
-                 return;
+                throw new Error(`Failed to fetch image via proxy: ${response.status} ${response.statusText}`);
             }
+            
             const blob = await response.blob();
             const reader = new FileReader();
+            
             reader.onloadend = () => {
                 if (typeof reader.result === 'string') {
                     resolve(reader.result);
@@ -91,10 +78,12 @@ export const urlToDataUrl = (url: string): Promise<string> => {
                     reject(new Error('Failed to convert blob to data URL.'));
                 }
             };
+            
             reader.onerror = reject;
             reader.readAsDataURL(blob);
         } catch (error) {
-            reject(error);
+            console.error(`Original fetch URL: ${url}`, error);
+            reject(new Error(`Failed to fetch or process image from URL. This may be a CORS or network issue. Error: ${error instanceof Error ? error.message : String(error)}`));
         }
     });
 };

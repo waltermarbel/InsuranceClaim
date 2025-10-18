@@ -29,3 +29,12 @@ export const CATEGORY_COLORS: Record<string, string> = {
     'Books': '#be123c',
     'Other': '#737373'
 };
+
+// New: Colors for proof purpose badges
+export const PROOF_PURPOSE_COLORS: Record<string, { bg: string, text: string }> = {
+    'Proof of Purchase': { bg: 'bg-emerald-100', text: 'text-emerald-800' },
+    'Proof of Possession': { bg: 'bg-sky-100', text: 'text-sky-800' },
+    'Proof of Value': { bg: 'bg-purple-100', text: 'text-purple-800' },
+    'Supporting Document': { bg: 'bg-slate-100', text: 'text-slate-600' },
+    'Unknown': { bg: 'bg-slate-100', text: 'text-slate-600' },
+};

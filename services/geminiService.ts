@@ -2,291 +2,82 @@
 import { GoogleGenAI, Type } from "@google/genai";
 // Fix: Added .ts extension to file paths
 import { fileToBase64 } from '../utils/fileUtils.ts';
-import { GeminiResponse, ParsedPolicy, AccountHolder, InventoryItem, DraftClaim, ValuationResponse, WebIntelligenceResponse, ApparelIdentificationResponse, HighestRcvResponse, SerialNumberResponse, ProofStrengthResponse, Proof, ProofSuggestion, ACVResponse, CoverageLimit, PolicyParseResponse } from '../types.ts';
-import { CATEGORIES } from '../constants';
+import { GeminiResponse, ParsedPolicy, AccountHolder, InventoryItem, DraftClaim, ValuationResponse, WebIntelligenceResponse, ApparelIdentificationResponse, HighestRcvResponse, SerialNumberResponse, ProofStrengthResponse, Proof, ProofSuggestion, ACVResponse, CoverageLimit, PolicyParseResponse, PolicyAnalysisReport } from '../types.ts';
+import { CATEGORIES } from '../constants.ts';
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
 
-// --- MOCK DATA & SCENARIO MODULES ---
-
-// --- Roydel Marquez Bello Claim Scenario ---
-
-/**
- * The pre-parsed insurance policy for the active claim scenario.
- */
-export const SCENARIO_POLICY: ParsedPolicy = {
-  provider: "Assurant",
-  policyNumber: "RI8462410",
-  policyHolder: "Roydel Marquez Bello & Maleidy Bello Landin",
-  effectiveDate: "2024-01-15",
-  expirationDate: "2025-01-15",
-  deductible: 500,
-  coverage: [
-    { category: "Personal Property", limit: 80000, type: "main" },
-    { category: "Jewelry", limit: 1000, type: "sub-limit" },
-    { category: "Personal Records", limit: 1000, type: "sub-limit" },
-    { category: "Credit Card / Forgery", limit: 500, type: "sub-limit" },
-    { category: "Identity Fraud Expenses", limit: 500, type: "sub-limit" },
-  ],
-  coverageD_limit: 16000,
-  lossSettlementMethod: 'RCV',
-  exclusions: ["Flood Damage", "Earthquake", "Intentional Acts"],
-  confidenceScore: 100,
-  isVerified: true,
-};
-
-/**
- * The account holder for the active claim scenario.
- */
-export const SCENARIO_ACCOUNT_HOLDER: AccountHolder = {
-  id: 'ah-roydel-bello',
-  name: 'Roydel Marquez Bello',
-  address: '312 W 43rd Street, Apt 14J, New York, NY 10036'
-};
-
-const placeholderProof: Proof = {
-    id: `proof-${Date.now()}`,
-    type: 'image',
-    fileName: 'item-photo.jpg',
-    dataUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', // 1x1 gray pixel
-    mimeType: 'image/png',
-    createdBy: 'User',
-};
-
-/**
- * The inventory of stolen items for the active claim scenario.
- */
-export const SCENARIO_INVENTORY_ITEMS: InventoryItem[] = [
-    {
-        id: 'item-macbook-pro',
-        status: 'claimed',
-        itemName: 'Apple MacBook Pro 16"',
-        itemDescription: 'Apple MacBook Pro 16", M2 Max, 64GB RAM, 2TB SSD. Stolen during burglary.',
-        itemCategory: 'Electronics',
-        originalCost: 4200,
-        replacementCostValueRCV: 4200,
-        purchaseDate: '2023-03-20',
-        brand: 'Apple',
-        model: 'MacBook Pro 16"',
-        serialNumber: 'C02F9ABCDEFG',
-        condition: 'Like New',
-        linkedProofs: [placeholderProof],
-        proofStrengthScore: 85,
-        createdAt: new Date('2023-03-21T10:00:00Z').toISOString(),
-        createdBy: 'User - Manual',
-        lastKnownLocation: 'Office',
-    },
-    {
-        id: 'item-iphone-15',
-        status: 'claimed',
-        itemName: 'Apple iPhone 15 Pro',
-        itemDescription: 'Apple iPhone 15 Pro, 512GB, Natural Titanium. Stolen during burglary.',
-        itemCategory: 'Electronics',
-        originalCost: 1199,
-        replacementCostValueRCV: 1199,
-        purchaseDate: '2023-09-25',
-        brand: 'Apple',
-        model: 'iPhone 15 Pro',
-        condition: 'Like New',
-        linkedProofs: [placeholderProof],
-        proofStrengthScore: 70,
-        createdAt: new Date('2023-09-26T11:00:00Z').toISOString(),
-        createdBy: 'User - Manual',
-        lastKnownLocation: 'Living Room',
-    },
-    {
-        id: 'item-watch-high-value',
-        status: 'claimed',
-        itemName: 'Luxury Watch',
-        itemDescription: 'Luxury brand watch, stainless steel case and bracelet. Stolen during burglary. Value exceeds standard sub-limit.',
-        itemCategory: 'Jewelry',
-        originalCost: 5500,
-        replacementCostValueRCV: 5500,
-        purchaseDate: '2021-06-10',
-        brand: 'Luxury Brand',
-        condition: 'Good',
-        linkedProofs: [placeholderProof],
-        proofStrengthScore: 60,
-        createdAt: new Date('2021-06-11T12:00:00Z').toISOString(),
-        createdBy: 'User - Manual',
-        lastKnownLocation: 'Master Bedroom',
-    },
-    {
-        id: 'item-handbag-luxury',
-        status: 'claimed',
-        itemName: 'Luxury Handbag',
-        itemDescription: 'Luxury designer handbag, black leather with gold hardware. Stolen during burglary.',
-        itemCategory: 'Clothing',
-        originalCost: 2800,
-        replacementCostValueRCV: 2800,
-        purchaseDate: '2022-11-01',
-        brand: 'Designer Brand',
-        condition: 'Good',
-        linkedProofs: [placeholderProof],
-        proofStrengthScore: 65,
-        createdAt: new Date('2022-11-02T13:00:00Z').toISOString(),
-        createdBy: 'User - Manual',
-        lastKnownLocation: 'Master Bedroom',
-    }
-];
-
-/**
- * Mock Unlinked Proofs
- *
- * Simulates a pool of proofs discovered from synced accounts (e.g., email, cloud storage)
- * that have not yet been linked to an inventory item.
- */
-export const UNLINKED_PROOFS: Proof[] = [
-    { id: 'proof-ext-1', type: 'document', fileName: 'receipt_sony_camera_2023.pdf', dataUrl: '', mimeType: 'application/pdf', createdBy: 'User' },
-    { id: 'proof-ext-2', type: 'image', fileName: 'photo_of_new_macbook.jpg', dataUrl: '', mimeType: 'image/jpeg', createdBy: 'User' },
-    { id: 'proof-ext-3', type: 'document', fileName: 'gucci_handbag_invoice_11-2022.pdf', dataUrl: '', mimeType: 'application/pdf', createdBy: 'User' },
-    { id: 'proof-ext-4', type: 'image', fileName: 'IMG_20230510_1430.jpg', dataUrl: '', mimeType: 'image/jpeg', createdBy: 'User' }, // A generic name to test matching
-    { id: 'proof-ext-5', type: 'document', fileName: 'warranty_appliance_kitchen.pdf', dataUrl: '', mimeType: 'application/pdf', createdBy: 'User' },
-];
-
-
 // --- CORE AI SERVICES ---
 
-const analyzeSchema = {
+// New schema for advanced proof analysis
+const proofAnalysisSchema = {
   type: Type.OBJECT,
   properties: {
-    itemName: { type: Type.STRING, description: 'A short, descriptive name for the item in the image.' },
-    description: { type: Type.STRING, description: 'A detailed description of the item, including its condition, material, and any notable features.' },
-    category: { type: Type.STRING, description: `The most relevant category for the item from the following list: ${CATEGORIES.join(', ')}` },
-    estimatedValue: { type: Type.NUMBER, description: 'An estimated monetary value of the item in USD. Provide just a number, without currency symbols.' },
-    brand: { type: Type.STRING, description: 'The brand name of the item, if identifiable.' },
-    model: { type: Type.STRING, description: 'The model name or number of the item, if identifiable.' },
+    itemName: { type: Type.STRING, description: 'A proper, insurance-style name for the item this proof refers to (e.g., "Apple MacBook Pro 16-inch, 2021"). If no specific item, title the document.' },
+    description: { type: Type.STRING, description: 'A detailed summary of the proof\'s content.' },
+    category: { type: Type.STRING, description: `The most relevant item category from this list: ${CATEGORIES.join(', ')}` },
+    estimatedValue: { type: Type.NUMBER, description: 'If a price/value is stated for one item, extract it. Otherwise, return 0.' },
+    brand: { type: Type.STRING },
+    model: { type: Type.STRING },
+    summary: { type: Type.STRING, description: 'A concise, one-sentence summary of the proof (e.g., "A Best Buy receipt for a Sony Camera dated 03/15/2023.").' },
+    purpose: { type: Type.STRING, enum: ['Proof of Purchase', 'Proof of Possession', 'Proof of Value', 'Supporting Document', 'Unknown'], description: "The primary purpose of this file." },
+    authenticityScore: { type: Type.INTEGER, description: 'A score (0-100) assessing the authenticity strength. A dated store receipt is very high (95). A clear photo of the item is good (70). A blurry photo is lower (40).' }
   },
-  required: ['itemName', 'description', 'category', 'estimatedValue'],
-};
-
-const analyzeDocumentSchema = {
-  type: Type.OBJECT,
-  properties: {
-    itemName: { type: Type.STRING, description: 'If this document refers to a specific product, what is its name? Otherwise, provide a title for the document.' },
-    description: { type: Type.STRING, description: 'A summary of the document contents, including any key entities, dates, or amounts.' },
-    category: { type: Type.STRING, description: `Based on the content, what is the most relevant item category from this list: ${CATEGORIES.join(', ')}` },
-    estimatedValue: { type: Type.NUMBER, description: 'If a price or value is clearly stated for a single item, extract it. Otherwise, return 0.' },
-    brand: { type: Type.STRING, description: 'The brand name of any product mentioned, if identifiable.' },
-    model: { type: Type.STRING, description: 'The model name or number of any product mentioned, if identifiable.' },
-  },
-  required: ['itemName', 'description', 'category', 'estimatedValue'],
+  required: ['itemName', 'description', 'category', 'estimatedValue', 'summary', 'purpose', 'authenticityScore'],
 };
 
 
-export const analyzeImageWithGemini = async (file: File): Promise<GeminiResponse> => {
+// New unified function to replace analyzeImageWithGemini and analyzeDocumentWithGemini
+export const analyzeProof = async (file: File): Promise<any> => {
   try {
-    const base64Image = await fileToBase64(file);
-    const imagePart = {
+    const base64Data = await fileToBase64(file);
+    const filePart = {
       inlineData: {
         mimeType: file.type,
-        data: base64Image,
+        data: base64Data,
       },
     };
-    const textPart = {
-      text: "Analyze the image of this household item for an inventory app. If the image shows the item's packaging (e.g., a box), infer the product itself, not the packaging. Provide a short name, detailed description, category, estimated value (USD), brand, and model."
-    };
+
+    const prompt = `You are an expert insurance claims analyst. Your task is to analyze a file for an inventory app and extract key information.
+
+    INSTRUCTIONS:
+    1.  **Determine Purpose:** Classify the file's primary purpose from this list:
+        - 'Proof of Purchase': A receipt, invoice, or bank statement showing a transaction.
+        - 'Proof of Possession': A photo of the item, a user manual, or warranty card.
+        - 'Proof of Value': An appraisal document.
+        - 'Supporting Document': Other relevant but indirect documents.
+        - 'Unknown': If purpose is unclear.
+    2.  **Assess Authenticity:** Rate the authenticity strength on a scale of 0-100. A clear, dated store receipt is very strong (~95). A clear photo of an item in the user's home is good (~70). A blurry photo or a generic document is weaker.
+    3.  **Extract Item Details:**
+        -   **Item Name:** Create a proper, descriptive name suitable for an insurance ledger (e.g., "Sony Alpha a7 IV Mirrorless Camera", not just "camera").
+        -   **Description:** Summarize the contents of the proof in detail.
+        -   **Category:** Choose the most fitting category from the provided list.
+        -   **Value:** If a monetary value is clearly stated for a single item, extract it. Otherwise, default to 0.
+        -   **Brand/Model:** Extract if identifiable.
+        -   **Summary:** A very brief, one-sentence summary of the proof.
+    4.  **Respond in JSON:** Return the result in the specified JSON format.`;
 
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: { parts: [imagePart, textPart] },
+      contents: { parts: [filePart] },
       config: {
         responseMimeType: "application/json",
-        responseSchema: analyzeSchema,
+        responseSchema: proofAnalysisSchema,
+        systemInstruction: prompt,
       },
     });
 
     const jsonText = response.text.trim();
     const result = JSON.parse(jsonText);
-    
+
     if (!CATEGORIES.includes(result.category)) {
-        result.category = 'Other';
+      result.category = file.type.startsWith('image/') ? 'Other' : 'Documents';
     }
 
-    return result as GeminiResponse;
+    return result;
   } catch (error) {
-    console.error("Error analyzing image with Gemini:", error);
-    let errorMessage = "An unknown error occurred while analyzing the image.";
-    if (error instanceof Error) {
-      errorMessage = error.message;
-    }
-    throw new Error(`Gemini API Error: ${errorMessage}`);
-  }
-};
-
-export const analyzeProofImageWithGemini = async (file: File): Promise<GeminiResponse> => {
-    try {
-        const base64Image = await fileToBase64(file);
-        const imagePart = {
-            inlineData: {
-                mimeType: file.type,
-                data: base64Image,
-            },
-        };
-        const textPart = {
-            text: "This is an image of a document (like a receipt, invoice, or manual). Analyze it for an inventory app. Extract the most likely item name, a description of the document's content, a relevant category, any monetary value or date mentioned, and the item's brand and model if available. The goal is to create a 'proof' record, so focus on the document's content."
-        };
-
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: { parts: [imagePart, textPart] },
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: analyzeDocumentSchema,
-            },
-        });
-
-        const jsonText = response.text.trim();
-        const result = JSON.parse(jsonText);
-
-        if (!CATEGORIES.includes(result.category)) {
-            result.category = 'Documents';
-        }
-
-        return result as GeminiResponse;
-    } catch (error) {
-        console.error("Error analyzing proof image with Gemini:", error);
-        let errorMessage = "An unknown error occurred while analyzing the proof image.";
-        if (error instanceof Error) {
-          errorMessage = error.message;
-        }
-        throw new Error(`Gemini API Error: ${errorMessage}`);
-    }
-};
-
-export const analyzeDocumentWithGemini = async (file: File): Promise<GeminiResponse> => {
-  try {
-    const base64Document = await fileToBase64(file);
-    const documentPart = {
-      inlineData: {
-        mimeType: file.type,
-        data: base64Document,
-      },
-    };
-    const textPart = {
-      text: "Analyze this document (which could be a receipt, statement, or manual) for an inventory app. Extract the most likely item name, a description of the document's content, a relevant category, any monetary value or date mentioned, and the item's brand and model if available."
-    };
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: { parts: [documentPart, textPart] },
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: analyzeDocumentSchema,
-      },
-    });
-
-    const jsonText = response.text.trim();
-    const result = JSON.parse(jsonText);
-    
-    if (!CATEGORIES.includes(result.category)) {
-        result.category = 'Documents'; // Default to Documents for PDFs
-    }
-
-    return result as GeminiResponse;
-  } catch (error) {
-    console.error("Error analyzing document with Gemini:", error);
-    let errorMessage = "An unknown error occurred while analyzing the document.";
+    console.error(`Error analyzing proof "${file.name}" with Gemini:`, error);
+    let errorMessage = "An unknown error occurred while analyzing the proof.";
     if (error instanceof Error) {
       errorMessage = error.message;
     }
@@ -297,83 +88,176 @@ export const analyzeDocumentWithGemini = async (file: File): Promise<GeminiRespo
 
 // --- NEW & ENHANCED MODULES ---
 
-const policySchema = {
+const policyAnalysisSchema = {
     type: Type.OBJECT,
     properties: {
-        provider: { type: Type.STRING, description: "The name of the insurance provider (e.g., 'GEICO', 'Assurant')." },
-        policyNumber: { type: Type.STRING, description: "The policy number." },
-        policyHolder: { type: Type.STRING, description: "The primary name of the policyholder." },
-        effectiveDate: { type: Type.STRING, description: "The policy effective date in YYYY-MM-DD format." },
-        expirationDate: { type: Type.STRING, description: "The policy expiration date in YYYY-MM-DD format." },
-        deductible: { type: Type.NUMBER, description: "The primary deductible amount for a personal property claim." },
-        coverage: {
-            type: Type.ARRAY,
-            items: {
-                type: Type.OBJECT,
-                properties: {
-                    category: { type: Type.STRING, description: "The name of the coverage or sub-limit (e.g., 'Personal Property', 'Jewelry')." },
-                    limit: { type: Type.NUMBER, description: "The maximum coverage amount in USD for this category." },
-                    type: { type: Type.STRING, description: "The type of coverage, either 'main' for Coverage C or 'sub-limit'." }
+        analysisType: { type: Type.STRING, enum: ['new', 'update', 'duplicate'], description: "Your analysis of the policy compared to existing ones." },
+        targetPolicyId: { type: Type.STRING, description: "If type is 'update' or 'duplicate', this is the ID of the existing policy it relates to." },
+        warnings: { type: Type.ARRAY, items: { type: Type.STRING }, description: "A list of warnings for the user, such as policyholder mismatch or missing critical details." },
+        parsedPolicy: {
+            type: Type.OBJECT,
+            properties: {
+                provider: { type: Type.STRING },
+                policyNumber: { type: Type.STRING },
+                policyHolder: { type: Type.STRING },
+                effectiveDate: { type: Type.STRING, description: "YYYY-MM-DD format." },
+                expirationDate: { type: Type.STRING, description: "YYYY-MM-DD format." },
+                deductible: { type: Type.NUMBER },
+                coverage: {
+                    type: Type.ARRAY,
+                    items: {
+                        type: Type.OBJECT,
+                        properties: { category: { type: Type.STRING }, limit: { type: Type.NUMBER }, type: { type: Type.STRING, enum: ['main', 'sub-limit'] } },
+                        required: ["category", "limit", "type"]
+                    }
                 },
-                required: ["category", "limit", "type"]
-            }
-        },
-        coverageD_limit: { type: Type.NUMBER, description: "The Coverage D limit for Loss of Use or Additional Living Expenses." },
-        lossSettlementMethod: { type: Type.STRING, description: "The loss settlement method, either 'ACV' (Actual Cash Value) or 'RCV' (Replacement Cost Value)." },
-        exclusions: {
-            type: Type.ARRAY,
-            items: { type: Type.STRING, description: "A key exclusion from the policy (e.g., 'Flood Damage', 'Earthquake')." }
-        },
-        confidenceScore: { type: Type.INTEGER, description: "Your confidence score (0-100) in the accuracy of the extracted data. Be critical; lower the score if the document is blurry, oddly formatted, or information is ambiguous." }
+                coverageD_limit: { type: Type.NUMBER },
+                lossSettlementMethod: { type: Type.STRING, enum: ['ACV', 'RCV'] },
+                exclusions: { type: Type.ARRAY, items: { type: Type.STRING } },
+                confidenceScore: { type: Type.INTEGER, description: "Your confidence (0-100) in the accuracy of the extracted data." },
+                policyType: { type: Type.STRING, description: "The specific type of policy, such as 'HO-4', 'Renters Insurance', 'DP-3', etc. If not found, leave blank." },
+            },
+            required: ["provider", "policyNumber", "policyHolder", "effectiveDate", "expirationDate", "deductible", "coverage", "coverageD_limit", "lossSettlementMethod", "exclusions", "confidenceScore"]
+        }
     },
-    required: ["provider", "policyNumber", "policyHolder", "effectiveDate", "expirationDate", "deductible", "coverage", "coverageD_limit", "lossSettlementMethod", "exclusions", "confidenceScore"]
+    required: ["analysisType", "warnings", "parsedPolicy"]
 };
 
-export const parsePolicyDocument = async (file: File): Promise<PolicyParseResponse> => {
+export const analyzeAndComparePolicy = async (file: File, existingPolicies: ParsedPolicy[], accountHolder: AccountHolder, userCorrections: string[] = []): Promise<PolicyAnalysisReport> => {
     try {
         const base64pdf = await fileToBase64(file);
-        const pdfPart = {
-            inlineData: {
-                mimeType: 'application/pdf',
-                data: base64pdf,
-            },
-        };
+        const pdfPart = { inlineData: { mimeType: 'application/pdf', data: base64pdf } };
 
         const prompt = `
-        Act as an expert insurance policy analyst. Carefully read the provided renters or homeowners insurance policy document and extract the following key information:
-        1.  **Provider:** The name of the insurance company.
-        2.  **Policy Number:** The unique identifier for the policy.
-        3.  **PolicyHolder:** The name of the primary insured person.
-        4.  **Effective & Expiration Dates:** The start and end dates of the policy period.
-        5.  **Deductible:** The main deductible for personal property claims.
-        6.  **Coverage C (Personal Property):** The main limit for personal property. This should have type 'main'.
-        7.  **Special Limits (Sub-limits):** All special limits for specific categories like Jewelry, Cash, Firearms, Business Property, etc. These should have type 'sub-limit'.
-        8.  **Coverage D (Loss of Use):** The limit for Additional Living Expenses.
-        9.  **Loss Settlement Method:** Determine if the policy pays out at 'ACV' or 'RCV'.
-        10. **Exclusions:** List up to 3 key exclusions (e.g., 'Flood', 'Earthquake', 'Intentional Acts').
-        11. **Confidence Score:** Provide a confidence score from 0 to 100 on how certain you are about the accuracy of the extracted data.
+        Act as an expert insurance policy analyst for an intelligent inventory app. Your task is to analyze a new policy document, paying close attention to the Declarations Page, and compare it against the user's existing policies.
 
-        Return the data in the specified JSON format.
+        CONTEXT:
+        - Primary Account Holder: ${accountHolder.name}
+        - Existing Policies in Vault: ${existingPolicies.length > 0 ? JSON.stringify(existingPolicies.map(p => ({ id: p.id, policyNumber: p.policyNumber, provider: p.provider, effectiveDate: p.effectiveDate }))) : "None"}
+        - Past User Corrections (CRITICAL: Learn from these to improve accuracy): ${userCorrections.length > 0 ? userCorrections.join('\n') : "None"}
+
+        CRITICAL INSTRUCTIONS:
+        1.  **MANDATORY: Prioritize the Declarations Page:** Your primary source of truth MUST be the page titled "Declarations". All key data (limits, numbers, dates, policy type) is located there. Do not infer from other sections if the Declarations page is present.
+        2.  **Parse Accurately:** Extract all key information, including the specific policy type (e.g., 'HO-4', 'Renters Insurance').
+        3.  **Compare and Analyze:**
+            - Compare the parsed policy number and dates with the existing policies.
+            - If it has the same policy number as an existing one but a newer effectiveDate, classify it as an 'update'. Provide the 'targetPolicyId' of the policy it updates.
+            - If it's identical to an existing policy, classify it as a 'duplicate'. Provide the 'targetPolicyId'.
+            - Otherwise, classify it as 'new'.
+        4.  **Generate Warnings:**
+            - If the 'policyHolder' name is significantly different from '${accountHolder.name}', add a warning.
+            - If you cannot find critical information like a deductible or main coverage limit, add a warning.
+        5.  **AI Self-Improvement (Most Important Task):** The user has provided these past corrections: ${userCorrections.length > 0 ? userCorrections.join('; ') : "None"}. This is direct feedback on your previous mistakes. You MUST learn from them. For example, if a user corrected a deductible you misread, be extremely cautious with deductibles this time. Demonstrating you have learned from this feedback is critical for user trust.
+        6.  **Return Result:** Respond with the full analysis in the specified JSON format.
         `;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-2.5-pro',
             contents: { parts: [pdfPart] },
             config: {
                 responseMimeType: "application/json",
-                responseSchema: policySchema,
+                responseSchema: policyAnalysisSchema,
                 systemInstruction: prompt,
             },
         });
 
         const jsonText = response.text.trim();
-        return JSON.parse(jsonText) as PolicyParseResponse;
+        return JSON.parse(jsonText) as PolicyAnalysisReport;
     } catch (error) {
-        console.error("Error parsing policy document:", error);
-        throw new Error("Failed to parse the policy document. Please ensure it's a valid PDF and try again.");
+        console.error("Error analyzing policy document:", error);
+        throw new Error("Failed to analyze the policy document. Please ensure it's a valid PDF and try again.");
     }
 };
 
+const clusterSchema = {
+  type: Type.OBJECT,
+  properties: {
+    clusters: {
+      type: Type.ARRAY,
+      description: "An array of item clusters found in the evidence.",
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          proofIds: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING },
+            description: 'The IDs of the proofs that belong to this synthesized item.'
+          },
+          synthesizedItem: {
+            type: Type.OBJECT,
+            properties: {
+              itemName: { type: Type.STRING, description: "A clear, concise name for the item (e.g., 'Apple MacBook Pro 16-inch')." },
+              itemDescription: { type: Type.STRING, description: 'A detailed description synthesized from all available proof information.' },
+              itemCategory: { type: Type.STRING, enum: CATEGORIES, description: "The best category for the item." },
+              originalCost: { type: Type.NUMBER, description: "The purchase price, ideally from a receipt. If not available, use the estimated value from a photo analysis. Default to 0 if no value can be found." },
+              purchaseDate: { type: Type.STRING, description: 'The purchase date in YYYY-MM-DD format, if available from a receipt or document.' },
+              brand: { type: Type.STRING },
+              model: { type: Type.STRING },
+              serialNumber: { type: Type.STRING },
+              provenance: { type: Type.STRING, description: 'A brief, one-sentence, human-readable explanation of how this item was synthesized from its proofs. For example: "Created from a photo of a laptop and a matching Best Buy receipt from March 2023." ' },
+            },
+            required: ['itemName', 'itemDescription', 'itemCategory', 'originalCost', 'provenance']
+          }
+        },
+        required: ['proofIds', 'synthesizedItem']
+      }
+    }
+  },
+  required: ['clusters']
+};
+
+export const clusterAndSynthesizeItems = async (proofs: Proof[], policy: ParsedPolicy): Promise<{ clusters: { proofIds: string[], synthesizedItem: Partial<InventoryItem> }[] }> => {
+    try {
+        const proofManifest = proofs.map(p => ({
+            id: p.id,
+            fileName: p.fileName,
+            type: p.type,
+            summary: p.summary,
+            // NEW: Pass richer data to the clustering model
+            purpose: p.purpose,
+            authenticityScore: p.authenticityScore,
+            predictedCategory: p.predictedCategory,
+        }));
+
+        const prompt = `
+        You are an expert autonomous insurance inventory creation agent. Your task is to analyze a collection of pre-analyzed evidence and group them into logical clusters, where each cluster represents a single real-world item. After clustering, you must synthesize a complete inventory item record from the combined information in each cluster.
+
+        INSURANCE CONTEXT:
+        The user's policy has these important coverage categories: ${policy.coverage.map(c => c.category).join(', ')}. Align the synthesized item's category with one of these if possible.
+        
+        EVIDENCE TO ANALYZE (pre-analyzed by a subordinate AI):
+        ${JSON.stringify(proofManifest, null, 2)}
+
+        CRITICAL INSTRUCTIONS:
+        1.  **Review the Pre-Analyzed Proofs:** Each proof has an ID, filename, a summary, a predicted purpose, and an authenticity score.
+        2.  **Cluster Logically:** Identify groups of proofs referring to the same item. Use matching brand/model names, similar dates, and content summaries.
+        3.  **Prioritize High-Quality Evidence:** When synthesizing the item, give strong preference to data from proofs with a 'Proof of Purchase' purpose and a high 'authenticityScore'. Use these for 'originalCost' and 'purchaseDate'.
+        4.  **Synthesize the Best Record:**
+            -   Create a clean, insurance-practice item name (e.g., 'Apple MacBook Pro 16-inch').
+            -   Synthesize a comprehensive 'itemDescription' by combining details from all proofs in the cluster.
+            -   Create a 'provenance' sentence explaining your clustering logic.
+        5.  **Be Conservative:** If a proof cannot be confidently matched, DO NOT include it in a cluster. It's better to leave a proof unclustered than to make an incorrect association.
+        
+        Return your response in the specified JSON format.
+        `;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-pro', // Use a more powerful model for this complex reasoning task
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: clusterSchema,
+            },
+        });
+
+        const jsonText = response.text.trim();
+        return JSON.parse(jsonText);
+
+    } catch (error) {
+        console.error("Error clustering and synthesizing items:", error);
+        throw new Error("AI failed to cluster the provided evidence. Please try again.");
+    }
+};
 
 export const selectBestCoverage = (category: string, policy: ParsedPolicy): CoverageLimit | null => {
     // Prioritize specific sub-limits
@@ -810,7 +694,6 @@ Return the direct URL to the image file (e.g., ending in .jpg, .png, .webp) and 
     }
 };
 
-
 const proofCategorySchema = {
     type: Type.OBJECT,
     properties: {
@@ -852,5 +735,51 @@ Return the category and a brief reasoning.`;
         console.error(`Error categorizing proof "${proof.fileName}":`, error);
         // Fallback on error
         return { category: 'Other', reasoning: 'AI analysis failed.' };
+    }
+};
+
+const visualSearchSchema = {
+    type: Type.OBJECT,
+    properties: {
+        itemName: { type: Type.STRING, description: "The specific product name identified from the image." },
+        description: { type: Type.STRING, description: "A concise, one-sentence description of the identified product." },
+        sourceUrl: { type: Type.STRING, description: "The URL of an official product page or major retailer selling this exact item." }
+    },
+    required: ["itemName", "description", "sourceUrl"]
+};
+
+export const findItemWithGoogleLens = async (item: InventoryItem): Promise<{ itemName: string; description: string; sourceUrl: string }> => {
+    const primaryProof = item.linkedProofs.find(p => p.type === 'image');
+    if (!primaryProof || !primaryProof.dataUrl) {
+        throw new Error("No primary image found for visual search.");
+    }
+
+    try {
+        const base64Image = primaryProof.dataUrl.split(',')[1];
+        const imagePart = {
+            inlineData: {
+                mimeType: primaryProof.mimeType,
+                data: base64Image,
+            },
+        };
+
+        const prompt = `Act like Google Lens. Analyze the provided image to identify the product. Find the specific product name, provide a concise one-sentence description, and locate a URL for the official product page or a major retailer where this item can be viewed or purchased.`;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: { parts: [imagePart] },
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: visualSearchSchema,
+                systemInstruction: prompt,
+            },
+        });
+
+        const jsonText = response.text.trim();
+        return JSON.parse(jsonText) as { itemName: string; description: string; sourceUrl: string };
+
+    } catch (error) {
+        console.error("Error with Visual Search:", error);
+        throw new Error("AI Visual Search failed. The image may be unclear or the product could not be identified.");
     }
 };

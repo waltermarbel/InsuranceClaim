@@ -1,38 +1,42 @@
 import React from 'react';
 import { useState, useEffect } from 'react';
 // Fix: Added .ts extension to file path
-import { InventoryItem, AccountHolder, ParsedPolicy, OtherCosts, ClaimDetails } from '../types.ts';
-import ItemCard from './ItemCard';
-import { PlusIcon, SearchIcon, VideoCameraIcon, ClipboardDocumentListIcon, ExclamationTriangleIcon, WrenchScrewdriverIcon, PencilIcon, CheckCircleIcon, InformationCircleIcon } from './icons';
-import { CATEGORIES } from '../constants';
-import { InsuranceSection } from './InsuranceSection';
-import { CategoryPieChart } from './CategoryPieChart';
-import { WorkflowProgressBar } from './WorkflowProgressBar';
-import { CurrencyInput } from './CurrencyInput';
+import { InventoryItem, AccountHolder, ParsedPolicy, OtherCosts, ClaimDetails, PipelineStage, PipelineProgress } from '../types.ts';
+import ItemCard from './ItemCard.tsx';
+import { PlusIcon, SearchIcon, VideoCameraIcon, ClipboardDocumentListIcon, ExclamationTriangleIcon, WrenchScrewdriverIcon, PencilIcon, CheckCircleIcon, InformationCircleIcon, CubeIcon, ShieldExclamationIcon } from './icons.tsx';
+import { InsuranceSection } from './InsuranceSection.tsx';
+import { CategoryPieChart } from './CategoryPieChart.tsx';
+import { AIPipelineMonitor } from './AIPipelineMonitor.tsx';
 
 interface InventoryDashboardProps {
   items: InventoryItem[];
   filteredItems: InventoryItem[];
   accountHolder: AccountHolder;
-  policy: ParsedPolicy | null;
+  policies: ParsedPolicy[];
+  activePolicy: ParsedPolicy | undefined;
   claimDetails: ClaimDetails;
   onUpdateClaimDetails: (details: ClaimDetails) => void;
   isParsingPolicy: boolean;
   onUploadPolicy: (file: File) => void;
   onUpdatePolicy: (policy: ParsedPolicy) => void;
-  onVerifyPolicy: () => void;
+  onSetActivePolicy: (policyId: string) => void;
   onSelectItem: (itemId: string) => void;
   onItemPhotosSelected: (files: FileList) => void;
-  onProofDocumentsSelected: (files: FileList) => void;
   onStartRoomScan: () => void;
   searchTerm: string;
   onSearchTermChange: (value: string) => void;
   categoryFilter: string;
   onCategoryFilterChange: (value: string) => void;
+  itemCategories: string[];
   statusFilter: string;
   onStatusFilterChange: (value: string) => void;
   coverageFilter: string;
   onCoverageFilterChange: (value: string) => void;
+  onApproveItem: (itemId: string) => void;
+  onRejectItem: (itemId: string) => void;
+  pipelineStage: PipelineStage;
+  pipelineProgress: PipelineProgress;
+  onCancelPipeline: () => void;
 }
 
 interface ClaimOverviewProps {
@@ -214,38 +218,37 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
     items,
     filteredItems, 
     accountHolder, 
-    policy, 
+    policies,
+    activePolicy,
     claimDetails,
     onUpdateClaimDetails,
     isParsingPolicy,
     onUploadPolicy,
     onUpdatePolicy,
-    onVerifyPolicy,
+    onSetActivePolicy,
     onSelectItem, 
     onItemPhotosSelected,
-    onProofDocumentsSelected,
     onStartRoomScan,
     searchTerm,
     onSearchTermChange,
     categoryFilter,
     onCategoryFilterChange,
+    itemCategories,
     statusFilter,
     onStatusFilterChange,
     coverageFilter,
     onCoverageFilterChange,
+    onApproveItem,
+    onRejectItem,
+    pipelineStage,
+    pipelineProgress,
+    onCancelPipeline
 }) => {
     const itemFileInputRef = React.useRef<HTMLInputElement>(null);
-    const proofFileInputRef = React.useRef<HTMLInputElement>(null);
-
+    
     const handleItemFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         if (event.target.files) {
             onItemPhotosSelected(event.target.files);
-        }
-    };
-    
-    const handleProofFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        if (event.target.files) {
-            onProofDocumentsSelected(event.target.files);
         }
     };
     
@@ -253,16 +256,41 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
         itemFileInputRef.current?.click();
     };
     
-    const handleAddProofClick = () => {
-        proofFileInputRef.current?.click();
-    };
-    
     const totalRcv = items.filter(i => i.status === 'active').reduce((acc, item) => {
         return acc + (item.replacementCostValueRCV || item.originalCost || 0);
     }, 0);
 
+    if (policies.length === 0) {
+        return (
+            <div className="max-w-4xl mx-auto text-center py-16">
+                 <h1 className="text-4xl font-extrabold text-dark tracking-tight font-heading">
+                    Welcome to Your Digital Vault
+                </h1>
+                <p className="mt-4 text-lg text-medium">
+                    To get started, the AI needs to understand your insurance coverage. Please upload your policy declarations page. This provides the context for all future analysis and ensures your inventory is aligned with your coverage.
+                </p>
+                <div className="mt-8">
+                     <InsuranceSection 
+                        policies={policies}
+                        onUpload={onUploadPolicy}
+                        onUpdate={onUpdatePolicy}
+                        onSetActivePolicy={onSetActivePolicy}
+                        isLoading={isParsingPolicy}
+                    />
+                </div>
+            </div>
+        )
+    }
+
   return (
-    <div>
+    <div className="relative">
+        {pipelineStage !== 'idle' && (
+            <AIPipelineMonitor 
+                stage={pipelineStage}
+                progress={pipelineProgress}
+                onCancel={onCancelPipeline}
+            />
+        )}
       <div className="mb-8 p-6 bg-white rounded-lg shadow-sm border border-slate-200">
         <h2 className="text-3xl font-bold tracking-tight text-dark font-heading mb-4">
             Welcome, {accountHolder.name.split(' ')[0]}!
@@ -274,43 +302,28 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                     You have <span className="font-semibold text-dark">{items.length}</span> items in your vault.
                     Your estimated total RCV for non-claimed items is <span className="font-semibold text-dark">${totalRcv.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>.
                 </p>
-                 <div className="flex items-center space-x-4 w-full pt-6 border-t border-slate-200 mt-6">
+                 <div className="flex items-center flex-wrap gap-4 w-full pt-6 border-t border-slate-200 mt-6">
                     <input
                       type="file"
                       multiple
-                      accept="image/*"
+                      accept="image/*,application/pdf"
                       ref={itemFileInputRef}
                       onChange={handleItemFileChange}
                       className="hidden"
                     />
-                     <input
-                      type="file"
-                      multiple
-                      accept="image/*,application/pdf"
-                      ref={proofFileInputRef}
-                      onChange={handleProofFileChange}
-                      className="hidden"
-                    />
                     <button 
                         onClick={onStartRoomScan}
-                        className="w-full md:w-auto flex items-center justify-center space-x-2 px-4 py-2 text-sm font-semibold bg-white text-medium border border-slate-300 rounded-md shadow-sm hover:bg-slate-50 transition"
+                        className="flex items-center justify-center space-x-2 px-4 py-2 text-sm font-semibold bg-white text-medium border border-slate-300 rounded-md shadow-sm hover:bg-slate-50 transition"
                     >
                         <VideoCameraIcon className="h-5 w-5"/>
                         <span>Room Scan</span>
                     </button>
                     <button 
-                        onClick={handleAddProofClick}
-                        className="w-full md:w-auto flex items-center justify-center space-x-2 px-4 py-2 text-sm font-semibold bg-white text-medium border border-slate-300 rounded-md shadow-sm hover:bg-slate-50 transition"
-                    >
-                        <PlusIcon className="h-5 w-5"/>
-                        <span>Add Proofs</span>
-                    </button>
-                    <button 
                         onClick={handleAddItemClick}
-                        className="w-full md:w-auto flex items-center justify-center space-x-2 px-4 py-2 text-sm font-semibold bg-primary text-white rounded-md shadow-sm hover:bg-primary-dark transition"
+                        className="flex items-center justify-center space-x-2 px-4 py-2 text-sm font-semibold bg-primary text-white rounded-md shadow-sm hover:bg-primary-dark transition"
                     >
                         <PlusIcon className="h-5 w-5"/>
-                        <span>Add Items</span>
+                        <span>Add Local Files</span>
                     </button>
                 </div>
             </div>
@@ -322,16 +335,16 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
 
       <ClaimOverview 
         items={items} 
-        policy={policy}
+        policy={activePolicy || null}
         claimDetails={claimDetails}
         onUpdateClaimDetails={onUpdateClaimDetails}
       />
 
       <InsuranceSection 
-        policy={policy}
+        policies={policies}
         onUpload={onUploadPolicy}
         onUpdate={onUpdatePolicy}
-        onVerify={onVerifyPolicy}
+        onSetActivePolicy={onSetActivePolicy}
         isLoading={isParsingPolicy}
       />
       
@@ -358,7 +371,7 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                     className="block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
                 >
                     <option value="all">All Item Categories</option>
-                    {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                    {itemCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                 </select>
             </div>
             <div>
@@ -369,9 +382,14 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                     className="block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
                 >
                     <option value="all">All Statuses</option>
+                    <option value="needs-review">Needs Review</option>
                     <option value="active">Active</option>
+                    <option value="enriching">Enriching</option>
+                    <option value="processing">Processing</option>
                     <option value="claimed">Claimed</option>
                     <option value="archived">Archived</option>
+                    <option value="rejected">Rejected</option>
+                    <option value="error">Error</option>
                 </select>
             </div>
             <div>
@@ -380,10 +398,10 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                     value={coverageFilter}
                     onChange={(e) => onCoverageFilterChange(e.target.value)}
                     className="block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
-                    disabled={!policy?.isVerified}
+                    disabled={!activePolicy?.isVerified}
                 >
                     <option value="all">All Coverages</option>
-                    {policy?.coverage.map(cov => <option key={cov.category} value={cov.category}>{cov.category}</option>)}
+                    {activePolicy?.coverage.map(cov => <option key={cov.category} value={cov.category}>{cov.category}</option>)}
                 </select>
             </div>
         </div>
@@ -391,7 +409,13 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
         {filteredItems.map(item => (
-          <ItemCard key={item.id} item={item} onSelect={() => onSelectItem(item.id)} />
+          <ItemCard 
+            key={item.id} 
+            item={item} 
+            onSelect={() => onSelectItem(item.id)}
+            onApprove={onApproveItem}
+            onReject={onRejectItem}
+          />
         ))}
       </div>
       {filteredItems.length === 0 && items.length > 0 && (

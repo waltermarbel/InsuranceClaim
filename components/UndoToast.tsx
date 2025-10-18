@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-// Fix: Added .ts extension to file path
 import { UndoableAction } from '../types.ts';
-import { InformationCircleIcon, XIcon } from './icons';
+import { InformationCircleIcon, XIcon } from './icons.tsx';
 
 interface UndoToastProps {
   action: UndoableAction;
@@ -56,7 +55,7 @@ const UndoToast: React.FC<UndoToastProps> = ({ action, onUndo, onDismiss }) => {
       className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[100] w-full max-w-md animate-fade-in-up"
     >
       <div className="bg-dark text-white rounded-lg shadow-2xl p-4 flex items-center space-x-4 relative overflow-hidden">
-        <InformationCircleIcon className="h-6 w-6 text-primary-light flex-shrink-0" />
+        <InformationCircleIcon className="h-6 w-6 text-blue-400 flex-shrink-0" />
         <div className="flex-grow">
           <p className="text-sm font-medium">{message}</p>
         </div>
@@ -69,7 +68,7 @@ const UndoToast: React.FC<UndoToastProps> = ({ action, onUndo, onDismiss }) => {
         <button onClick={onDismiss} className="text-slate-400 hover:text-white">
           <XIcon className="h-5 w-5" />
         </button>
-        <div className="absolute bottom-0 left-0 h-1 bg-primary-light/50" style={{ width: `${progressPercentage}%`, transition: 'width 0.1s linear' }}></div>
+        <div className="absolute bottom-0 left-0 h-1 bg-blue-400/50" style={{ width: `${progressPercentage}%`, transition: 'width 0.1s linear' }}></div>
       </div>
        <style>{`
         @keyframes fade-in-up {

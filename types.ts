@@ -1,14 +1,26 @@
 // Fix: Removed invalid file marker that was causing a parsing error.
-export type ItemStatus = 'processing' | 'enriching' | 'needs-review' | 'active' | 'claimed' | 'archived' | 'error' | 'rejected';
-
+export type ItemStatus = 'processing' | 'enriching' | 'clustering' | 'needs-review' | 'active' | 'claimed' | 'archived' | 'error' | 'rejected';
+export type ProofStatus = 'unprocessed' | 'categorizing' | 'categorized' | 'error';
+// New: Define the purpose of a piece of evidence.
+export type ProofPurpose = 'Proof of Purchase' | 'Proof of Possession' | 'Proof of Value' | 'Supporting Document' | 'Unknown';
 export type ProofType = 'image' | 'document' | 'video' | 'audio' | 'other';
 export type CostType = 'Loss of Use' | 'Property Damage & Debris Removal' | 'Identity Fraud Expenses' | 'Other';
+
+// New: Type to represent the stages of the autonomous AI pipeline.
+export type PipelineStage = 'idle' | 'analyzing' | 'clustering';
+
+// New: Interface to track the progress within a pipeline stage.
+export interface PipelineProgress {
+    current: number;
+    total: number;
+    fileName: string;
+}
 
 export interface Proof {
     id: string;
     type: ProofType;
     fileName: string;
-    dataUrl: string; // Base64 encoded for images, or a URL for other types
+    dataUrl: string; // Base64 encoded for local files
     mimeType: string;
     createdBy: 'User' | 'AI' | 'System';
     createdAt?: string;
@@ -16,6 +28,14 @@ export interface Proof {
     estimatedValue?: number;
     predictedCategory?: string;
     predictedCategoryReasoning?: string;
+    sourceType?: 'local' | 'cloud'; // New: To distinguish local uploads from cloud links
+    sourceUrl?: string; // New: To store the URL for cloud-based proofs
+    status?: ProofStatus;
+    summary?: string;
+    
+    // New: Rich analysis fields for each proof.
+    purpose?: ProofPurpose;
+    authenticityScore?: number;
 }
 
 export interface InventoryItem {
@@ -41,6 +61,7 @@ export interface InventoryItem {
     valuationHistory?: ValuationResponse[];
     webIntelligence?: WebIntelligenceResponse[];
     suggestedProofs?: ProofSuggestion[];
+    provenance?: string;
 }
 
 export interface AccountHolder {
@@ -56,6 +77,9 @@ export interface CoverageLimit {
 }
 
 export interface ParsedPolicy {
+    id: string;
+    policyName: string;
+    isActive: boolean;
     provider: string;
     policyNumber: string;
     policyHolder: string;
@@ -68,9 +92,19 @@ export interface ParsedPolicy {
     exclusions: string[];
     confidenceScore: number;
     isVerified: boolean;
+    policyType?: string;
 }
 
-export interface PolicyParseResponse extends Omit<ParsedPolicy, 'isVerified'> {}
+// New: Represents the AI's full analysis of a new policy document, including comparisons.
+export interface PolicyAnalysisReport {
+    analysisType: 'new' | 'update' | 'duplicate';
+    targetPolicyId?: string; // ID of the policy this is an update/duplicate of
+    warnings: string[];
+    parsedPolicy: Omit<ParsedPolicy, 'id' | 'isActive' | 'isVerified' | 'policyName'>;
+}
+
+
+export interface PolicyParseResponse extends Omit<ParsedPolicy, 'isVerified' | 'id' | 'isActive' | 'policyName'> {}
 
 export interface GeminiResponse {
     itemName: string;
@@ -79,6 +113,7 @@ export interface GeminiResponse {
     estimatedValue: number;
     brand?: string;
     model?: string;
+    summary: string;
 }
 
 export interface DraftClaim {
@@ -141,6 +176,7 @@ export interface ProofSuggestion {
     proofId: string;
     confidence: number;
     reason: string;
+    sourceUrl?: string;
 }
 
 export interface OtherCosts {
@@ -158,7 +194,7 @@ export interface ClaimDetails {
     propertyDamageDetails: string;
 }
 
-export type AppView = 'upload' | 'processing' | 'bulk-review' | 'dashboard' | 'item-detail' | 'room-scan';
+export type AppView = 'upload' | 'dashboard' | 'item-detail' | 'room-scan';
 
 export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error';
 
@@ -178,3 +214,10 @@ export type UploadProgress = Record<string, {
     loaded: number;
     total: number;
 }>;
+
+// Represents an item currently in the background processing queue.
+export interface ProcessingQueueItem {
+    file: File;
+    dataUrl: string;
+    placeholderId: string;
+}

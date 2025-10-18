@@ -1,12 +1,12 @@
 // Fix: Removed invalid file marker that was causing a parsing error.
 import React, { useState, useEffect } from 'react';
-import { InventoryItem, Proof, ParsedPolicy, AccountHolder, UploadProgress } from '../types';
-import { ChevronLeftIcon, PlusIcon, TrashIcon, TagIcon, FolderIcon, SparklesIcon, GlobeIcon, DocumentMagnifyingGlassIcon, CalculatorIcon, TrophyIcon, PaperAirplaneIcon, LinkIcon, PencilIcon, XCircleIcon, CheckCircleIcon } from './icons';
-import { ScoreIndicator } from './ScoreIndicator';
-import { CurrencyInput } from './CurrencyInput';
-import { CATEGORIES } from '../constants';
-import InferenceCard from './InferenceCard';
-import AnnotationEditor from './AnnotationEditor';
+import { InventoryItem, Proof, ParsedPolicy, AccountHolder, UploadProgress } from '../types.ts';
+// Fix: Imported the missing DocumentTextIcon component.
+import { ChevronLeftIcon, PlusIcon, TrashIcon, TagIcon, FolderIcon, SparklesIcon, GlobeIcon, DocumentMagnifyingGlassIcon, CalculatorIcon, TrophyIcon, PaperAirplaneIcon, LinkIcon, PencilIcon, XCircleIcon, CheckCircleIcon, CubeIcon, DocumentTextIcon, CameraIcon, InformationCircleIcon, ChevronRightIcon } from './icons.tsx';
+import { ScoreIndicator } from './ScoreIndicator.tsx';
+import { CurrencyInput } from './CurrencyInput.tsx';
+import { PROOF_PURPOSE_COLORS } from '../constants.ts';
+import AnnotationEditor from './AnnotationEditor.tsx';
 
 interface ItemDetailViewProps {
   item: InventoryItem;
@@ -22,17 +22,49 @@ interface ItemDetailViewProps {
   onCalculateACV: (item: InventoryItem) => void;
   onFindHighestRCV: (item: InventoryItem) => void;
   onDraftClaim: (item: InventoryItem) => void;
-  onFuzzyMatch: (item: InventoryItem) => void;
   onFindProductImage: (item: InventoryItem) => void;
+  onVisualSearch: (item: InventoryItem) => void;
   onLinkProof: (itemId: string, proofId: string) => void;
   onUnlinkProof: (itemId: string, proofId: string) => void;
   onRejectSuggestion: (itemId: string, proofId: string) => void;
   onAddProof: (itemId: string, files: File[]) => void;
   uploadProgress: UploadProgress | null;
+  itemCategories: string[];
 }
 
+const Accordion: React.FC<{
+    title: string;
+    icon: React.ReactNode;
+    children: React.ReactNode;
+    defaultOpen?: boolean;
+}> = ({ title, icon, children, defaultOpen = true }) => {
+    const [isOpen, setIsOpen] = useState(defaultOpen);
+
+    return (
+        <div className="bg-white rounded-lg shadow-sm border border-slate-200">
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-full flex justify-between items-center p-4 text-left"
+                aria-expanded={isOpen}
+            >
+                <h3 className="font-bold font-heading flex items-center gap-2 text-dark">
+                    <span className="h-6 w-6 text-medium">{icon}</span>
+                    {title}
+                </h3>
+                <ChevronRightIcon className={`h-5 w-5 text-medium accordion-icon ${isOpen ? 'open' : ''}`} />
+            </button>
+            <div className={`accordion-content ${isOpen ? 'open' : ''}`}>
+                <div className="p-4 border-t border-slate-200">
+                    {children}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+
 const ItemDetailView: React.FC<ItemDetailViewProps> = ({
-    item, unlinkedProofs, onBack, onUpdateItem, onDeleteItem, onFindMarketPrice, onEnrichAsset, onCalculateProofStrength, onCalculateACV, onFindHighestRCV, onDraftClaim, onUnlinkProof, onAddProof, onLinkProof, onRejectSuggestion, onFindProductImage, uploadProgress
+    item, unlinkedProofs, onBack, onUpdateItem, onDeleteItem, onFindMarketPrice, onEnrichAsset, onCalculateProofStrength, onCalculateACV, onFindHighestRCV, onDraftClaim, onUnlinkProof, onAddProof, onLinkProof, onRejectSuggestion, onFindProductImage, onVisualSearch, uploadProgress, itemCategories
 }) => {
     const [editableItem, setEditableItem] = useState(item);
     const [isEditing, setIsEditing] = useState(false);
@@ -112,7 +144,7 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
                 <div className="lg:col-span-1 space-y-6">
                     <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
                         <div className="aspect-[4/3] bg-slate-100 flex items-center justify-center">
-                            {primaryProof ? (
+                            {primaryProof && primaryProof.dataUrl ? (
                                 <img src={primaryProof.dataUrl} alt={primaryProof.fileName} className="w-full h-full object-cover" />
                             ) : (
                                 <FolderIcon className="h-24 w-24 text-slate-300" />
@@ -129,7 +161,6 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
                         </div>
                         <div className="space-y-2">
                             {uploadProgress && Object.entries(uploadProgress).map(([fileName, progress]) => {
-                                // Fix: Cast progress value to `any` to resolve TypeScript error where type is inferred as `unknown`.
                                 const percentage = (progress as any).total > 0 ? Math.round(((progress as any).loaded / (progress as any).total) * 100) : 0;
                                 return (
                                     <div key={fileName} className="p-2 bg-slate-50 rounded-md">
@@ -146,12 +177,36 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
                             {item.linkedProofs.map(proof => (
                                 <div key={proof.id} className="group flex items-center justify-between p-2 bg-slate-50 rounded-md hover:bg-slate-100">
                                     <div className="flex items-center gap-2 overflow-hidden">
-                                        <img src={proof.dataUrl} alt={proof.fileName} className="h-8 w-8 rounded-md object-cover flex-shrink-0" />
-                                        <span className="text-sm text-medium truncate">{proof.fileName}</span>
+                                        {proof.dataUrl ? (
+                                             <img src={proof.dataUrl} alt={proof.fileName} className="h-10 w-10 rounded-md object-cover flex-shrink-0" />
+                                        ) : (
+                                            <div className="h-10 w-10 rounded-md bg-slate-200 flex items-center justify-center flex-shrink-0">
+                                                <DocumentTextIcon className="h-6 w-6 text-slate-500" />
+                                            </div>
+                                        )}
+                                        <div className="overflow-hidden">
+                                            <p className="text-sm text-medium truncate">{proof.fileName}</p>
+                                            {proof.purpose && (
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${PROOF_PURPOSE_COLORS[proof.purpose]?.bg || 'bg-slate-100'} ${PROOF_PURPOSE_COLORS[proof.purpose]?.text || 'text-slate-600'}`}>
+                                                        {proof.purpose}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
-                                    <div className="flex-shrink-0 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button onClick={() => handleAnnotate(proof)} className="p-1 text-medium hover:text-primary"><PencilIcon className="h-4 w-4"/></button>
-                                        <button onClick={() => onUnlinkProof(item.id, proof.id)} className="p-1 text-medium hover:text-danger"><TrashIcon className="h-4 w-4"/></button>
+                                    <div className="flex-shrink-0 flex items-center">
+                                         {proof.authenticityScore && (
+                                            <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-1 rounded-full mr-2" title={`AI Authenticity Score: ${proof.authenticityScore}%`}>
+                                                {proof.authenticityScore}
+                                            </span>
+                                        )}
+                                        <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center">
+                                            {proof.dataUrl && (
+                                                <button onClick={() => handleAnnotate(proof)} className="p-1 text-medium hover:text-primary"><PencilIcon className="h-4 w-4"/></button>
+                                            )}
+                                            <button onClick={() => onUnlinkProof(item.id, proof.id)} className="p-1 text-medium hover:text-danger"><TrashIcon className="h-4 w-4"/></button>
+                                        </div>
                                     </div>
                                 </div>
                             ))}
@@ -172,7 +227,7 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
                                 )}
                                 {isEditing ? (
                                     <select name="itemCategory" value={editableItem.itemCategory} onChange={handleChange} className="text-sm text-medium mt-1 border-slate-300 rounded-md">
-                                        {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                        {itemCategories.map(c => <option key={c} value={c}>{c}</option>)}
                                     </select>
                                 ) : (
                                     <p className="text-sm font-semibold text-primary mt-1">{item.itemCategory}</p>
@@ -186,6 +241,25 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
                          ) : (
                             <p className="mt-4 text-medium">{item.itemDescription}</p>
                          )}
+
+                        <div className="mt-4">
+                            <label htmlFor="notes" className="text-xs font-semibold text-medium uppercase tracking-wider">Notes</label>
+                            {isEditing ? (
+                                <textarea 
+                                    id="notes"
+                                    name="notes" 
+                                    value={editableItem.notes || ''} 
+                                    onChange={handleChange} 
+                                    rows={4} 
+                                    placeholder="Add any relevant notes here..."
+                                    className="mt-1 text-medium w-full p-2 border border-slate-300 rounded-md" 
+                                />
+                            ) : (
+                                <div className="mt-1 text-medium whitespace-pre-wrap p-3 bg-slate-50 rounded-md border min-h-[4rem]">
+                                    {item.notes || <span className="text-slate-400 italic">No notes added.</span>}
+                                </div>
+                            )}
+                        </div>
 
                         <div className="mt-6 border-t pt-4 grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-4">
                             {isEditing ? (
@@ -223,12 +297,18 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
                              )}
                         </div>
                     </div>
-                     {item.suggestedProofs && item.suggestedProofs.length > 0 && (
-                        <InferenceCard
-                            title="Suggested Proofs"
-                            icon={<LinkIcon />}
-                            color="medium"
-                        >
+                     {item.provenance && (
+                        <Accordion title="AI Synthesis Report" icon={<InformationCircleIcon />} defaultOpen={true}>
+                             <p className="text-sm text-medium italic">
+                                This item was automatically created by clustering multiple pieces of evidence.
+                            </p>
+                            <p className="mt-2 text-sm text-dark">
+                                <span className="font-bold">AI Reasoning:</span> {item.provenance}
+                            </p>
+                        </Accordion>
+                    )}
+                     {(item.suggestedProofs && item.suggestedProofs.length > 0) && (
+                        <Accordion title="Suggested Proofs" icon={<LinkIcon />} defaultOpen={true}>
                             <div className="space-y-3">
                                 {item.suggestedProofs.map(suggestion => {
                                     const proof = unlinkedProofs.find(p => p.id === suggestion.proofId);
@@ -246,7 +326,15 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
                                                             <span className="text-xs font-medium bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full whitespace-nowrap">{proof.predictedCategory}</span>
                                                         )}
                                                     </p>
-                                                    <p className="text-xs text-medium italic">"{suggestion.reason}"</p>
+                                                    <p className="text-xs text-medium italic">
+                                                        {suggestion.sourceUrl ? (
+                                                            <a href={suggestion.sourceUrl} target="_blank" rel="noopener noreferrer" className="hover:underline text-blue-600">
+                                                                {suggestion.reason}
+                                                            </a>
+                                                        ) : (
+                                                            `"${suggestion.reason}"`
+                                                        )}
+                                                    </p>
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-2 flex-shrink-0 ml-4">
@@ -262,28 +350,31 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
                                     );
                                 })}
                             </div>
-                        </InferenceCard>
+                        </Accordion>
                     )}
 
-                    <InferenceCard
-                        title="AI Actions"
-                        icon={<SparklesIcon />}
-                        color="primary"
-                    >
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <Accordion title="AI Actions" icon={<SparklesIcon />} defaultOpen={false}>
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                             <button onClick={() => onFindMarketPrice(item)} className="p-3 text-center bg-slate-50 hover:bg-primary/10 rounded-md"><GlobeIcon className="h-6 w-6 mx-auto text-slate-500"/><span className="text-xs font-semibold mt-1 block text-medium">Market Price</span></button>
                             <button onClick={() => onEnrichAsset(item)} className="p-3 text-center bg-slate-50 hover:bg-primary/10 rounded-md"><DocumentMagnifyingGlassIcon className="h-6 w-6 mx-auto text-slate-500"/><span className="text-xs font-semibold mt-1 block text-medium">Enrich Data</span></button>
                              <button onClick={() => onCalculateProofStrength(item)} className="p-3 text-center bg-slate-50 hover:bg-primary/10 rounded-md"><CheckCircleIcon className="h-6 w-6 mx-auto text-slate-500"/><span className="text-xs font-semibold mt-1 block text-medium">Proof Strength</span></button>
                              <button onClick={() => onCalculateACV(item)} className="p-3 text-center bg-slate-50 hover:bg-primary/10 rounded-md"><CalculatorIcon className="h-6 w-6 mx-auto text-slate-500"/><span className="text-xs font-semibold mt-1 block text-medium">Calculate ACV</span></button>
                              <button onClick={() => onFindHighestRCV(item)} className="p-3 text-center bg-slate-50 hover:bg-primary/10 rounded-md"><TrophyIcon className="h-6 w-6 mx-auto text-slate-500"/><span className="text-xs font-semibold mt-1 block text-medium">Find Max RCV</span></button>
                             <button onClick={() => onFindProductImage(item)} className="p-3 text-center bg-slate-50 hover:bg-primary/10 rounded-md"><TagIcon className="h-6 w-6 mx-auto text-slate-500"/><span className="text-xs font-semibold mt-1 block text-medium">Find Image</span></button>
+                             <button
+                                onClick={() => onVisualSearch(item)}
+                                disabled={!primaryProof || !primaryProof.dataUrl}
+                                className="p-3 text-center bg-slate-50 hover:bg-primary/10 rounded-md disabled:opacity-50 disabled:cursor-not-allowed">
+                                <CameraIcon className="h-6 w-6 mx-auto text-slate-500"/>
+                                <span className="text-xs font-semibold mt-1 block text-medium">Visual Search</span>
+                            </button>
                              {item.status !== 'claimed' ? (
                                 <button onClick={() => onDraftClaim(item)} className="p-3 text-center bg-slate-50 hover:bg-primary/10 rounded-md"><PaperAirplaneIcon className="h-6 w-6 mx-auto text-slate-500"/><span className="text-xs font-semibold mt-1 block text-medium">Draft Claim</span></button>
                             ) : (
                                 <button onClick={() => onUpdateItem({...item, status: 'active'})} className="p-3 text-center bg-slate-50 hover:bg-amber-100 rounded-md"><XCircleIcon className="h-6 w-6 mx-auto text-slate-500"/><span className="text-xs font-semibold mt-1 block text-medium">Remove from Claim</span></button>
                             )}
                         </div>
-                    </InferenceCard>
+                    </Accordion>
                 </div>
             </div>
         </div>
