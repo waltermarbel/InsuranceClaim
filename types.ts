@@ -7,7 +7,7 @@ export type ProofType = 'image' | 'document' | 'video' | 'audio' | 'other';
 export type CostType = 'Loss of Use' | 'Property Damage & Debris Removal' | 'Identity Fraud Expenses' | 'Other';
 
 // New: Type to represent the stages of the autonomous AI pipeline.
-export type PipelineStage = 'idle' | 'analyzing' | 'clustering';
+export type PipelineStage = 'idle' | 'processing';
 
 // New: Interface to track the progress within a pipeline stage.
 export interface PipelineProgress {
@@ -16,11 +16,24 @@ export interface PipelineProgress {
     fileName: string;
 }
 
+export interface LineItem {
+  description: string;
+  quantity: number;
+  price: number;
+}
+
+export interface ReceiptData {
+  vendor: string;
+  totalAmount: number;
+  transactionDate: string; // YYYY-MM-DD
+  lineItems: LineItem[];
+}
+
 export interface Proof {
     id: string;
     type: ProofType;
     fileName: string;
-    dataUrl: string; // Base64 encoded for local files
+    dataUrl?: string; // Base64 encoded for local files - NOW OPTIONAL
     mimeType: string;
     createdBy: 'User' | 'AI' | 'System';
     createdAt?: string;
@@ -36,6 +49,9 @@ export interface Proof {
     // New: Rich analysis fields for each proof.
     purpose?: ProofPurpose;
     authenticityScore?: number;
+    receiptData?: ReceiptData;
+    notes?: string;
+    owner?: string;
 }
 
 export interface InventoryItem {
@@ -62,6 +78,8 @@ export interface InventoryItem {
     webIntelligence?: WebIntelligenceResponse[];
     suggestedProofs?: ProofSuggestion[];
     provenance?: string;
+    isGift?: boolean;
+    giftedBy?: string;
 }
 
 export interface AccountHolder {
@@ -130,6 +148,7 @@ export interface ValuationSource {
     url: string;
     price: number;
     type: 'RCV' | 'ACV';
+    title?: string;
 }
 
 export interface ValuationResponse {
@@ -192,9 +211,13 @@ export interface ClaimDetails {
     location: string;
     policeReport: string;
     propertyDamageDetails: string;
+    claimDateRange?: {
+        startDate?: string;
+        endDate?: string;
+    };
 }
 
-export type AppView = 'upload' | 'dashboard' | 'item-detail' | 'room-scan';
+export type AppView = 'upload' | 'dashboard' | 'item-detail' | 'room-scan' | 'processing-preview' | 'autonomous-processor';
 
 export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error';
 
@@ -220,4 +243,53 @@ export interface ProcessingQueueItem {
     file: File;
     dataUrl: string;
     placeholderId: string;
+}
+
+// New: Type for chat messages in the AI Assistant
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'model';
+  text: string;
+  isLoading?: boolean;
+}
+
+// --- NEW: Types for Interactive Processing Queue ---
+export interface AleDetails {
+    vendor: string;
+    date: string;
+    amount: number;
+    costType: CostType;
+}
+
+export type InferenceType = 'NEW_ITEM' | 'EXISTING_ITEM_MATCH' | 'ALE_EXPENSE' | 'UNCLEAR';
+
+export interface ProcessingInference {
+    proof: Proof;
+    status: 'pending' | 'processing' | 'complete' | 'error';
+    analysisType?: InferenceType;
+    synthesizedItem?: Partial<Omit<InventoryItem, 'linkedProofs' | 'suggestedProofs'>>;
+    matchedItemId?: string;
+    matchConfidence?: number;
+    aleDetails?: AleDetails;
+    proofSummary?: string;
+    errorMessage?: string;
+    userSelection: 'approved' | 'rejected';
+    notes?: string;
+    owner?: string;
+}
+
+// New: Type for the output of the Autonomous Inventory Processor AI
+export interface AutonomousInventoryItem {
+    category: string;
+    description: string;
+    brandmodel: string;
+    estimatedvaluercv: number;
+    quantity: number;
+    lastseendate: string;
+    inferredowner: string;
+    location: string;
+    imagesource: string[];
+    ainotes: string;
+    confidencescore: number;
+    sublimit_tag: string | null;
 }

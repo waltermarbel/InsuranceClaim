@@ -1,6 +1,6 @@
 // Fix: Removed invalid file marker that was causing a parsing error.
 // Fix: Imported useState, useCallback, and useEffect from React to resolve multiple hook-related errors.
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Header } from './components/Header.tsx';
 import InventoryDashboard from './components/InventoryDashboard.tsx';
 import ItemDetailView from './components/ItemDetailView.tsx';
@@ -10,10 +10,18 @@ import UndoToast from './components/UndoToast.tsx';
 import SaveModal from './components/SaveModal.tsx';
 import RoomScanView from './components/RoomScanView.tsx';
 import PolicyReviewModal from './components/PolicyReviewModal.tsx';
+import GeminiAssistant from './components/GeminiAssistant.tsx';
+import ImageEditorModal from './components/ImageEditorModal.tsx';
+import ImageGeneratorModal from './components/ImageGeneratorModal.tsx';
+import AudioRecorderModal from './components/AudioRecorderModal.tsx';
+import BulkImageEditModal from './components/BulkImageEditModal.tsx';
+import ImageAnalysisModal from './components/ImageAnalysisModal.tsx';
+import ProcessingPreview from './components/ProcessingPreview.tsx';
+import ImageZoomModal from './components/ImageZoomModal.tsx';
 
 
 import * as geminiService from './services/geminiService.ts';
-import { InventoryItem, AccountHolder, ParsedPolicy, Proof, AppView, ActivityLogEntry, UndoableAction, ClaimDetails, ItemStatus, ProofSuggestion, UploadProgress, PipelineStage, PipelineProgress, PolicyAnalysisReport } from './types.ts';
+import { InventoryItem, AccountHolder, ParsedPolicy, Proof, AppView, ActivityLogEntry, UndoableAction, ClaimDetails, ItemStatus, ProofSuggestion, UploadProgress, PipelineStage, PipelineProgress, PolicyAnalysisReport, ProcessingInference } from './types.ts';
 import { fileToDataUrl, urlToDataUrl, sanitizeFileName, dataUrlToBlob, exportToCSV, exportToZip } from './utils/fileUtils.ts';
 import { CATEGORIES } from './constants.ts';
 
@@ -43,13 +51,38 @@ const DEFAULT_POLICY: ParsedPolicy = {
 };
 
 const DEFAULT_ACCOUNT_HOLDER: AccountHolder = {
-  id: 'ah-default-user',
-  name: 'Maleidy Bello Landin', // Using first name on policy for personalization
-  address: '312 W 43RD ST, APT 14J, NEW YORK NY 10036'
+  id: 'ah-victim-roy del',
+  name: 'Roydel Marquez Bello',
+  address: '421 W 56 ST, APT 4A, NEW YORK NY 10019'
 };
 
 
-const INITIAL_INVENTORY: InventoryItem[] = []; // Start with an empty inventory
+const INITIAL_INVENTORY: InventoryItem[] = [
+    { id: `item-import-${Date.now()}-1`, status: 'claimed', itemName: 'Apple Mac #1', itemDescription: 'Stolen laptop, as per police report.', itemCategory: 'Electronics', originalCost: 1250, linkedProofs: [], createdAt: '2024-11-28', createdBy: 'System Import' },
+    { id: `item-import-${Date.now()}-2`, status: 'claimed', itemName: 'Apple Mac #2', itemDescription: 'Stolen laptop, as per police report.', itemCategory: 'Electronics', originalCost: 1250, linkedProofs: [], createdAt: '2024-11-28', createdBy: 'System Import' },
+    { id: `item-import-${Date.now()}-3`, status: 'claimed', itemName: 'Gold Chain', itemDescription: 'Stolen jewelry, as per police report.', itemCategory: 'Jewelry', originalCost: 8000, linkedProofs: [], createdAt: '2024-11-28', createdBy: 'System Import' },
+    { id: `item-import-${Date.now()}-4`, status: 'claimed', itemName: 'Bracelet', itemDescription: 'Stolen jewelry, as per police report.', itemCategory: 'Jewelry', originalCost: 2000, linkedProofs: [], createdAt: '2024-11-28', createdBy: 'System Import' },
+    { id: `item-import-${Date.now()}-5`, status: 'claimed', itemName: 'iPhone #1', itemDescription: 'Stolen phone, as per police report.', itemCategory: 'Electronics', originalCost: 600, linkedProofs: [], createdAt: '2024-11-28', createdBy: 'System Import' },
+    { id: `item-import-${Date.now()}-6`, status: 'claimed', itemName: 'iPhone #2', itemDescription: 'Stolen phone, as per police report.', itemCategory: 'Electronics', originalCost: 600, linkedProofs: [], createdAt: '2024-11-28', createdBy: 'System Import' },
+    { id: `item-import-${Date.now()}-7`, status: 'claimed', itemName: 'iPhone #3', itemDescription: 'Stolen phone, as per police report.', itemCategory: 'Electronics', originalCost: 600, linkedProofs: [], createdAt: '2024-11-28', createdBy: 'System Import' },
+    { id: `item-import-${Date.now()}-8`, status: 'claimed', itemName: 'iPad #1', itemDescription: 'Stolen tablet, as per police report.', itemCategory: 'Electronics', originalCost: 25, linkedProofs: [], createdAt: '2024-11-28', createdBy: 'System Import' },
+    { id: `item-import-${Date.now()}-9`, status: 'claimed', itemName: 'iPad #2', itemDescription: 'Stolen tablet, as per police report.', itemCategory: 'Electronics', originalCost: 25, linkedProofs: [], createdAt: '2024-11-28', createdBy: 'System Import' },
+    { id: `item-import-${Date.now()}-10`, status: 'claimed', itemName: 'Oculus VR Headset #1', itemDescription: 'Stolen VR headset, as per police report.', itemCategory: 'Electronics', originalCost: 250, linkedProofs: [], createdAt: '2024-11-28', createdBy: 'System Import' },
+    { id: `item-import-${Date.now()}-11`, status: 'claimed', itemName: 'Oculus VR Headset #2', itemDescription: 'Stolen VR headset, as per police report.', itemCategory: 'Electronics', originalCost: 250, linkedProofs: [], createdAt: '2024-11-28', createdBy: 'System Import' },
+    { id: `item-import-${Date.now()}-12`, status: 'claimed', itemName: 'Samsung TV', itemDescription: 'Stolen television, as per police report.', itemCategory: 'Electronics', originalCost: 100, linkedProofs: [], createdAt: '2024-11-28', createdBy: 'System Import' },
+    { id: `item-import-${Date.now()}-13`, status: 'claimed', itemName: 'Painting #1', itemDescription: 'Stolen artwork, as per police report.', itemCategory: 'Art', originalCost: 4000, linkedProofs: [], createdAt: '2024-11-28', createdBy: 'System Import' },
+    { id: `item-import-${Date.now()}-14`, status: 'claimed', itemName: 'Painting #2', itemDescription: 'Stolen artwork, as per police report.', itemCategory: 'Art', originalCost: 4000, linkedProofs: [], createdAt: '2024-11-28', createdBy: 'System Import' },
+    { id: `item-import-${Date.now()}-15`, status: 'claimed', itemName: 'Apple HomePod #1', itemDescription: 'Stolen smart speaker, as per police report.', itemCategory: 'Electronics', originalCost: 0, linkedProofs: [], createdAt: '2024-11-28', createdBy: 'System Import' },
+    { id: `item-import-${Date.now()}-16`, status: 'claimed', itemName: 'Apple HomePod #2', itemDescription: 'Stolen smart speaker, as per police report.', itemCategory: 'Electronics', originalCost: 0, linkedProofs: [], createdAt: '2024-11-28', createdBy: 'System Import' },
+    { id: `item-import-${Date.now()}-17`, status: 'claimed', itemName: 'Smart Frame', itemDescription: 'Stolen smart frame, as per police report.', itemCategory: 'Electronics', originalCost: 50, linkedProofs: [], createdAt: '2024-11-28', createdBy: 'System Import' },
+    { id: `item-import-${Date.now()}-18`, status: 'claimed', itemName: 'HP Printer #1', itemDescription: 'Stolen printer, as per police report.', itemCategory: 'Electronics', originalCost: 140, linkedProofs: [], createdAt: '2024-11-28', createdBy: 'System Import' },
+    { id: `item-import-${Date.now()}-19`, status: 'claimed', itemName: 'HP Printer #2', itemDescription: 'Stolen printer, as per police report.', itemCategory: 'Electronics', originalCost: 140, linkedProofs: [], createdAt: '2024-11-28', createdBy: 'System Import' },
+    { id: `item-import-${Date.now()}-20`, status: 'claimed', itemName: 'Luis Vuitton Accessory #1', itemDescription: 'Stolen designer accessory, as per police report.', itemCategory: 'Clothing', originalCost: 25, linkedProofs: [], createdAt: '2024-11-28', createdBy: 'System Import' },
+    { id: `item-import-${Date.now()}-21`, status: 'claimed', itemName: 'Luis Vuitton Accessory #2', itemDescription: 'Stolen designer accessory, as per police report.', itemCategory: 'Clothing', originalCost: 25, linkedProofs: [], createdAt: '2024-11-28', createdBy: 'System Import' },
+    { id: `item-import-${Date.now()}-22`, status: 'claimed', itemName: 'Sonos Sound System', itemDescription: 'Stolen sound system, as per police report.', itemCategory: 'Electronics', originalCost: 2000, linkedProofs: [], createdAt: '2024-11-28', createdBy: 'System Import' },
+    { id: `item-import-${Date.now()}-23`, status: 'claimed', itemName: 'NAS Computer System', itemDescription: 'Stolen NAS, as per police report.', itemCategory: 'Electronics', originalCost: 50, linkedProofs: [], createdAt: '2024-11-28', createdBy: 'System Import' },
+    { id: `item-import-${Date.now()}-24`, status: 'claimed', itemName: 'Home Server', itemDescription: 'Stolen server, as per police report.', itemCategory: 'Electronics', originalCost: 50, linkedProofs: [], createdAt: '2024-11-28', createdBy: 'System Import' },
+];
 const INITIAL_UNLINKED_PROOFS: Proof[] = []; // Start with no unlinked proofs
 
 /**
@@ -92,6 +125,7 @@ const getPolicyCorrections = (
     }
 
     const originalSubLimits = originalCoverage.filter(c => c.type === 'sub-limit');
+    // Fix: Changed .find() to .filter() to correctly iterate over all sub-limits.
     const updatedSubLimits = updatedCoverage.filter(c => c.type === 'sub-limit');
 
     updatedSubLimits.forEach(updatedSub => {
@@ -114,16 +148,21 @@ const App: React.FC = () => {
     const [unlinkedProofs, setUnlinkedProofs] = useState<Proof[]>(INITIAL_UNLINKED_PROOFS);
     const [accountHolder, setAccountHolder] = useState<AccountHolder>(DEFAULT_ACCOUNT_HOLDER);
     const [claimDetails, setClaimDetails] = useState<ClaimDetails>({
-        name: "Burglary Claim - 312 W 43rd St",
-        dateOfLoss: "2024-07-20",
+        name: "Claim for Burglary at 421 W 56 ST",
+        dateOfLoss: "2024-11-28",
         incidentType: "Burglary",
-        location: "312 W 43rd Street, Apt 14J, New York, NY 10036",
-        policeReport: "NYPD-2024-845123",
-        propertyDamageDetails: "Front door lock was forcibly broken and requires replacement.\nWindow in the living room was shattered.\nEstimated cost for door repair: $450\nEstimated cost for window replacement: $600"
+        location: "421 W 56 ST, APT 4A, NEW YORK NY 10019",
+        policeReport: "NYPD: 2024-018-012043",
+        propertyDamageDetails: "Victim states at TPO he had packed boxes in his apartment since he is in the process of moving. Victim left his apartment on Wednesday 11/27/24 at 0800 hours and ensured he locked his door before leaving. Victim returned to apartment at 7am 11/28/24 to find his door partially opened and upon entering apartment noticed his packed boxes were missing and his doorknob was very loose and a window he had closed before leaving had been left halfway open.",
+        claimDateRange: {
+            startDate: "2024-11-27",
+            endDate: "2024-11-28",
+        }
     });
     
     // Derived State for Active Policy
     const activePolicy = useMemo(() => policies.find(p => p.isActive), [policies]);
+    const policyHolders = useMemo(() => activePolicy?.policyHolder.split(/ & | and /i).map(s => s.trim()).filter(Boolean) || [], [activePolicy]);
 
     // UI State
     const [currentView, setCurrentView] = useState<AppView>('dashboard');
@@ -136,7 +175,17 @@ const App: React.FC = () => {
     const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
     const [showPolicyReviewModal, setShowPolicyReviewModal] = useState(false);
     const [policyAnalysisReport, setPolicyAnalysisReport] = useState<PolicyAnalysisReport | null>(null);
-    const [policyCorrections, setPolicyCorrections] = useState<string[]>([]);
+    const [showAssistant, setShowAssistant] = useState(false);
+    const [editingProof, setEditingProof] = useState<Proof | null>(null);
+    const [generatingForItem, setGeneratingForItem] = useState<InventoryItem | null>(null);
+    const [recordingForItem, setRecordingForItem] = useState<InventoryItem | null>(null);
+    const [showBulkImageEditModal, setShowBulkImageEditModal] = useState(false);
+    // Fix: Declared missing state variable for bulk image editing.
+    const [itemsToBulkEdit, setItemsToBulkEdit] = useState<InventoryItem[]>([]);
+    const [showImageAnalysisModal, setShowImageAnalysisModal] = useState(false);
+    const [proofsToProcess, setProofsToProcess] = useState<Proof[]>([]);
+    const [zoomedImageUrl, setZoomedImageUrl] = useState<string | null>(null);
+
 
     // Background Processing State
     const [pipelineStage, setPipelineStage] = useState<PipelineStage>('idle');
@@ -145,12 +194,16 @@ const App: React.FC = () => {
     // Filter State
     const [searchTerm, setSearchTerm] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('all');
-    const [statusFilter, setStatusFilter] = useState('needs-review');
+    const [statusFilter, setStatusFilter] = useState('claimed');
     const [coverageFilter, setCoverageFilter] = useState('all');
     const [itemCategories, setItemCategories] = useState<string[]>(CATEGORIES);
     
     // Activity Log State
     const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([]);
+    
+    // Selection State
+    const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
+    const imageAnalysisInputRef = useRef<HTMLInputElement>(null);
 
     const logActivity = useCallback((action: string, details: string, app: 'VeritasVault' | 'Gemini' = 'VeritasVault') => {
         const newEntry: ActivityLogEntry = {
@@ -168,6 +221,11 @@ const App: React.FC = () => {
         logActivity('ITEM_UPDATED', `Updated item: ${updatedItem.itemName}`);
     }, [logActivity]);
     
+    const handleUpdateClaimDetails = useCallback((updatedDetails: Partial<ClaimDetails>) => {
+        setClaimDetails(prev => ({ ...prev, ...updatedDetails }));
+        logActivity('CLAIM_DETAILS_UPDATED', `Claim details were updated.`);
+    }, [logActivity]);
+
     const handleFindProductImage = useCallback(async (item: InventoryItem) => {
         logActivity('AI_ACTION_START', `Searching for web image for ${item.itemName}`, 'Gemini');
         try {
@@ -248,173 +306,6 @@ const App: React.FC = () => {
     }, [unlinkedProofs, logActivity, handleFindProductImage]);
     
 
-    const runAutonomousPipeline = useCallback(async (newProofs: Proof[]) => {
-        if (!activePolicy) {
-            logActivity('ERROR', 'Cannot start pipeline: No active insurance policy found.');
-            return;
-        }
-
-        // --- STAGE 1: ANALYSIS & CATEGORIZATION ---
-        logActivity('PIPELINE_START', `Starting autonomous pipeline for ${newProofs.length} new proofs.`);
-        setPipelineStage('analyzing');
-        setPipelineProgress({ current: 0, total: newProofs.length, fileName: newProofs[0]?.fileName || 'Starting...' });
-
-        let analysisPromises = newProofs.map(async (proof, index) => {
-            try {
-                setPipelineProgress(prev => ({ ...prev, current: index + 1, fileName: proof.fileName }));
-                
-                const fileBlob = dataUrlToBlob(proof.dataUrl);
-                const file = new File([fileBlob], proof.fileName, { type: proof.mimeType });
-
-                // NEW: Use the single, more powerful analysis function
-                const analysisResult = await geminiService.analyzeProof(file);
-                
-                return { 
-                    ...proof, 
-                    status: 'categorized' as const,
-                    predictedCategory: analysisResult.category,
-                    summary: analysisResult.summary,
-                    // NEW: Add the rich analysis data to the proof object
-                    purpose: analysisResult.purpose,
-                    authenticityScore: analysisResult.authenticityScore,
-                    // Also update the estimated value from the proof if available
-                    estimatedValue: analysisResult.estimatedValue,
-                };
-            } catch (error) {
-                console.error(`Failed to analyze proof ${proof.fileName}:`, error);
-                logActivity('AI_ACTION_ERROR', `Failed to analyze ${proof.fileName}.`);
-                return { ...proof, status: 'error' as const };
-            }
-        });
-
-        const analyzedProofs = await Promise.all(analysisPromises);
-        setUnlinkedProofs(prev => [...prev.filter(p => !newProofs.some(np => np.id === p.id)), ...analyzedProofs]);
-        logActivity('PIPELINE_STAGE_COMPLETE', `Analysis complete for ${analyzedProofs.length} proofs.`);
-
-        // --- STAGE 2: CLUSTERING & SYNTHESIS ---
-        setPipelineStage('clustering');
-        setPipelineProgress({ current: 1, total: 1, fileName: 'Synthesizing items from analyzed proofs...' });
-        logActivity('PIPELINE_STAGE_START', 'Clustering proofs to synthesize inventory items.');
-
-        try {
-            const proofsToCluster = analyzedProofs.filter(p => p.status === 'categorized');
-            if (proofsToCluster.length > 0) {
-                const { clusters } = await geminiService.clusterAndSynthesizeItems(proofsToCluster, activePolicy);
-
-                if (clusters && clusters.length > 0) {
-                    const newItems: InventoryItem[] = clusters.map((cluster, i) => {
-                        const linkedProofs = cluster.proofIds.map(proofId => {
-                            const proof = proofsToCluster.find(p => p.id === proofId);
-                            if (!proof) throw new Error(`Clustered proof ID ${proofId} not found`);
-                            return proof;
-                        });
-                        
-                        // --- Policy-Aware Category Adjustment Logic ---
-                        const escapeRegExp = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-                        let finalCategory = cluster.synthesizedItem.itemCategory || 'Other';
-                        const originalCategory = finalCategory;
-
-                        if (activePolicy) {
-                            const policyCategories = activePolicy.coverage.map(c => ({ name: c.category, type: c.type }));
-                            const searchableText = [
-                                cluster.synthesizedItem.itemDescription?.toLowerCase() || '',
-                                ...linkedProofs.map(p => p.predictedCategory?.toLowerCase() || '')
-                            ].join(' ');
-
-                            let bestMatch: string | null = null;
-                            
-                            // Prioritize matching sub-limit categories
-                            const subLimitCats = policyCategories.filter(c => c.type === 'sub-limit').map(c => c.name);
-                            for (const cat of subLimitCats) {
-                                if (new RegExp(`\\b${escapeRegExp(cat)}\\b`, 'i').test(searchableText)) {
-                                    bestMatch = cat;
-                                    break;
-                                }
-                            }
-                            
-                            // If no sub-limit match, check for main category match
-                            if (!bestMatch) {
-                                const mainCat = policyCategories.find(c => c.type === 'main');
-                                if (mainCat && new RegExp(`\\b${escapeRegExp(mainCat.name)}\\b`, 'i').test(searchableText)) {
-                                    bestMatch = mainCat.name;
-                                }
-                            }
-
-                            const allPolicyCategoryNames = policyCategories.map(c => c.name);
-                            const isOriginalCategoryInPolicy = allPolicyCategoryNames.includes(originalCategory);
-
-                            // Decide whether to update the category
-                            if (bestMatch && bestMatch !== originalCategory) {
-                                // A better, policy-aligned category was found in the text.
-                                finalCategory = bestMatch;
-                            } else if (!isOriginalCategoryInPolicy) {
-                                // The original category isn't valid, and we couldn't find a better one.
-                                // Fallback to the main coverage category as a sensible default.
-                                const mainCategoryName = policyCategories.find(c => c.type === 'main')?.name;
-                                if (mainCategoryName) {
-                                    finalCategory = mainCategoryName;
-                                }
-                            }
-
-                            if (finalCategory !== originalCategory) {
-                                logActivity(
-                                    'AI_CATEGORY_ADJUSTED', 
-                                    `AI adjusted category for '${cluster.synthesizedItem.itemName || 'new item'}' from '${originalCategory}' to '${finalCategory}' for policy alignment.`, 
-                                    'Gemini'
-                                );
-                            }
-                        }
-                        // --- End of Category Adjustment Logic ---
-
-                        // Validate category against the state list
-                        if (!itemCategories.includes(finalCategory)) {
-                            logActivity(
-                                'CATEGORY_INVALID',
-                                `AI suggested invalid category '${finalCategory}' for '${cluster.synthesizedItem.itemName || 'new item'}'. Defaulting to 'Other'.`,
-                                'VeritasVault'
-                            );
-                            finalCategory = 'Other';
-                        }
-
-                        return {
-                            id: `item-synth-${Date.now()}-${i}`,
-                            status: 'needs-review',
-                            linkedProofs: linkedProofs,
-                            createdAt: new Date().toISOString(),
-                            createdBy: 'AI Pipeline',
-                            proofStrengthScore: 50, // Initial score
-                            itemName: 'Unnamed Item',
-                            itemDescription: 'No description.',
-                            originalCost: 0,
-                            ...cluster.synthesizedItem,
-                            itemCategory: finalCategory, // Overwrite with the adjusted category
-                        };
-                    });
-                    
-                    const clusteredProofIds = new Set(clusters.flatMap(c => c.proofIds));
-
-                    setInventory(prev => [...prev, ...newItems]);
-                    setUnlinkedProofs(prev => prev.filter(p => !clusteredProofIds.has(p.id)));
-
-                    logActivity('PIPELINE_STAGE_COMPLETE', `AI synthesized ${newItems.length} new inventory items from ${clusteredProofIds.size} proofs.`);
-                } else {
-                    logActivity('PIPELINE_STAGE_COMPLETE', 'No new items were synthesized from the provided proofs.');
-                }
-            } else {
-                 logActivity('PIPELINE_STAGE_SKIPPED', 'No successfully analyzed proofs to cluster.');
-            }
-        } catch (error) {
-            console.error('Clustering failed:', error);
-            logActivity('AI_ACTION_ERROR', `Clustering and synthesis stage failed.`);
-        } finally {
-            setPipelineStage('idle');
-            setStatusFilter('needs-review');
-        }
-
-    }, [activePolicy, logActivity, itemCategories]);
-
-
     const handleFileUploads = useCallback(async (files: File[]) => {
         if (!activePolicy) {
             alert("Please add and activate an insurance policy before adding evidence.");
@@ -424,7 +315,6 @@ const App: React.FC = () => {
         const initialProgress: UploadProgress = {};
         files.forEach(f => initialProgress[f.name] = { loaded: 0, total: f.size });
         setUploadProgress(initialProgress);
-        setCurrentView('dashboard'); // Switch to dashboard to see progress
 
         try {
             const readFilesPromises = files.map((file, i) => 
@@ -437,23 +327,103 @@ const App: React.FC = () => {
                     dataUrl,
                     mimeType: file.type,
                     createdBy: 'User' as const,
-                    status: 'unprocessed' as const,
                 }))
             );
             
             const newProofs: Proof[] = await Promise.all(readFilesPromises);
-            setUnlinkedProofs(prev => [...prev, ...newProofs]);
+            setProofsToProcess(newProofs);
             setUploadProgress(null);
-            
-            // Start the autonomous pipeline
-            await runAutonomousPipeline(newProofs);
+            setCurrentView('processing-preview');
 
         } catch (error) {
             console.error("Error reading files:", error);
             logActivity('ERROR', `Failed to read files for upload: ${error instanceof Error ? error.message : 'Unknown Error'}`);
             setUploadProgress(null); // Clear progress on error
         }
-    }, [activePolicy, runAutonomousPipeline, logActivity]);
+    }, [activePolicy, logActivity]);
+    
+    const handleFinalizeProcessing = useCallback((finalizedInferences: ProcessingInference[]) => {
+        const approvedInferences = finalizedInferences.filter(inf => inf.userSelection === 'approved');
+        logActivity('PROCESSING_FINALIZE', `User finalized processing, approving ${approvedInferences.length} of ${finalizedInferences.length} inferences.`);
+
+        const newItems: InventoryItem[] = [];
+        const itemsToUpdate = new Map<string, Proof[]>();
+        const newUnlinkedProofs: Proof[] = [];
+
+        for (const inference of approvedInferences) {
+            const finalProof: Proof = {
+                ...inference.proof,
+                notes: inference.notes,
+                owner: inference.owner,
+            };
+
+            switch (inference.analysisType) {
+                case 'NEW_ITEM':
+                    const synthItem = inference.synthesizedItem || {};
+                    const newItem: InventoryItem = {
+                        id: `item-final-${Date.now()}-${newItems.length}`,
+                        status: 'needs-review',
+                        itemName: synthItem.itemName || 'Untitled Item',
+                        itemDescription: synthItem.itemDescription || 'No description provided.',
+                        itemCategory: synthItem.itemCategory || 'Other',
+                        originalCost: synthItem.originalCost || 0,
+                        purchaseDate: synthItem.purchaseDate,
+                        isGift: synthItem.isGift,
+                        giftedBy: synthItem.giftedBy,
+                        linkedProofs: [finalProof],
+                        createdAt: new Date().toISOString(),
+                        createdBy: 'AI Interactive',
+                    };
+                    newItems.push(newItem);
+                    break;
+
+                case 'EXISTING_ITEM_MATCH':
+                    if (inference.matchedItemId) {
+                        const existingProofs = itemsToUpdate.get(inference.matchedItemId) || [];
+                        itemsToUpdate.set(inference.matchedItemId, [...existingProofs, finalProof]);
+                    }
+                    break;
+                
+                case 'ALE_EXPENSE':
+                    if (inference.aleDetails) {
+                        const aleProof: Proof = {
+                            ...finalProof,
+                            purpose: 'Supporting Document',
+                            costType: inference.aleDetails.costType,
+                            estimatedValue: inference.aleDetails.amount,
+                            summary: `${inference.aleDetails.vendor} - $${inference.aleDetails.amount.toFixed(2)} on ${inference.aleDetails.date}`
+                        };
+                        newUnlinkedProofs.push(aleProof);
+                    }
+                    break;
+            }
+        }
+
+        // Apply updates
+        setInventory(prev => {
+            let updatedInventory = [...prev, ...newItems];
+            
+            if (itemsToUpdate.size > 0) {
+                updatedInventory = updatedInventory.map(item => {
+                    const proofsToAdd = itemsToUpdate.get(item.id);
+                    if (proofsToAdd) {
+                        return { ...item, linkedProofs: [...item.linkedProofs, ...proofsToAdd] };
+                    }
+                    return item;
+                });
+            }
+            return updatedInventory;
+        });
+
+        if (newUnlinkedProofs.length > 0) {
+            setUnlinkedProofs(prev => [...prev, ...newUnlinkedProofs]);
+        }
+
+        // Clean up and go back to dashboard
+        setProofsToProcess([]);
+        setCurrentView('dashboard');
+        setStatusFilter('needs-review');
+    }, [logActivity]);
 
 
     const handleApproveItem = useCallback((itemId: string) => {
@@ -473,12 +443,94 @@ const App: React.FC = () => {
             logActivity('ITEM_REJECTED', `User rejected item: ${item.itemName}`);
          }
     }, [inventory, updateItem, logActivity]);
+
+    // Derived State
+    const selectedItem = useMemo(() => inventory.find(item => item.id === selectedItemId), [inventory, selectedItemId]);
     
-    const handlePolicyUpload = async (file: File) => {
+    const filteredInventory = useMemo(() => {
+        return inventory.filter(item => {
+            const searchMatch = searchTerm.length === 0 ||
+                item.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                item.itemDescription.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (item.brand && item.brand.toLowerCase().includes(searchTerm.toLowerCase()));
+            
+            const categoryMatch = categoryFilter === 'all' || item.itemCategory === categoryFilter;
+            const statusMatch = statusFilter === 'all' || item.status === statusFilter;
+
+            const coverageMatch = coverageFilter === 'all' || (
+                activePolicy && activePolicy.isVerified && geminiService.selectBestCoverage(item.itemCategory, activePolicy)?.category === coverageFilter
+            );
+            
+            return searchMatch && categoryMatch && statusMatch && coverageMatch;
+        });
+    }, [inventory, searchTerm, categoryFilter, statusFilter, coverageFilter, activePolicy]);
+
+    // Selection Handlers
+    const handleToggleItemSelection = useCallback((itemId: string) => {
+        setSelectedItemIds(prev =>
+            prev.includes(itemId)
+                ? prev.filter(id => id !== itemId)
+                : [...prev, itemId]
+        );
+    }, []);
+
+    const handleSelectAllFilteredItems = useCallback(() => {
+        setSelectedItemIds(filteredInventory.map(item => item.id));
+    }, [filteredInventory]);
+
+    const handleClearSelection = useCallback(() => {
+        setSelectedItemIds([]);
+    }, []);
+    
+    // Bulk Actions (now based on selection state)
+    const handleApproveSelectedItems = useCallback(() => {
+        const itemsToApprove = inventory.filter(i => selectedItemIds.includes(i.id) && i.status === 'needs-review');
+        if (itemsToApprove.length === 0) return;
+
+        if (!window.confirm(`Are you sure you want to approve all ${itemsToApprove.length} selected items? This will start the enrichment process.`)) {
+            return;
+        }
+
+        logActivity('BULK_APPROVE', `User approved ${itemsToApprove.length} selected items.`);
+        
+        const approvedItemIds = new Set(itemsToApprove.map(i => i.id));
+        const updatedInventory = inventory.map(item => 
+            approvedItemIds.has(item.id) ? { ...item, status: 'enriching' as ItemStatus } : item
+        );
+        
+        setInventory(updatedInventory);
+
+        updatedInventory
+            .filter(i => approvedItemIds.has(i.id))
+            .forEach(item => runAutonomousEnrichment(item));
+            
+        setSelectedItemIds([]);
+    }, [inventory, selectedItemIds, runAutonomousEnrichment, logActivity]);
+
+    const handleRejectSelectedItems = useCallback(() => {
+        const itemsToReject = inventory.filter(i => selectedItemIds.includes(i.id));
+        if (itemsToReject.length === 0) return;
+
+        if (!window.confirm(`Are you sure you want to reject all ${itemsToReject.length} selected items?`)) {
+            return;
+        }
+
+        logActivity('BULK_REJECT', `User rejected ${itemsToReject.length} selected items.`);
+
+        const rejectedItemIds = new Set(itemsToReject.map(i => i.id));
+        const updatedInventory = inventory.map(item => 
+            rejectedItemIds.has(item.id) ? { ...item, status: 'rejected' as ItemStatus } : item
+        );
+        
+        setInventory(updatedInventory);
+        setSelectedItemIds([]);
+    }, [inventory, selectedItemIds, logActivity]);
+    
+    const handlePolicyUpload = useCallback(async (file: File) => {
         setIsParsingPolicy(true);
         logActivity('POLICY_UPLOAD', `User uploaded policy: ${file.name}`);
         try {
-            const report = await geminiService.analyzeAndComparePolicy(file, policies, accountHolder, policyCorrections);
+            const report = await geminiService.analyzeAndComparePolicy(file, policies, accountHolder);
             logActivity('AI_POLICY_PARSE', `Gemini analyzed the policy with ${report.parsedPolicy.confidenceScore}% confidence.`, 'Gemini');
             setPolicyAnalysisReport(report);
             setShowPolicyReviewModal(true);
@@ -488,18 +540,14 @@ const App: React.FC = () => {
         } finally {
             setIsParsingPolicy(false);
         }
-    };
+    }, [policies, accountHolder, logActivity]);
     
-    const handleSavePolicy = (finalPolicyData: Omit<ParsedPolicy, 'id' | 'isActive' | 'isVerified'>, report: PolicyAnalysisReport) => {
-        const corrections = getPolicyCorrections(report.parsedPolicy, finalPolicyData);
-
-        if (corrections.length > 0) {
-            setPolicyCorrections(prev => [...prev, ...corrections]);
-            logActivity('AI_FEEDBACK', `User provided ${corrections.length} correction(s) during policy review.`);
-        }
+    const handleSavePolicy = useCallback((report: PolicyAnalysisReport) => {
+        const finalPolicyData = report.parsedPolicy;
 
         const newPolicy: ParsedPolicy = {
             ...finalPolicyData,
+            policyName: `Policy ${finalPolicyData.provider} ${finalPolicyData.effectiveDate.split('-')[0]}`,
             id: `policy-${Date.now()}`,
             isVerified: true,
             isActive: false, // Default to inactive
@@ -519,28 +567,28 @@ const App: React.FC = () => {
         }
         setShowPolicyReviewModal(false);
         setPolicyAnalysisReport(null);
-    };
+    }, [logActivity]);
 
-    const handleSetActivePolicy = (policyId: string) => {
+    const handleSetActivePolicy = useCallback((policyId: string) => {
         setPolicies(prev => prev.map(p => ({
             ...p,
             isActive: p.id === policyId
         })));
         logActivity('POLICY_ACTIVATED', `Set policy ${policyId} as active.`);
-    };
+    }, [logActivity]);
 
 
     // Item CRUD
-    const deleteItem = (itemId: string) => {
+    const deleteItem = useCallback((itemId: string) => {
         const itemToDelete = inventory.find(i => i.id === itemId);
         if (itemToDelete) {
             setInventory(prev => prev.filter(item => item.id !== itemId));
             logActivity('ITEM_DELETED', `Deleted item: ${itemToDelete.itemName}`);
             setUndoAction({ type: 'DELETE_ITEM', payload: { item: itemToDelete } });
         }
-    };
+    }, [inventory, logActivity]);
     
-    const handleAddProofs = async (itemId: string, files: File[]) => {
+    const handleAddProofs = useCallback(async (itemId: string, files: File[]) => {
         const initialProgress: UploadProgress = {};
         files.forEach(f => initialProgress[f.name] = { loaded: 0, total: f.size });
         setUploadProgress(initialProgress);
@@ -569,56 +617,20 @@ const App: React.FC = () => {
         }
         logActivity('PROOFS_ADDED', `Added ${newProofs.length} proof(s) to ${itemToUpdate?.itemName}`);
         setUploadProgress(null);
-    };
-
-    // Derived State
-    const selectedItem = useMemo(() => inventory.find(item => item.id === selectedItemId), [inventory, selectedItemId]);
-    
-    const filteredInventory = useMemo(() => {
-        return inventory.filter(item => {
-            const searchMatch = searchTerm.length === 0 ||
-                item.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                item.itemDescription.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (item.brand && item.brand.toLowerCase().includes(searchTerm.toLowerCase()));
-            
-            const categoryMatch = categoryFilter === 'all' || item.itemCategory === categoryFilter;
-            const statusMatch = statusFilter === 'all' || item.status === statusFilter;
-
-            const coverageMatch = coverageFilter === 'all' || (
-                activePolicy && activePolicy.isVerified && geminiService.selectBestCoverage(item.itemCategory, activePolicy)?.category === coverageFilter
-            );
-            
-            return searchMatch && categoryMatch && statusMatch && coverageMatch;
-        });
-    }, [inventory, searchTerm, categoryFilter, statusFilter, coverageFilter, activePolicy]);
-
+    }, [inventory, updateItem, logActivity]);
 
     // Handlers
-    const handleUpdatePolicy = (updatedPolicy: ParsedPolicy) => {
-        const originalPolicy = policies.find(p => p.id === updatedPolicy.id);
-        if (originalPolicy) {
-            const corrections = getPolicyCorrections(originalPolicy, updatedPolicy);
-            if (corrections.length > 0) {
-                setPolicyCorrections(prev => [...prev, ...corrections]);
-                logActivity('AI_FEEDBACK', `User provided ${corrections.length} manual correction(s) for policy ${originalPolicy.policyName}.`);
-            }
-        }
-
-        setPolicies(prev => prev.map(p => (p.id === updatedPolicy.id ? updatedPolicy : p)));
-        logActivity('POLICY_UPDATED', `User manually updated details for policy: ${updatedPolicy.policyName}`);
-    };
-
-    const handleSelectItem = (itemId: string) => {
+    const handleSelectItem = useCallback((itemId: string) => {
         setSelectedItemId(itemId);
         setCurrentView('item-detail');
-    };
+    }, []);
 
-    const handleBackToDashboard = () => {
+    const handleBackToDashboard = useCallback(() => {
         setSelectedItemId(null);
         setCurrentView('dashboard');
-    };
+    }, []);
 
-    const handleReset = () => {
+    const handleReset = useCallback(() => {
         if (window.confirm("Are you sure you want to start a new vault? This will clear all current data.")) {
             setInventory(INITIAL_INVENTORY);
             setUnlinkedProofs(INITIAL_UNLINKED_PROOFS);
@@ -629,9 +641,9 @@ const App: React.FC = () => {
             setSelectedItemId(null);
             logActivity('VAULT_RESET', 'User started a new vault.');
         }
-    };
+    }, [logActivity]);
     
-    const handleUndo = () => {
+    const handleUndo = useCallback(() => {
         if (undoAction?.type === 'DELETE_ITEM') {
             setInventory(prev => [...prev, undoAction.payload.item]);
             logActivity('ITEM_RESTORED', `Restored item: ${undoAction.payload.item.itemName}`);
@@ -648,33 +660,33 @@ const App: React.FC = () => {
             logActivity('SUGGESTION_RESTORED', `User undid rejection of proof suggestion for item ID ${undoAction.payload.itemId}.`);
         }
         setUndoAction(null);
-    };
+    }, [undoAction, logActivity]);
 
-    const handleCalculateProofStrength = async (item: InventoryItem) => {
+    const handleCalculateProofStrength = useCallback(async (item: InventoryItem) => {
         logActivity('AI_ACTION_START', `Calculating proof strength for ${item.itemName}`, 'Gemini');
         const res = await geminiService.calculateProofStrength(item);
         const updatedItem = { ...item, proofStrengthScore: res.score };
         updateItem(updatedItem);
         logActivity('AI_ACTION_SUCCESS', `Proof strength for ${item.itemName} is ${res.score}. Feedback: ${res.feedback}`, 'Gemini');
-    };
+    }, [logActivity, updateItem]);
 
-    const handleFindMarketPrice = async (item: InventoryItem) => {
+    const handleFindMarketPrice = useCallback(async (item: InventoryItem) => {
         logActivity('AI_ACTION_START', `Finding market price for ${item.itemName}`, 'Gemini');
         const res = await geminiService.findMarketPrice(item);
         const updatedItem = { ...item, replacementCostValueRCV: res.rcv, actualCashValueACV: res.acv, valuationHistory: [...(item.valuationHistory || []), res] };
         updateItem(updatedItem);
         logActivity('AI_ACTION_SUCCESS', `Found market price for ${item.itemName}. RCV: $${res.rcv}, ACV: $${res.acv}`, 'Gemini');
-    };
+    }, [logActivity, updateItem]);
     
-    const handleEnrichAsset = async (item: InventoryItem) => {
+    const handleEnrichAsset = useCallback(async (item: InventoryItem) => {
         logActivity('AI_ACTION_START', `Enriching ${item.itemName} with web data`, 'Gemini');
         const res = await geminiService.enrichAssetFromWeb(item);
         const updatedItem = { ...item, webIntelligence: [...(item.webIntelligence || []), res] };
         updateItem(updatedItem);
         logActivity('AI_ACTION_SUCCESS', `Enriched ${item.itemName} with ${res.facts.length} new facts.`, 'Gemini');
-    };
+    }, [logActivity, updateItem]);
     
-    const handleCalculateACV = async (item: InventoryItem) => {
+    const handleCalculateACV = useCallback(async (item: InventoryItem) => {
         logActivity('AI_ACTION_START', `Calculating ACV for ${item.itemName}`, 'Gemini');
         try {
             const res = await geminiService.calculateACV(item);
@@ -684,25 +696,25 @@ const App: React.FC = () => {
         } catch (error) {
             logActivity('AI_ACTION_ERROR', `Failed to calculate ACV for ${item.itemName}. Reason: ${error instanceof Error ? error.message : 'Unknown'}`);
         }
-    };
+    }, [logActivity, updateItem]);
     
-    const handleFindHighestRCV = async (item: InventoryItem) => {
+    const handleFindHighestRCV = useCallback(async (item: InventoryItem) => {
         logActivity('AI_ACTION_START', `Finding highest RCV for ${item.itemName}`, 'Gemini');
         const res = await geminiService.findHighestRCV(item);
         const updatedItem = { ...item, replacementCostValueRCV: res.price };
         updateItem(updatedItem);
         logActivity('AI_ACTION_SUCCESS', `Found max RCV for ${item.itemName}: $${res.price} at ${res.source}`, 'Gemini');
-    };
+    }, [logActivity, updateItem]);
     
-    const handleDraftClaim = async (item: InventoryItem) => {
+    const handleDraftClaim = useCallback(async (item: InventoryItem) => {
         if (!activePolicy || !accountHolder) return;
         logActivity('AI_ACTION_START', `Drafting claim for ${item.itemName}`, 'Gemini');
         const claim = await geminiService.assembleDraftClaim(item, activePolicy, accountHolder);
         updateItem({ ...item, status: 'claimed' });
         logActivity('AI_ACTION_SUCCESS', `Drafted claim for ${item.itemName}. Description: ${claim.failureDescription}`, 'Gemini');
-    };
+    }, [activePolicy, accountHolder, logActivity, updateItem]);
 
-    const handleVisualSearch = async (item: InventoryItem) => {
+    const handleVisualSearch = useCallback(async (item: InventoryItem) => {
         logActivity('AI_ACTION_START', `Performing visual search for ${item.itemName}`, 'Gemini');
         try {
             const res = await geminiService.findItemWithGoogleLens(item);
@@ -713,29 +725,270 @@ const App: React.FC = () => {
         } catch(e) {
              logActivity('AI_ACTION_ERROR', `Visual search failed for ${item.itemName}.`, 'Gemini');
         }
-    };
+    }, [logActivity]);
+
+    const handleExtractSerialNumber = useCallback(async (item: InventoryItem) => {
+        const imageProof = item.linkedProofs.find(p => p.type === 'image');
+        if (!imageProof?.dataUrl) {
+            alert('This item needs an image proof to extract a serial number.');
+            logActivity('AI_ACTION_FAIL', `No image for S/N extraction on ${item.itemName}.`);
+            return;
+        }
+
+        logActivity('AI_ACTION_START', `Extracting serial number for ${item.itemName}`, 'Gemini');
+        try {
+            const res = await geminiService.extractSerialNumber(imageProof.dataUrl);
+            if (res.serialNumber) {
+                const updatedItem = { ...item, serialNumber: res.serialNumber };
+                updateItem(updatedItem);
+                logActivity('AI_ACTION_SUCCESS', `Extracted S/N for ${item.itemName}: ${res.serialNumber}`, 'Gemini');
+            } else {
+                logActivity('AI_ACTION_SUCCESS', `No serial number found for ${item.itemName}.`, 'Gemini');
+            }
+        } catch (error) {
+            logActivity('AI_ACTION_ERROR', `Failed to extract serial number for ${item.itemName}.`);
+        }
+    }, [logActivity, updateItem]);
+
+    const handleExtractReceiptInfo = useCallback(async (itemId: string, proofId: string) => {
+        const item = inventory.find(i => i.id === itemId);
+        const proof = item?.linkedProofs.find(p => p.id === proofId);
+
+        if (!item || !proof || proof.type !== 'image') {
+            logActivity('AI_ACTION_FAIL', `Cannot extract receipt info: No valid image proof found.`);
+            return;
+        }
+
+        logActivity('AI_ACTION_START', `Extracting receipt info from ${proof.fileName} for ${item.itemName}`, 'Gemini');
+
+        try {
+            const receiptData = await geminiService.extractReceiptInfo(proof.dataUrl);
+            
+            let updatedItem = { ...item };
+            
+            const updatedProofs = item.linkedProofs.map(p => 
+                p.id === proofId ? { ...p, receiptData } : p
+            );
+            updatedItem.linkedProofs = updatedProofs;
+
+            const costIsUnset = !item.originalCost || item.originalCost === 0;
+            const dateIsUnset = !item.purchaseDate;
+            
+            if ( (costIsUnset || dateIsUnset) && window.confirm(`AI extracted a total of $${receiptData.totalAmount.toFixed(2)} and a date of ${receiptData.transactionDate}.\n\nDo you want to update this item's Original Cost and Purchase Date with this information?`)) {
+                if (costIsUnset) {
+                    updatedItem.originalCost = receiptData.totalAmount;
+                }
+                if (dateIsUnset) {
+                    updatedItem.purchaseDate = receiptData.transactionDate;
+                }
+                logActivity('ITEM_UPDATED', `Item details updated from receipt for ${item.itemName}.`);
+            }
+
+            updateItem(updatedItem);
+            logActivity('AI_ACTION_SUCCESS', `Successfully extracted receipt info for ${item.itemName}.`, 'Gemini');
+
+        } catch (error) {
+            logActivity('AI_ACTION_ERROR', `Failed to extract receipt info for ${item.itemName}. ${error instanceof Error ? error.message : ''}`);
+            alert("The AI could not extract information from this receipt. Please ensure it is a clear image.");
+        }
+    }, [inventory, updateItem, logActivity]);
     
-    const handleLinkProof = (itemId: string, proofId: string) => {
-        const proofToLink = unlinkedProofs.find(p => p.id === proofId);
-        if (!proofToLink) return;
+    const handleBulkExtractSerialNumbers = useCallback(async () => {
+        const items = inventory.filter(i => selectedItemIds.includes(i.id));
+        if (!window.confirm(`This will run AI serial number extraction on ${items.length} item(s) with image proofs. This may take some time and incur costs. Continue?`)) {
+            return;
+        }
+        logActivity('BULK_ACTION_START', `Starting bulk S/N extraction for ${items.length} items.`);
+        
+        const updates: { id: string, serialNumber: string }[] = [];
+
+        for (const item of items) {
+            const imageProof = item.linkedProofs.find(p => p.type === 'image');
+            if (!imageProof?.dataUrl) {
+                logActivity('AI_ACTION_SKIPPED', `Skipping ${item.itemName}: No image proof.`, 'VeritasVault');
+                continue;
+            }
+            try {
+                const res = await geminiService.extractSerialNumber(imageProof.dataUrl);
+                if (res.serialNumber && res.serialNumber.length > 0) {
+                    updates.push({ id: item.id, serialNumber: res.serialNumber });
+                    logActivity('AI_ACTION_SUCCESS', `Extracted S/N for ${item.itemName}: ${res.serialNumber}`, 'Gemini');
+                } else {
+                    logActivity('AI_ACTION_SUCCESS', `No S/N found for ${item.itemName}.`, 'Gemini');
+                }
+            } catch (error) {
+                 logActivity('AI_ACTION_ERROR', `S/N extraction failed for ${item.itemName}.`);
+            }
+        }
+
+        setInventory(prev => prev.map(item => {
+            const update = updates.find(u => u.id === item.id);
+            return update ? { ...item, serialNumber: update.serialNumber } : item;
+        }));
+        logActivity('BULK_ACTION_COMPLETE', `Finished bulk S/N extraction. ${updates.length} item(s) updated.`);
+        setSelectedItemIds([]);
+    }, [inventory, selectedItemIds, logActivity]);
+
+    // FIX: All subsequent handlers were missing useCallback wrappers, leading to scope issues.
+    // Wrapped all handlers in useCallback with appropriate dependencies.
+    // New Bulk Action Handlers
+    const runBulkAiAction = useCallback(async <T extends unknown>(
+        actionName: string,
+        serviceCall: (item: InventoryItem) => Promise<T>,
+        updateLogic: (item: InventoryItem, result: T) => InventoryItem,
+        itemFilter?: (item: InventoryItem) => boolean
+    ) => {
+        let items = inventory.filter(i => selectedItemIds.includes(i.id));
+        if (itemFilter) {
+            items = items.filter(itemFilter);
+        }
+        
+        if (items.length === 0) {
+            alert(`No suitable items selected for "${actionName}".`);
+            return;
+        }
+
+        if (!window.confirm(`This will run "${actionName}" on ${items.length} item(s). This may take some time and incur costs. Continue?`)) {
+            return;
+        }
+
+        logActivity('BULK_ACTION_START', `Starting bulk ${actionName} for ${items.length} items.`);
+        
+        const updates = new Map<string, InventoryItem>();
+        for (const item of items) {
+            try {
+                const result = await serviceCall(item);
+                const updatedItem = updateLogic(item, result);
+                updates.set(item.id, updatedItem);
+                logActivity('AI_ACTION_SUCCESS', `${actionName} successful for ${item.itemName}`, 'Gemini');
+            } catch (error) {
+                logActivity('AI_ACTION_ERROR', `${actionName} failed for ${item.itemName}.`);
+            }
+        }
+
+        setInventory(prev => prev.map(item => updates.get(item.id) || item));
+        logActivity('BULK_ACTION_COMPLETE', `Finished bulk ${actionName}. ${updates.size} item(s) updated.`);
+        setSelectedItemIds([]);
+    }, [inventory, logActivity, selectedItemIds, setInventory, setSelectedItemIds]);
+    
+    const handleBulkFindMarketPrice = useCallback(() => runBulkAiAction(
+        "Find Market Price",
+        geminiService.findMarketPrice,
+        (item, res) => ({ ...item, replacementCostValueRCV: res.rcv, actualCashValueACV: res.acv, valuationHistory: [...(item.valuationHistory || []), res] })
+    ), [runBulkAiAction]);
+
+    const handleBulkEnrichData = useCallback(() => runBulkAiAction(
+        "Enrich Data",
+        geminiService.enrichAssetFromWeb,
+        (item, res) => ({ ...item, webIntelligence: [...(item.webIntelligence || []), res] })
+    ), [runBulkAiAction]);
+
+    const handleBulkVisualSearch = useCallback(() => runBulkAiAction(
+        "Visual Search",
+        geminiService.findItemWithGoogleLens,
+        // Fix: Added explicit type for `res` to resolve 'unknown' type error.
+        (item, res: { itemName: string, sourceUrl: string }) => {
+            // Visual search doesn't update the item, just logs and optionally opens a tab
+            if (window.confirm(`Visual search identified "${item.itemName}" as "${res.itemName}".\n\nOpen product page?\n\n${res.sourceUrl}`)) {
+                window.open(res.sourceUrl, '_blank');
+            }
+            return item;
+        },
+        item => item.linkedProofs.some(p => p.type === 'image')
+    ), [runBulkAiAction]);
+
+    const handleBulkGenerateImages = useCallback(() => runBulkAiAction(
+        "Generate Images",
+        (item) => geminiService.generateImage(item.itemName, '4:3'),
+        // Fix: Added explicit type for `dataUrl` to resolve 'unknown' type error.
+        (item, dataUrl: string) => {
+            const newProof: Proof = {
+                id: `proof-gen-${Date.now()}`,
+                type: 'image',
+                fileName: `generated_${sanitizeFileName(item.itemName)}.jpg`,
+                dataUrl,
+                mimeType: 'image/jpeg',
+                createdBy: 'AI',
+                purpose: 'Proof of Possession',
+            };
+            return { ...item, linkedProofs: [...item.linkedProofs, newProof] };
+        },
+        item => !item.linkedProofs.some(p => p.type === 'image')
+    ), [runBulkAiAction]);
+    
+    const handleOpenBulkImageEditModal = useCallback(() => {
+        const itemsWithImages = inventory.filter(i => selectedItemIds.includes(i.id) && i.linkedProofs.some(p => p.type === 'image'));
+        if (itemsWithImages.length === 0) {
+            alert("No selected items have images to edit.");
+            return;
+        }
+        setItemsToBulkEdit(itemsWithImages);
+        setShowBulkImageEditModal(true);
+    }, [inventory, selectedItemIds]);
+
+    const handleBulkEditImages = useCallback(async (prompt: string) => {
+        setShowBulkImageEditModal(false);
+        logActivity('BULK_ACTION_START', `Starting bulk image edit for ${itemsToBulkEdit.length} items with prompt: "${prompt}"`);
+
+        const newProofs: {itemId: string, proof: Proof}[] = [];
+        for (const item of itemsToBulkEdit) {
+            const imageProof = item.linkedProofs.find(p => p.type === 'image');
+            if (imageProof) {
+                try {
+                    const newDataUrl = await geminiService.editImageWithPrompt(imageProof.dataUrl, prompt);
+                    const newProof: Proof = {
+                        id: `proof-edit-bulk-${Date.now()}`,
+                        type: 'image',
+                        fileName: `edited_${imageProof.fileName}`,
+                        dataUrl: newDataUrl,
+                        mimeType: imageProof.mimeType,
+                        createdBy: 'AI',
+                    };
+                    newProofs.push({ itemId: item.id, proof: newProof });
+                    logActivity('AI_ACTION_SUCCESS', `Bulk edit successful for ${item.itemName}`, 'Gemini');
+                } catch (error) {
+                    logActivity('AI_ACTION_ERROR', `Bulk edit failed for ${item.itemName}.`);
+                }
+            }
+        }
+
+        setInventory(prev => prev.map(item => {
+            const proofsToAdd = newProofs.filter(p => p.itemId === item.id).map(p => p.proof);
+            if (proofsToAdd.length > 0) {
+                return { ...item, linkedProofs: [...item.linkedProofs, ...proofsToAdd] };
+            }
+            return item;
+        }));
+
+        logActivity('BULK_ACTION_COMPLETE', `Finished bulk image edit. ${newProofs.length} image(s) created.`);
+        setSelectedItemIds([]);
+        setItemsToBulkEdit([]);
+    }, [itemsToBulkEdit, logActivity]);
+
+    
+    const handleLinkMultipleProofs = useCallback((itemId: string, proofIds: string[]) => {
+        const proofsToLink = unlinkedProofs.filter(p => proofIds.includes(p.id));
+        const itemToUpdate = inventory.find(i => i.id === itemId);
+
+        if (!itemToUpdate || proofsToLink.length === 0) return;
 
         setInventory(prev => prev.map(item => {
             if (item.id === itemId) {
                 // Remove from suggested proofs
-                const newSuggested = item.suggestedProofs?.filter(s => s.proofId !== proofId);
+                const newSuggested = item.suggestedProofs?.filter(s => !proofIds.includes(s.proofId));
                 return {
                     ...item,
-                    linkedProofs: [...item.linkedProofs, proofToLink],
+                    linkedProofs: [...item.linkedProofs, ...proofsToLink],
                     suggestedProofs: newSuggested
                 };
             }
             return item;
         }));
-        setUnlinkedProofs(prev => prev.filter(p => p.id !== proofId));
-        logActivity('PROOF_LINKED', `Linked proof ${proofToLink.fileName} to item.`);
-    };
+        setUnlinkedProofs(prev => prev.filter(p => !proofIds.includes(p.id)));
+        logActivity('PROOFS_LINKED', `Linked ${proofsToLink.length} proof(s) to ${itemToUpdate.itemName}.`);
+    }, [inventory, unlinkedProofs, logActivity]);
     
-    const handleUnlinkProof = (itemId: string, proofId: string) => {
+    const handleUnlinkProof = useCallback((itemId: string, proofId: string) => {
          const item = inventory.find(i => i.id === itemId);
          const proofToUnlink = item?.linkedProofs.find(p => p.id === proofId);
          if (!item || !proofToUnlink) return;
@@ -748,9 +1001,9 @@ const App: React.FC = () => {
          updateItem(updatedItem);
          setUnlinkedProofs(prev => [...prev, proofToUnlink]);
          logActivity('PROOF_UNLINKED', `Unlinked proof ${proofToUnlink.fileName}.`);
-    };
+    }, [inventory, updateItem, logActivity]);
 
-    const handleRejectSuggestion = (itemId: string, proofId: string) => {
+    const handleRejectSuggestion = useCallback((itemId: string, proofId: string) => {
         setInventory(prev => prev.map(item => {
             if (item.id === itemId) {
                 return {
@@ -761,9 +1014,9 @@ const App: React.FC = () => {
             return item;
         }));
         logActivity('SUGGESTION_REJECTED', `User rejected a proof suggestion.`);
-    };
+    }, [logActivity]);
     
-    const handleSaveToFile = () => {
+    const handleSaveToFile = useCallback(() => {
         const data = {
             inventory,
             unlinkedProofs,
@@ -782,9 +1035,9 @@ const App: React.FC = () => {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
         logActivity('VAULT_SAVED', 'User saved vault to a local JSON file.');
-    };
+    }, [inventory, unlinkedProofs, policies, accountHolder, claimDetails, activityLog, logActivity]);
     
-    const handleLoadFromFile = (file: File) => {
+    const handleLoadFromFile = useCallback((file: File) => {
         const reader = new FileReader();
         reader.onload = (event) => {
             try {
@@ -809,8 +1062,127 @@ const App: React.FC = () => {
             }
         };
         reader.readAsText(file);
-    };
+    }, [logActivity]);
 
+    const handleProcessVideo = useCallback(async (videoBlob: Blob) => {
+        logActivity('AI_ACTION_START', 'Analyzing room scan video...', 'Gemini');
+        setCurrentView('dashboard');
+        setPipelineStage('processing');
+        setPipelineProgress({ current: 0, total: 1, fileName: 'Analyzing video for items...' });
+        try {
+            const results = await geminiService.analyzeVideoForItems(videoBlob);
+            logActivity('AI_ACTION_SUCCESS', `Video analysis complete. Found ${results.items.length} potential items.`, 'Gemini');
+
+            if (results.items.length > 0) {
+                 const newItems: InventoryItem[] = results.items.map((item, i) => ({
+                    id: `item-video-${Date.now()}-${i}`,
+                    status: 'needs-review',
+                    itemName: item.name,
+                    itemDescription: item.description,
+                    itemCategory: item.category,
+                    originalCost: item.estimatedValue || 0,
+                    linkedProofs: [],
+                    createdAt: new Date().toISOString(),
+                    createdBy: 'AI Video Analysis',
+                 }));
+                 setInventory(prev => [...prev, ...newItems]);
+            }
+        } catch (error) {
+            logActivity('AI_ACTION_ERROR', `Video analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        } finally {
+            setPipelineStage('idle');
+            setStatusFilter('needs-review');
+        }
+    }, [logActivity]);
+
+    const handleAnalyzeImages = useCallback(async (files: File[], prompt: string): Promise<string> => {
+        logActivity('AI_ACTION_START', `Analyzing ${files.length} image(s) with prompt: "${prompt}"`, 'Gemini');
+        try {
+            const imageDataUrls = await Promise.all(
+                files.map(async file => {
+                    const dataUrl = await fileToDataUrl(file);
+                    return {
+                        data: dataUrl.split(',')[1],
+                        mimeType: file.type
+                    };
+                })
+            );
+            const result = await geminiService.analyzeImages(imageDataUrls, prompt);
+            logActivity('AI_ACTION_SUCCESS', `Image analysis complete.`);
+            return result;
+        } catch (error) {
+            logActivity('AI_ACTION_ERROR', `Image analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            throw error; // Re-throw to be caught in the modal
+        }
+    }, [logActivity]);
+    
+    const handleSaveEditedImage = useCallback((originalProof: Proof, newDataUrl: string) => {
+        const newProof: Proof = {
+            id: `proof-edit-${Date.now()}`,
+            type: 'image',
+            fileName: `edited_${originalProof.fileName}`,
+            dataUrl: newDataUrl,
+            mimeType: originalProof.mimeType,
+            createdBy: 'AI',
+            purpose: originalProof.purpose,
+        };
+
+        // Find which item this proof belonged to and add the new one
+        setInventory(prev => prev.map(item => {
+            if (item.linkedProofs.some(p => p.id === originalProof.id)) {
+                return {
+                    ...item,
+                    linkedProofs: [...item.linkedProofs, newProof]
+                };
+            }
+            return item;
+        }));
+        logActivity('PROOF_CREATED', `AI edited an image, creating new proof: ${newProof.fileName}`);
+        setEditingProof(null);
+    }, [logActivity]);
+
+    const handleSaveGeneratedImage = useCallback((item: InventoryItem, dataUrl: string) => {
+         const newProof: Proof = {
+            id: `proof-gen-${Date.now()}`,
+            type: 'image',
+            fileName: `generated_${sanitizeFileName(item.itemName)}.jpg`,
+            dataUrl,
+            mimeType: 'image/jpeg',
+            createdBy: 'AI',
+            purpose: 'Proof of Possession',
+        };
+         const updatedItem = {
+            ...item,
+            linkedProofs: [...item.linkedProofs, newProof]
+        };
+        updateItem(updatedItem);
+        logActivity('PROOF_CREATED', `AI generated an image for item: ${item.itemName}`);
+        setGeneratingForItem(null);
+    }, [updateItem, logActivity]);
+    
+    const handleSaveAudioNote = useCallback((item: InventoryItem, audioBlob: Blob, transcription: string) => {
+        const dataUrlPromise = fileToDataUrl(new File([audioBlob], 'audio_note.webm', { type: audioBlob.type }));
+        Promise.all([dataUrlPromise]).then(([audioDataUrl]) => {
+             const audioProof: Proof = {
+                id: `proof-audio-${Date.now()}`,
+                type: 'audio',
+                fileName: `audio_note_${new Date().toISOString()}.webm`,
+                dataUrl: audioDataUrl,
+                mimeType: audioBlob.type,
+                createdBy: 'User',
+                purpose: 'Supporting Document',
+                summary: transcription,
+            };
+
+            const updatedItem = {
+                ...item,
+                linkedProofs: [...item.linkedProofs, audioProof]
+            };
+            updateItem(updatedItem);
+            logActivity('PROOF_CREATED', `Added transcribed audio note to ${item.itemName}`);
+            setRecordingForItem(null);
+        });
+    }, [updateItem, logActivity]);
 
     const renderContent = () => {
         switch (currentView) {
@@ -832,14 +1204,37 @@ const App: React.FC = () => {
                         onDraftClaim={handleDraftClaim}
                         onVisualSearch={handleVisualSearch}
                         onFindProductImage={handleFindProductImage}
-                        onLinkProof={handleLinkProof}
+                        onLinkMultipleProofs={handleLinkMultipleProofs}
                         onUnlinkProof={handleUnlinkProof}
                         onRejectSuggestion={handleRejectSuggestion}
                         onAddProof={handleAddProofs}
                         uploadProgress={uploadProgress}
                         itemCategories={itemCategories}
+                        onExtractSerialNumber={handleExtractSerialNumber}
+                        onExtractReceiptInfo={handleExtractReceiptInfo}
+                        onEditImage={setEditingProof}
+                        onGenerateImage={setGeneratingForItem}
+                        onRecordAudio={setRecordingForItem}
+                        onImageZoom={setZoomedImageUrl}
+                        claimDetails={claimDetails}
+                        policyHolders={policyHolders}
                     />
                 ) : null;
+            case 'processing-preview':
+                return (
+                    <ProcessingPreview
+                        proofs={proofsToProcess}
+                        inventory={inventory}
+                        onFinalize={handleFinalizeProcessing}
+                        onCancel={() => {
+                            setProofsToProcess([]);
+                            setCurrentView('dashboard');
+                        }}
+                        policyHolders={policyHolders}
+                        onImageZoom={setZoomedImageUrl}
+                        claimDetails={claimDetails}
+                    />
+                );
             case 'dashboard':
             default:
                  return (
@@ -850,14 +1245,14 @@ const App: React.FC = () => {
                         policies={policies}
                         activePolicy={activePolicy}
                         claimDetails={claimDetails}
-                        onUpdateClaimDetails={setClaimDetails}
+                        onUpdateClaimDetails={handleUpdateClaimDetails}
                         isParsingPolicy={isParsingPolicy}
                         onUploadPolicy={handlePolicyUpload}
-                        onUpdatePolicy={handleUpdatePolicy}
                         onSetActivePolicy={handleSetActivePolicy}
                         onSelectItem={handleSelectItem}
                         onItemPhotosSelected={(files) => handleFileUploads(Array.from(files))}
                         onStartRoomScan={() => setCurrentView('room-scan')}
+                        onOpenImageAnalysis={() => setShowImageAnalysisModal(true)}
                         searchTerm={searchTerm}
                         onSearchTermChange={setSearchTerm}
                         categoryFilter={categoryFilter}
@@ -872,10 +1267,23 @@ const App: React.FC = () => {
                         pipelineStage={pipelineStage}
                         pipelineProgress={pipelineProgress}
                         onCancelPipeline={() => setPipelineStage('idle')}
+                        
+                        selectedItemIds={selectedItemIds}
+                        onToggleItemSelection={handleToggleItemSelection}
+                        onSelectAllFilteredItems={handleSelectAllFilteredItems}
+                        onClearSelection={handleClearSelection}
+                        onApproveSelected={handleApproveSelectedItems}
+                        onRejectSelected={handleRejectSelectedItems}
+                        onBulkExtractSerialNumbers={handleBulkExtractSerialNumbers}
+                        onBulkFindMarketPrice={handleBulkFindMarketPrice}
+                        onBulkEnrichData={handleBulkEnrichData}
+                        onBulkVisualSearch={handleBulkVisualSearch}
+                        onBulkGenerateImages={handleBulkGenerateImages}
+                        onOpenBulkImageEditModal={handleOpenBulkImageEditModal}
                     />
                  );
              case 'room-scan':
-                return <RoomScanView onClose={() => setCurrentView('dashboard')} onProcessVideo={() => {}} />;
+                return <RoomScanView onClose={() => setCurrentView('dashboard')} onProcessVideo={handleProcessVideo} />;
         }
     };
 
@@ -889,15 +1297,63 @@ const App: React.FC = () => {
                 showDownload={inventory.length > 0}
                 onSaveToFile={() => setShowSaveModal(true)}
                 onLoadFromFile={handleLoadFromFile}
+                onAskGemini={() => setShowAssistant(true)}
             />
             <main className="container mx-auto px-4 md:px-8 py-8">
                 {renderContent()}
             </main>
+            {zoomedImageUrl && (
+                <ImageZoomModal 
+                    imageUrl={zoomedImageUrl}
+                    onClose={() => setZoomedImageUrl(null)}
+                />
+            )}
+            {showAssistant && (
+                <GeminiAssistant
+                    onClose={() => setShowAssistant(false)}
+                    inventory={inventory}
+                    policy={activePolicy}
+                />
+            )}
+            {editingProof && (
+                <ImageEditorModal
+                    proof={editingProof}
+                    onClose={() => setEditingProof(null)}
+                    onSave={handleSaveEditedImage}
+                />
+            )}
+            {generatingForItem && (
+                <ImageGeneratorModal
+                    item={generatingForItem}
+                    onClose={() => setGeneratingForItem(null)}
+                    onGenerate={handleSaveGeneratedImage}
+                />
+            )}
+             {recordingForItem && (
+                <AudioRecorderModal
+                    item={recordingForItem}
+                    onClose={() => setRecordingForItem(null)}
+                    onSave={handleSaveAudioNote}
+                />
+            )}
+            {showImageAnalysisModal && (
+                <ImageAnalysisModal
+                    onClose={() => setShowImageAnalysisModal(false)}
+                    onAnalyze={handleAnalyzeImages}
+                />
+            )}
             {showPolicyReviewModal && policyAnalysisReport && (
                 <PolicyReviewModal
                     report={policyAnalysisReport}
                     onClose={() => setShowPolicyReviewModal(false)}
                     onSave={handleSavePolicy}
+                />
+            )}
+            {showBulkImageEditModal && (
+                <BulkImageEditModal
+                    itemCount={selectedItemIds.length}
+                    onClose={() => setShowBulkImageEditModal(false)}
+                    onSave={handleBulkEditImages}
                 />
             )}
             {showLog && <ActivityLogView log={activityLog} onClose={() => setShowLog(false)} />}

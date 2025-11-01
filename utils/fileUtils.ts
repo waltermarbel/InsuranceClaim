@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import { InventoryItem, Proof } from './types';
+import { InventoryItem, Proof } from './types.ts';
 // Fix: Removed self-import of `sanitizeFileName` which was causing a conflict.
 
 
@@ -41,6 +41,21 @@ export const fileToBase64 = (file: File): Promise<string> => {
     });
 };
 
+export const blobToBase64 = (blob: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(blob);
+        reader.onloadend = () => {
+            if (typeof reader.result === 'string') {
+                resolve(reader.result.split(',')[1]);
+            } else {
+                reject(new Error("Failed to read blob as base64 string."));
+            }
+        };
+        reader.onerror = error => reject(error);
+    });
+};
+
 export const dataUrlToBlob = (dataUrl: string): Blob => {
     const arr = dataUrl.split(',');
     const mimeMatch = arr[0].match(/:(.*?);/);
@@ -61,7 +76,8 @@ export const urlToDataUrl = (url: string): Promise<string> => {
     return new Promise(async (resolve, reject) => {
         try {
             // Use a reliable CORS proxy to fetch cross-origin images client-side.
-            const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+            // Switched from corsproxy.io to allorigins.win to resolve 404 errors.
+            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
             const response = await fetch(proxyUrl);
 
             if (!response.ok) {
@@ -97,7 +113,7 @@ export const sanitizeFileName = (name: string): string => {
 export const exportToCSV = (items: InventoryItem[], filename: string) => {
     const headers = [
         "Item Name", "Description", "Category", "Original Cost", "RCV", "ACV",
-        "Purchase Date", "Brand", "Model", "Serial Number", "Condition", "Proof Strength", "Is Claimed"
+        "Purchase Date", "Brand", "Model", "Serial Number", "Condition", "Proof Strength", "Is Claimed", "Primary Proof Note"
     ];
     const rows = items.map(item => [
         `"${item.itemName.replace(/"/g, '""')}"`,
@@ -112,7 +128,8 @@ export const exportToCSV = (items: InventoryItem[], filename: string) => {
         item.serialNumber || '',
         item.condition || '',
         item.proofStrengthScore || '',
-        item.status === 'claimed' ? 'Yes' : 'No'
+        item.status === 'claimed' ? 'Yes' : 'No',
+        `"${item.linkedProofs[0]?.notes?.replace(/"/g, '""') || ''}"`
     ]);
 
     const csvContent = "data:text/csv;charset=utf-8,"
@@ -149,17 +166,19 @@ export const exportToZip = async (inventory: InventoryItem[], unlinkedProofs: Pr
     }
 
     // Process unlinked proofs
-    for (const proof of unlinkedProofs) {
+    const unlinkedForExport = JSON.parse(JSON.stringify(unlinkedProofs));
+    for (const proof of unlinkedForExport) {
         const blob = dataUrlToBlob(proof.dataUrl);
         const newFileName = sanitizeFileName(`unlinked_${proof.fileName}`);
         proofsFolder.file(newFileName, blob);
+        proof.dataUrl = `proofs/${newFileName}`;
     }
     
     // Create the main JSON manifest
     const manifest = {
         exportedAt: new Date().toISOString(),
         inventory: inventoryForExport,
-        unlinkedProofs: unlinkedProofs.map(p => ({...p, dataUrl: `proofs/unlinked_${sanitizeFileName(p.fileName)}`})),
+        unlinkedProofs: unlinkedForExport,
     };
     zip.file("inventory.json", JSON.stringify(manifest, null, 2));
 

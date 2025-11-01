@@ -1,56 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { ParsedPolicy, PolicyAnalysisReport } from '../types.ts';
 import { XIcon, CheckCircleIcon, InformationCircleIcon, TrashIcon, PlusIcon, ExclamationTriangleIcon } from './icons.tsx';
-import { CurrencyInput } from './CurrencyInput.tsx';
 
 interface PolicyReviewModalProps {
   report: PolicyAnalysisReport;
-  onSave: (policy: Omit<ParsedPolicy, 'id' | 'isActive' | 'isVerified'>, report: PolicyAnalysisReport) => void;
+  onSave: (report: PolicyAnalysisReport) => void;
   onClose: () => void;
 }
 
+const DetailRow: React.FC<{ label: string, value: string | number | undefined }> = ({ label, value }) => (
+    <div>
+        <p className="text-xs font-medium text-medium">{label}</p>
+        <p className="text-sm text-dark font-semibold">{value || 'N/A'}</p>
+    </div>
+);
+
 const PolicyReviewModal: React.FC<PolicyReviewModalProps> = ({ report, onSave, onClose }) => {
-  const [editablePolicy, setEditablePolicy] = useState<Omit<ParsedPolicy, 'id'| 'isActive' | 'isVerified'>>(() => ({
-    policyName: `Policy ${report.parsedPolicy.policyNumber}`,
-    ...report.parsedPolicy
-  }));
-
-  useEffect(() => {
-    setEditablePolicy({
-        policyName: `Policy ${report.parsedPolicy.provider} ${report.parsedPolicy.effectiveDate.split('-')[0]}`,
-        ...report.parsedPolicy
-    });
-  }, [report]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setEditablePolicy(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleSubLimitChange = (index: number, field: 'category' | 'limit', value: string | number) => {
-    const updatedCoverage = [...editablePolicy.coverage];
-    const subLimits = updatedCoverage.filter(c => c.type === 'sub-limit');
-    const mainCoverage = updatedCoverage.find(c => c.type === 'main');
-    
-    const targetLimit = subLimits[index];
-    if (targetLimit) {
-        (targetLimit[field] as any) = value;
-    }
-
-    const newSubLimits = [...subLimits];
-    
-    setEditablePolicy(prev => ({
-        ...prev,
-        coverage: mainCoverage ? [mainCoverage, ...newSubLimits] : newSubLimits
-    }));
-  };
+  const policy = report.parsedPolicy;
 
   const handleSubmit = () => {
-    onSave(editablePolicy, report);
+    onSave(report);
   };
 
-  const mainCoverage = editablePolicy.coverage.find(c => c.type === 'main');
-  const subLimits = editablePolicy.coverage.filter(c => c.type === 'sub-limit');
+  const mainCoverage = policy.coverage.find(c => c.type === 'main');
+  const subLimits = policy.coverage.filter(c => c.type === 'sub-limit');
 
   const getAnalysisTitle = () => {
     switch(report.analysisType) {
@@ -81,7 +54,7 @@ const PolicyReviewModal: React.FC<PolicyReviewModalProps> = ({ report, onSave, o
                     <div className="flex-shrink-0"><InformationCircleIcon className="h-5 w-5 text-blue-500" /></div>
                     <div className="ml-3">
                         <p className="text-sm font-bold">AI Confidence: {report.parsedPolicy.confidenceScore}%</p>
-                        <p className="mt-1 text-xs">Please review the details extracted by the AI. You can edit any field before saving. Your corrections help the AI learn.</p>
+                        <p className="mt-1 text-xs">Please review the details extracted by the AI. If correct, confirm and save.</p>
                     </div>
                 </div>
             </div>
@@ -98,33 +71,32 @@ const PolicyReviewModal: React.FC<PolicyReviewModalProps> = ({ report, onSave, o
                     </div>
                 </div>
             )}
-            {/* Form Fields */}
+            {/* Display Fields */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 text-sm">
                  <div className="space-y-4">
                     <h4 className="font-semibold text-dark border-b pb-1">Policy Info</h4>
-                    <div><label className="text-xs font-medium text-medium">Policy Name</label><input type="text" name="policyName" value={editablePolicy.policyName} onChange={handleChange} className="w-full mt-0.5 px-2 py-1.5 text-sm border-slate-300 rounded-md"/></div>
-                    <div><label className="text-xs font-medium text-medium">Policy #</label><input type="text" name="policyNumber" value={editablePolicy.policyNumber} onChange={handleChange} className="w-full mt-0.5 px-2 py-1.5 text-sm border-slate-300 rounded-md"/></div>
-                    <div><label className="text-xs font-medium text-medium">Policyholder</label><input type="text" name="policyHolder" value={editablePolicy.policyHolder} onChange={handleChange} className="w-full mt-0.5 px-2 py-1.5 text-sm border-slate-300 rounded-md"/></div>
-                    <div><label className="text-xs font-medium text-medium">Provider</label><input type="text" name="provider" value={editablePolicy.provider} onChange={handleChange} className="w-full mt-0.5 px-2 py-1.5 text-sm border-slate-300 rounded-md"/></div>
-                    <div><label className="text-xs font-medium text-medium">Policy Type (e.g., HO-4)</label><input type="text" name="policyType" value={editablePolicy.policyType || ''} onChange={handleChange} className="w-full mt-0.5 px-2 py-1.5 text-sm border-slate-300 rounded-md"/></div>
-                    <div className="grid grid-cols-2 gap-2">
-                         <div><label className="text-xs font-medium text-medium">Effective Date</label><input type="date" name="effectiveDate" value={editablePolicy.effectiveDate || ''} onChange={handleChange} className="w-full mt-0.5 px-2 py-1.5 text-sm border-slate-300 rounded-md"/></div>
-                        <div><label className="text-xs font-medium text-medium">Expiration Date</label><input type="date" name="expirationDate" value={editablePolicy.expirationDate || ''} onChange={handleChange} className="w-full mt-0.5 px-2 py-1.5 text-sm border-slate-300 rounded-md"/></div>
+                    <DetailRow label="Policy #" value={policy.policyNumber} />
+                    <DetailRow label="Policyholder" value={policy.policyHolder} />
+                    <DetailRow label="Provider" value={policy.provider} />
+                    <DetailRow label="Policy Type" value={policy.policyType} />
+                    <div className="grid grid-cols-2 gap-4">
+                        <DetailRow label="Effective Date" value={policy.effectiveDate} />
+                        <DetailRow label="Expiration Date" value={policy.expirationDate} />
                     </div>
                 </div>
                  <div className="space-y-4">
                     <h4 className="font-semibold text-dark border-b pb-1">Coverage Details</h4>
-                    {mainCoverage && <div><label className="text-xs font-medium text-medium">{mainCoverage.category}</label><CurrencyInput value={mainCoverage.limit} onChange={(v) => { /* Main limit is not typically user-editable this way */ }} className="w-full text-sm mt-0.5 px-2 py-1.5 border-slate-300 rounded-md bg-slate-50"/></div>}
-                    <div><label className="text-xs font-medium text-medium">Deductible</label><CurrencyInput value={editablePolicy.deductible} onChange={(v) => setEditablePolicy(p => ({...p, deductible: v}))} className="w-full text-sm mt-0.5 px-2 py-1.5 border-slate-300 rounded-md"/></div>
-                    <div><label className="text-xs font-medium text-medium">Loss of Use (Coverage D)</label><CurrencyInput value={editablePolicy.coverageD_limit} onChange={(v) => setEditablePolicy(p => ({...p, coverageD_limit: v}))} className="w-full text-sm mt-0.5 px-2 py-1.5 border-slate-300 rounded-md"/></div>
-                    <div><label className="text-xs font-medium text-medium">Settlement Method</label><select name="lossSettlementMethod" value={editablePolicy.lossSettlementMethod} onChange={handleChange} className="w-full text-sm mt-0.5 px-2 py-1.5 border-slate-300 rounded-md"><option>RCV</option><option>ACV</option></select></div>
+                    {mainCoverage && <DetailRow label={mainCoverage.category} value={mainCoverage.limit ? `$${mainCoverage.limit.toLocaleString()}` : 'N/A'} />}
+                    <DetailRow label="Deductible" value={policy.deductible ? `$${policy.deductible.toLocaleString()}` : 'N/A'} />
+                    <DetailRow label="Loss of Use (Coverage D)" value={policy.coverageD_limit ? `$${policy.coverageD_limit.toLocaleString()}` : 'N/A'} />
+                    <DetailRow label="Settlement Method" value={policy.lossSettlementMethod} />
                     
                     <h4 className="font-semibold text-dark pt-2 border-b pb-1">Sub-Limits</h4>
                     <div className="space-y-2 max-h-48 overflow-y-auto pr-2 -mr-2">
                         {subLimits.map((limit, index) => (
-                             <div key={index} className="flex items-center gap-2">
-                                <input type="text" placeholder="Category" value={limit.category} onChange={(e) => handleSubLimitChange(index, 'category', e.target.value)} className="w-full text-sm p-1 border rounded-md"/>
-                                <CurrencyInput value={limit.limit} onChange={(v) => handleSubLimitChange(index, 'limit', v)} className="w-full text-sm p-1 border rounded-md"/>
+                             <div key={index} className="flex items-center justify-between text-sm">
+                                <span className="text-dark">{limit.category}</span>
+                                <span className="font-semibold text-dark">{limit.limit ? `$${limit.limit.toLocaleString()}` : 'N/A'}</span>
                             </div>
                         ))}
                          {subLimits.length === 0 && (

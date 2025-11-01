@@ -1,6 +1,6 @@
 
 import React, { useRef } from 'react';
-import { CubeIcon } from './icons';
+import { CubeIcon, SparklesIcon } from './icons.tsx';
 
 interface HeaderProps {
     onReset: () => void;
@@ -10,6 +10,7 @@ interface HeaderProps {
     showDownload: boolean;
     onSaveToFile: () => void;
     onLoadFromFile: (file: File) => void;
+    onAskGemini: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({ 
@@ -20,6 +21,7 @@ export const Header: React.FC<HeaderProps> = ({
     showDownload,
     onSaveToFile,
     onLoadFromFile,
+    onAskGemini
 }) => {
   const loadFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -52,6 +54,14 @@ export const Header: React.FC<HeaderProps> = ({
             </span>
           </div>
           <div className="flex items-center space-x-4">
+             <button
+                onClick={onAskGemini}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold bg-primary/10 text-primary rounded-full shadow-sm hover:bg-primary/20 transition"
+             >
+                <SparklesIcon className="h-5 w-5"/>
+                Ask Gemini
+            </button>
+            <div className="h-6 border-l border-slate-200"></div>
              {showDownload && (
                 <button
                     onClick={onDownloadVault}

@@ -44,7 +44,8 @@ const UploadProgressView: React.FC<UploadProgressViewProps> = ({ files, onDone, 
                 {file.status === 'pending' && <span className="text-xs text-medium">Waiting...</span>}
                 {file.status === 'analyzing' && <SpinnerIcon className="h-5 w-5 text-primary"/>}
                 {file.status === 'success' && <CheckCircleIcon className="h-5 w-5 text-success"/>}
-                {file.status === 'error' && <ExclamationIcon className="h-5 w-5 text-danger" title={file.errorMessage}/>}
+                {/* Fix: Wrap icon in a span to apply the title attribute correctly. */}
+                {file.status === 'error' && <span title={file.errorMessage}><ExclamationIcon className="h-5 w-5 text-danger"/></span>}
               </div>
             </div>
           ))}

@@ -1,3 +1,21 @@
+import React from 'react';
+import {
+    DevicePhoneMobileIcon,
+    HomeIcon,
+    GemIcon,
+    PaintBrushIcon,
+    WashingMachineIcon,
+    TShirtIcon,
+    WrenchScrewdriverIcon,
+    StarIcon,
+    DocumentTextIcon,
+    HeartIcon,
+    BriefcaseIcon,
+    BookOpenIcon,
+    TagIcon,
+} from './components/icons.tsx';
+
+
 export const CATEGORIES = [
     'Electronics', 
     'Furniture', 
@@ -14,7 +32,7 @@ export const CATEGORIES = [
     'Other'
 ];
 
-export const CATEGORY_COLORS: Record<string, string> = {
+export const CATEGORY_COLORS = {
     'Electronics': '#3b82f6',
     'Furniture': '#a16207',
     'Jewelry': '#d97706',
@@ -30,8 +48,25 @@ export const CATEGORY_COLORS: Record<string, string> = {
     'Other': '#737373'
 };
 
+export const CATEGORY_ICONS = {
+    'Electronics': DevicePhoneMobileIcon,
+    'Furniture': HomeIcon,
+    'Jewelry': GemIcon,
+    'Art': PaintBrushIcon,
+    'Appliances': WashingMachineIcon,
+    'Clothing': TShirtIcon,
+    'Tools': WrenchScrewdriverIcon,
+    'Collectibles': StarIcon,
+    'Documents': DocumentTextIcon,
+    'Medical Equipment': HeartIcon,
+    'Travel Accessories': BriefcaseIcon,
+    'Books': BookOpenIcon,
+    'Other': TagIcon,
+};
+
+
 // New: Colors for proof purpose badges
-export const PROOF_PURPOSE_COLORS: Record<string, { bg: string, text: string }> = {
+export const PROOF_PURPOSE_COLORS = {
     'Proof of Purchase': { bg: 'bg-emerald-100', text: 'text-emerald-800' },
     'Proof of Possession': { bg: 'bg-sky-100', text: 'text-sky-800' },
     'Proof of Value': { bg: 'bg-purple-100', text: 'text-purple-800' },

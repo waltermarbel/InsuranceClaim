@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 // Fix: Added .ts extension to file path
 import { InventoryItem, AccountHolder, ParsedPolicy, OtherCosts, ClaimDetails, PipelineStage, PipelineProgress } from '../types.ts';
 import ItemCard from './ItemCard.tsx';
-import { PlusIcon, SearchIcon, VideoCameraIcon, ClipboardDocumentListIcon, ExclamationTriangleIcon, WrenchScrewdriverIcon, PencilIcon, CheckCircleIcon, InformationCircleIcon, CubeIcon, ShieldExclamationIcon } from './icons.tsx';
+import { PlusIcon, SearchIcon, VideoCameraIcon, ClipboardDocumentListIcon, ExclamationTriangleIcon, WrenchScrewdriverIcon, PencilIcon, CheckCircleIcon, InformationCircleIcon, CubeIcon, ShieldExclamationIcon, XCircleIcon, QrCodeIcon, PencilSquareIcon, GlobeIcon, DocumentMagnifyingGlassIcon, CameraIcon, SparklesIcon, PhotoIcon } from './icons.tsx';
 import { InsuranceSection } from './InsuranceSection.tsx';
 import { CategoryPieChart } from './CategoryPieChart.tsx';
 import { AIPipelineMonitor } from './AIPipelineMonitor.tsx';
@@ -15,14 +15,14 @@ interface InventoryDashboardProps {
   policies: ParsedPolicy[];
   activePolicy: ParsedPolicy | undefined;
   claimDetails: ClaimDetails;
-  onUpdateClaimDetails: (details: ClaimDetails) => void;
+  onUpdateClaimDetails: (updatedDetails: Partial<ClaimDetails>) => void;
   isParsingPolicy: boolean;
   onUploadPolicy: (file: File) => void;
-  onUpdatePolicy: (policy: ParsedPolicy) => void;
   onSetActivePolicy: (policyId: string) => void;
   onSelectItem: (itemId: string) => void;
   onItemPhotosSelected: (files: FileList) => void;
   onStartRoomScan: () => void;
+  onOpenImageAnalysis: () => void;
   searchTerm: string;
   onSearchTermChange: (value: string) => void;
   categoryFilter: string;
@@ -37,54 +37,30 @@ interface InventoryDashboardProps {
   pipelineStage: PipelineStage;
   pipelineProgress: PipelineProgress;
   onCancelPipeline: () => void;
+  
+  selectedItemIds: string[];
+  onToggleItemSelection: (itemId: string) => void;
+  onSelectAllFilteredItems: () => void;
+  onClearSelection: () => void;
+  onApproveSelected: () => void;
+  onRejectSelected: () => void;
+  onBulkExtractSerialNumbers: () => void;
+  onBulkFindMarketPrice: () => void;
+  onBulkEnrichData: () => void;
+  onBulkVisualSearch: () => void;
+  onBulkGenerateImages: () => void;
+  onOpenBulkImageEditModal: () => void;
 }
 
 interface ClaimOverviewProps {
     items: InventoryItem[];
     policy: ParsedPolicy | null;
     claimDetails: ClaimDetails;
-    onUpdateClaimDetails: (details: ClaimDetails) => void;
+    onUpdateClaimDetails: (updatedDetails: Partial<ClaimDetails>) => void;
 }
 
 const ClaimOverview: React.FC<ClaimOverviewProps> = ({ items, policy, claimDetails, onUpdateClaimDetails }) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editableDetails, setEditableDetails] = useState<ClaimDetails>(claimDetails);
-
   const claimedItems = items.filter(item => item.status === 'claimed');
-
-  useEffect(() => {
-      setEditableDetails(claimDetails);
-  }, [claimDetails]);
-
-  if (!policy) return null;
-
-  if (claimedItems.length === 0) {
-    return (
-        <div className="mb-10 text-center p-8 bg-white rounded-lg shadow-sm border border-slate-200">
-             <h3 className="text-xl font-bold tracking-tight text-dark font-heading flex items-center justify-center gap-2 mb-2">
-                <ClipboardDocumentListIcon className="h-6 w-6 text-medium"/>
-                No Active Claim
-            </h3>
-            <p className="text-medium">To start a claim, select an item from your ledger and use the "Draft Claim" action in its detail view.</p>
-        </div>
-    );
-  }
-
-  const handleSave = () => {
-    onUpdateClaimDetails(editableDetails);
-    setIsEditing(false);
-  };
-  
-  const handleCancel = () => {
-    setEditableDetails(claimDetails);
-    setIsEditing(false);
-  };
-
-  const handleDetailsChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setEditableDetails(prev => ({ ...prev, [name]: value }));
-  };
-
 
   const calculateCosts = () => {
     let lossOfUse = 0;
@@ -117,97 +93,110 @@ const ClaimOverview: React.FC<ClaimOverviewProps> = ({ items, policy, claimDetai
   const personalPropertyTotal = claimedItems.reduce((acc, item) => acc + (item.replacementCostValueRCV || item.originalCost || 0), 0);
   const totalClaimValue = personalPropertyTotal + calculatedCosts.lossOfUse + calculatedCosts.propertyDamage + calculatedCosts.identityFraud;
   
+  if (!policy) return null;
   const identityFraudLimit = policy.coverage.find(c => c.category === 'Identity Fraud Expenses')?.limit || 0;
   const jewelryLimit = policy.coverage.find(c => c.category === 'Jewelry')?.limit || 0;
   
   const identityFraudConflict = calculatedCosts.identityFraud > identityFraudLimit;
   const jewelryValue = claimedItems.filter(i => i.itemCategory === 'Jewelry').reduce((acc, item) => acc + (item.replacementCostValueRCV || item.originalCost || 0), 0);
   const jewelryConflict = jewelryValue > jewelryLimit;
+  
+  const isClaimSetup = claimedItems.length === 0;
+
+  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const { name, value } = e.target;
+      onUpdateClaimDetails({
+          claimDateRange: {
+              ...claimDetails.claimDateRange,
+              [name]: value,
+          }
+      });
+  };
 
   return (
     <div className="mb-10">
         <h3 className="text-xl font-bold tracking-tight text-dark font-heading flex items-center gap-2 mb-4">
             <ClipboardDocumentListIcon className="h-6 w-6 text-medium"/>
-            Claim Overview: {claimDetails.name}
+            {isClaimSetup ? 'Claim Setup' : `Claim Overview: ${claimDetails.name}`}
         </h3>
         <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="md:col-span-2">
-                 <div className="flex justify-between items-center mb-3">
-                    <h4 className="font-bold text-dark font-heading">Claim Value Breakdown</h4>
-                 </div>
-                <div className="space-y-2 text-sm">
-                    <div className="flex justify-between items-center py-1 border-b"><span className="text-medium">Personal Property (Coverage C)</span><span className="font-semibold text-dark">${personalPropertyTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
-                    <div className="flex justify-between items-center py-1 border-b"><span className="text-medium">Loss of Use (Coverage D)</span><span className="font-semibold text-dark">${calculatedCosts.lossOfUse.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
-                    <div className="flex justify-between items-center py-1 border-b"><span className="text-medium">Property Damage & Debris Removal</span><span className="font-semibold text-dark">${calculatedCosts.propertyDamage.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
-                    <div className="flex justify-between items-center py-1 border-b"><span className="text-medium">Identity Fraud Expenses</span><span className="font-semibold text-dark">${calculatedCosts.identityFraud.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
-                    <div className="flex justify-between items-center pt-2 font-bold text-lg"><span className="text-dark font-heading">Total Claim Value</span><span className="text-primary">${totalClaimValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
-                </div>
-                
-                <div className="mt-6">
-                    <h4 className="font-bold text-dark mb-2 flex items-center gap-2 font-heading">
-                        <WrenchScrewdriverIcon className="h-5 w-5 text-medium" />
-                        <span>Property Damage Details</span>
-                    </h4>
-                    {isEditing ? (
-                        <textarea
-                            name="propertyDamageDetails"
-                            value={editableDetails.propertyDamageDetails}
-                            onChange={handleDetailsChange}
-                            rows={6}
-                            className="w-full text-xs text-medium bg-white p-4 rounded-md border border-primary/50 shadow-inner focus:outline-none focus:ring-1 focus:ring-primary"
-                        />
-                    ) : (
-                        <div className="text-xs text-medium bg-slate-50 p-4 rounded-md border space-y-2 whitespace-pre-wrap">
-                            {claimDetails.propertyDamageDetails || 'No details provided.'}
+                {isClaimSetup ? (
+                    <div className="h-full flex flex-col justify-center">
+                        <h4 className="font-bold text-dark font-heading">Prepare Your Claim</h4>
+                        <p className="text-medium text-sm mt-1">
+                            Set up the details of your loss event here. Once you start drafting claims for items, a value breakdown will appear.
+                        </p>
+                         <div className="mt-6">
+                            <h4 className="font-bold text-dark mb-2 flex items-center gap-2 font-heading">
+                                <WrenchScrewdriverIcon className="h-5 w-5 text-medium" />
+                                <span>Property Damage Details</span>
+                            </h4>
+                            <div className="text-xs text-medium bg-slate-50 p-4 rounded-md border space-y-2 whitespace-pre-wrap">
+                                {claimDetails.propertyDamageDetails || 'No details provided.'}
+                            </div>
                         </div>
-                    )}
-                </div>
-                {(identityFraudConflict || jewelryConflict) && (<div className="mt-6"><h4 className="font-bold text-dark mb-2 font-heading">Strategic Highlights</h4><div className="space-y-3">{identityFraudConflict && (<div className="p-3 bg-warning/20 border-l-4 border-warning text-dark/80 text-sm"><div className="flex"><div className="flex-shrink-0"><ExclamationTriangleIcon className="h-5 w-5 text-warning"/></div><div className="ml-3"><p><strong className="font-semibold">Sub-Limit Conflict:</strong> Claimed Identity Fraud Expenses of ${calculatedCosts.identityFraud.toLocaleString()} exceed the ${identityFraudLimit.toLocaleString()} policy sub-limit. This requires a specific negotiation strategy.</p></div></div></div>)}{jewelryConflict && (<div className="p-3 bg-warning/20 border-l-4 border-warning text-dark/80 text-sm"><div className="flex"><div className="flex-shrink-0"><ExclamationTriangleIcon className="h-5 w-5 text-warning"/></div><div className="ml-3"><p><strong className="font-semibold">Sub-Limit Conflict:</strong> Total Jewelry value of ${jewelryValue.toLocaleString()} exceed the ${jewelryLimit.toLocaleString()} theft sub-limit. Items may need separate scheduling for full coverage.</p></div></div></div>)}</div></div>)}
+                    </div>
+                ) : (
+                    <>
+                        <div className="flex justify-between items-center mb-3">
+                            <h4 className="font-bold text-dark font-heading">Claim Value Breakdown</h4>
+                        </div>
+                        <div className="space-y-2 text-sm">
+                            <div className="flex justify-between items-center py-1 border-b"><span className="text-medium">Personal Property (Coverage C)</span><span className="font-semibold text-dark">${personalPropertyTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
+                            <div className="flex justify-between items-center py-1 border-b"><span className="text-medium">Loss of Use (Coverage D)</span><span className="font-semibold text-dark">${calculatedCosts.lossOfUse.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
+                            <div className="flex justify-between items-center py-1 border-b"><span className="text-medium">Property Damage & Debris Removal</span><span className="font-semibold text-dark">${calculatedCosts.propertyDamage.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
+                            <div className="flex justify-between items-center py-1 border-b"><span className="text-medium">Identity Fraud Expenses</span><span className="font-semibold text-dark">${calculatedCosts.identityFraud.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
+                            <div className="flex justify-between items-center pt-2 font-bold text-lg"><span className="text-dark font-heading">Total Claim Value</span><span className="text-primary">${totalClaimValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
+                        </div>
+                        
+                        <div className="mt-6">
+                            <h4 className="font-bold text-dark mb-2 flex items-center gap-2 font-heading">
+                                <WrenchScrewdriverIcon className="h-5 w-5 text-medium" />
+                                <span>Property Damage Details</span>
+                            </h4>
+                            <div className="text-xs text-medium bg-slate-50 p-4 rounded-md border space-y-2 whitespace-pre-wrap">
+                                {claimDetails.propertyDamageDetails || 'No details provided.'}
+                            </div>
+                        </div>
+                        {(identityFraudConflict || jewelryConflict) && (<div className="mt-6"><h4 className="font-bold text-dark mb-2 font-heading">Strategic Highlights</h4><div className="space-y-3">{identityFraudConflict && (<div className="p-3 bg-warning/20 border-l-4 border-warning text-dark/80 text-sm"><div className="flex"><div className="flex-shrink-0"><ExclamationTriangleIcon className="h-5 w-5 text-warning"/></div><div className="ml-3"><p><strong className="font-semibold">Sub-Limit Conflict:</strong> Claimed Identity Fraud Expenses of ${calculatedCosts.identityFraud.toLocaleString()} exceed the ${identityFraudLimit.toLocaleString()} policy sub-limit. This requires a specific negotiation strategy.</p></div></div></div>)}{jewelryConflict && (<div className="p-3 bg-warning/20 border-l-4 border-warning text-dark/80 text-sm"><div className="flex"><div className="flex-shrink-0"><ExclamationTriangleIcon className="h-5 w-5 text-warning"/></div><div className="ml-3"><p><strong className="font-semibold">Sub-Limit Conflict:</strong> Total Jewelry value of ${jewelryValue.toLocaleString()} exceed the ${jewelryLimit.toLocaleString()} theft sub-limit. Items may need separate scheduling for full coverage.</p></div></div></div>)}</div></div>)}
+                    </>
+                )}
             </div>
             <div>
                 <div className="flex justify-between items-center mb-3">
                     <h4 className="font-bold text-dark font-heading">Incident Details</h4>
-                    {!isEditing && (
-                        <button onClick={() => setIsEditing(true)} className="flex items-center gap-1 text-xs font-semibold text-primary hover:underline">
-                            <PencilIcon className="h-3 w-3" /> Edit
-                        </button>
-                    )}
                 </div>
-                 {isEditing ? (
-                    <div className="space-y-2 text-sm p-4 rounded-md border border-primary/50 bg-slate-50">
+                <div className="space-y-4 text-sm bg-slate-50 p-4 rounded-md border">
+                    <div className="flex justify-between"><span className="text-medium">Date of Loss:</span><span className="font-medium">{claimDetails.dateOfLoss ? new Date(claimDetails.dateOfLoss).toLocaleDateString('en-US', {timeZone: 'UTC'}) : 'N/A'}</span></div>
+                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="text-xs font-medium text-medium">Claim Name</label>
-                            <input type="text" name="name" value={editableDetails.name} onChange={handleDetailsChange} className="w-full mt-0.5 px-2 py-1 text-sm border-slate-300 rounded-md"/>
+                            <label htmlFor="startDate" className="block text-xs font-medium text-medium">Timeframe Start</label>
+                            <input
+                                type="date"
+                                id="startDate"
+                                name="startDate"
+                                value={claimDetails.claimDateRange?.startDate || ''}
+                                onChange={handleDateChange}
+                                className="mt-1 block w-full px-2 py-1 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
+                            />
                         </div>
                         <div>
-                            <label className="text-xs font-medium text-medium">Date of Loss</label>
-                            <input type="date" name="dateOfLoss" value={editableDetails.dateOfLoss} onChange={handleDetailsChange} className="w-full mt-0.5 px-2 py-1 text-sm border-slate-300 rounded-md"/>
-                        </div>
-                         <div>
-                            <label className="text-xs font-medium text-medium">Incident</label>
-                            <input type="text" name="incidentType" value={editableDetails.incidentType} onChange={handleDetailsChange} className="w-full mt-0.5 px-2 py-1 text-sm border-slate-300 rounded-md"/>
-                        </div>
-                        <div>
-                            <label className="text-xs font-medium text-medium">Location</label>
-                            <input type="text" name="location" value={editableDetails.location} onChange={handleDetailsChange} className="w-full mt-0.5 px-2 py-1 text-sm border-slate-300 rounded-md"/>
-                        </div>
-                         <div>
-                            <label className="text-xs font-medium text-medium">Police Report #</label>
-                            <input type="text" name="policeReport" value={editableDetails.policeReport} onChange={handleDetailsChange} className="w-full mt-0.5 px-2 py-1 text-sm border-slate-300 rounded-md"/>
-                        </div>
-                        <div className="flex gap-2 pt-2">
-                             <button onClick={handleCancel} className="w-full text-xs font-semibold py-1.5 bg-white border border-slate-300 rounded-md hover:bg-slate-50">Cancel</button>
-                            <button onClick={handleSave} className="w-full text-xs font-semibold py-1.5 bg-primary text-white rounded-md hover:bg-primary-dark">Save</button>
+                            <label htmlFor="endDate" className="block text-xs font-medium text-medium">Timeframe End</label>
+                            <input
+                                type="date"
+                                id="endDate"
+                                name="endDate"
+                                value={claimDetails.claimDateRange?.endDate || ''}
+                                onChange={handleDateChange}
+                                className="mt-1 block w-full px-2 py-1 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
+                            />
                         </div>
                     </div>
-                 ) : (
-                    <div className="space-y-2 text-sm bg-slate-50 p-4 rounded-md border">
-                        <div className="flex justify-between"><span className="text-medium">Date of Loss:</span><span className="font-medium">{claimDetails.dateOfLoss ? new Date(claimDetails.dateOfLoss).toLocaleDateString('en-US', {timeZone: 'UTC'}) : 'N/A'}</span></div>
-                        <div className="flex justify-between"><span className="text-medium">Incident:</span><span className="font-medium">{claimDetails.incidentType}</span></div>
-                        <div className="flex justify-between text-left"><span className="text-medium pr-2">Location:</span><span className="font-medium text-right">{claimDetails.location}</span></div>
-                        <div className="flex justify-between"><span className="text-medium">Police Report:</span><span className="font-medium">{claimDetails.policeReport}</span></div>
-                    </div>
-                 )}
+                    <div className="flex justify-between pt-2"><span className="text-medium">Incident:</span><span className="font-medium">{claimDetails.incidentType}</span></div>
+                    <div className="flex justify-between text-left"><span className="text-medium pr-2">Location:</span><span className="font-medium text-right">{claimDetails.location}</span></div>
+                    <div className="flex justify-between"><span className="text-medium">Police Report:</span><span className="font-medium">{claimDetails.policeReport}</span></div>
+                </div>
             </div>
         </div>
     </div>
@@ -224,11 +213,11 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
     onUpdateClaimDetails,
     isParsingPolicy,
     onUploadPolicy,
-    onUpdatePolicy,
     onSetActivePolicy,
     onSelectItem, 
     onItemPhotosSelected,
     onStartRoomScan,
+    onOpenImageAnalysis,
     searchTerm,
     onSearchTermChange,
     categoryFilter,
@@ -242,7 +231,19 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
     onRejectItem,
     pipelineStage,
     pipelineProgress,
-    onCancelPipeline
+    onCancelPipeline,
+    selectedItemIds,
+    onToggleItemSelection,
+    onSelectAllFilteredItems,
+    onClearSelection,
+    onApproveSelected,
+    onRejectSelected,
+    onBulkExtractSerialNumbers,
+    onBulkFindMarketPrice,
+    onBulkEnrichData,
+    onBulkVisualSearch,
+    onBulkGenerateImages,
+    onOpenBulkImageEditModal,
 }) => {
     const itemFileInputRef = React.useRef<HTMLInputElement>(null);
     
@@ -260,6 +261,16 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
         return acc + (item.replacementCostValueRCV || item.originalCost || 0);
     }, 0);
 
+    const isAllFilteredSelected = filteredItems.length > 0 && selectedItemIds.length === filteredItems.length && filteredItems.every(i => selectedItemIds.includes(i.id));
+
+    const handleSelectAllChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.checked) {
+            onSelectAllFilteredItems();
+        } else {
+            onClearSelection();
+        }
+    };
+
     if (policies.length === 0) {
         return (
             <div className="max-w-4xl mx-auto text-center py-16">
@@ -273,7 +284,6 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                      <InsuranceSection 
                         policies={policies}
                         onUpload={onUploadPolicy}
-                        onUpdate={onUpdatePolicy}
                         onSetActivePolicy={onSetActivePolicy}
                         isLoading={isParsingPolicy}
                     />
@@ -319,6 +329,13 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                         <span>Room Scan</span>
                     </button>
                     <button 
+                        onClick={onOpenImageAnalysis}
+                        className="flex items-center justify-center space-x-2 px-4 py-2 text-sm font-semibold bg-white text-medium border border-slate-300 rounded-md shadow-sm hover:bg-slate-50 transition"
+                    >
+                        <DocumentMagnifyingGlassIcon className="h-5 w-5"/>
+                        <span>Analyze Images</span>
+                    </button>
+                    <button 
                         onClick={handleAddItemClick}
                         className="flex items-center justify-center space-x-2 px-4 py-2 text-sm font-semibold bg-primary text-white rounded-md shadow-sm hover:bg-primary-dark transition"
                     >
@@ -343,7 +360,6 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
       <InsuranceSection 
         policies={policies}
         onUpload={onUploadPolicy}
-        onUpdate={onUpdatePolicy}
         onSetActivePolicy={onSetActivePolicy}
         isLoading={isParsingPolicy}
       />
@@ -405,7 +421,47 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                 </select>
             </div>
         </div>
+        {selectedItemIds.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-slate-200 bg-primary/5 p-3 -m-4 mt-4 rounded-b-lg flex items-center justify-between flex-wrap gap-4">
+                <div className="flex items-center gap-3">
+                    <p className="text-sm font-semibold text-dark">
+                        {selectedItemIds.length} item(s) selected
+                    </p>
+                    <button onClick={onClearSelection} className="text-sm text-primary font-semibold hover:underline">
+                        Deselect All
+                    </button>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap justify-end">
+                    <button onClick={onRejectSelected} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-danger bg-danger/10 hover:bg-danger/20 rounded-md transition-colors"><XCircleIcon className="h-4 w-4" />Reject</button>
+                    <button onClick={onApproveSelected} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-success bg-success/10 hover:bg-success/20 rounded-md transition-colors"><CheckCircleIcon className="h-4 w-4" />Approve</button>
+                    <div className="h-5 border-l border-slate-300 mx-1"></div>
+                    <button onClick={onBulkFindMarketPrice} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 rounded-md transition-colors"><GlobeIcon className="h-4 w-4" />Market Price</button>
+                    <button onClick={onBulkEnrichData} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 rounded-md transition-colors"><DocumentMagnifyingGlassIcon className="h-4 w-4" />Enrich Data</button>
+                    <button onClick={onBulkVisualSearch} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 rounded-md transition-colors"><CameraIcon className="h-4 w-4" />Visual Search</button>
+                    <div className="h-5 border-l border-slate-300 mx-1"></div>
+                    <button onClick={onBulkGenerateImages} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 rounded-md transition-colors"><PhotoIcon className="h-4 w-4" />Generate Images</button>
+                    <button onClick={onOpenBulkImageEditModal} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 rounded-md transition-colors"><SparklesIcon className="h-4 w-4" />Edit Images</button>
+                    <div className="h-5 border-l border-slate-300 mx-1"></div>
+                    <button onClick={onBulkExtractSerialNumbers} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 rounded-md transition-colors"><QrCodeIcon className="h-4 w-4" />Extract S/N</button>
+                </div>
+            </div>
+        )}
       </div>
+      
+      {filteredItems.length > 0 && (
+        <div className="px-1 py-2 flex items-center">
+            <input
+                type="checkbox"
+                checked={isAllFilteredSelected}
+                onChange={handleSelectAllChange}
+                aria-label="Select all items"
+                className="h-5 w-5 rounded border-slate-400 text-primary focus:ring-primary"
+            />
+            <label className="ml-3 text-sm font-semibold text-medium">
+                {isAllFilteredSelected ? `Deselect All ${filteredItems.length} items` : `Select All ${filteredItems.length} items`}
+            </label>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
         {filteredItems.map(item => (
@@ -415,6 +471,8 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
             onSelect={() => onSelectItem(item.id)}
             onApprove={onApproveItem}
             onReject={onRejectItem}
+            isSelected={selectedItemIds.includes(item.id)}
+            onToggleSelection={onToggleItemSelection}
           />
         ))}
       </div>

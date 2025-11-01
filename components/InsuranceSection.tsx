@@ -7,94 +7,48 @@ import { CurrencyInput } from './CurrencyInput';
 interface InsuranceSectionProps {
   policies: ParsedPolicy[];
   onUpload: (file: File) => void;
-  onUpdate: (policy: ParsedPolicy) => void;
   onSetActivePolicy: (policyId: string) => void;
   isLoading: boolean;
 }
 
-const PolicyDetails: React.FC<{ policy: ParsedPolicy, onUpdate: (p: ParsedPolicy) => void }> = ({ policy: initialPolicy, onUpdate }) => {
-    const [isEditing, setIsEditing] = useState(false);
-    const [policy, setPolicy] = useState(initialPolicy);
-
+const PolicyDetails: React.FC<{ policy: ParsedPolicy }> = ({ policy }) => {
     const mainCoverage = policy.coverage.find(c => c.type === 'main');
     const subLimits = policy.coverage.filter(c => c.type === 'sub-limit');
 
-    const handleSave = () => {
-        onUpdate(policy);
-        setIsEditing(false);
-    }
-    const handleCancel = () => {
-        setPolicy(initialPolicy);
-        setIsEditing(false);
-    }
-
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        const { name, value } = e.target;
-        setPolicy(prev => ({ ...prev, [name]: value }));
-    };
-
-    const handleSubLimitChange = (index: number, field: 'category' | 'limit', value: string | number) => {
-        const updatedSubLimits = [...subLimits];
-        const targetLimit = updatedSubLimits[index];
-        if (targetLimit) {
-            (targetLimit[field] as any) = value;
-        }
-        setPolicy(prev => ({ ...prev, coverage: mainCoverage ? [mainCoverage, ...updatedSubLimits] : updatedSubLimits }));
-    };
-
-    if (!isEditing) {
-        return (
-            <div className="p-4 bg-slate-50/70 rounded-b-lg">
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                    <div><p className="text-xs text-medium">Policy #</p><p className="font-semibold text-dark">{policy.policyNumber}</p></div>
-                    <div><p className="text-xs text-medium">Type</p><p className="font-semibold text-dark">{policy.policyType || 'N/A'}</p></div>
-                    <div><p className="text-xs text-medium">Holder</p><p className="font-semibold text-dark truncate">{policy.policyHolder}</p></div>
-                    <div><p className="text-xs text-medium">Effective</p><p className="font-semibold text-dark">{policy.effectiveDate}</p></div>
-                    <div><p className="text-xs text-medium">Expires</p><p className="font-semibold text-dark">{policy.expirationDate}</p></div>
-                </div>
-                <div className="mt-4 pt-4 border-t">
-                    <button onClick={() => setIsEditing(true)} className="text-xs font-semibold text-primary hover:underline">View All Details & Edit</button>
-                </div>
-            </div>
-        );
-    }
-
     return (
         <div className="p-4 bg-slate-50/70 rounded-b-lg">
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 text-sm">
                 <div className="space-y-3">
-                    <h4 className="font-semibold text-dark">Policy Info</h4>
-                    <div><label className="text-xs text-medium">Policy Name</label><input type="text" name="policyName" value={policy.policyName} onChange={handleChange} className="w-full text-sm font-semibold p-1 border rounded-md"/></div>
-                    <div><label className="text-xs text-medium">Policy #</label><input type="text" name="policyNumber" value={policy.policyNumber} onChange={handleChange} className="w-full text-sm font-semibold p-1 border rounded-md"/></div>
-                    <div><label className="text-xs text-medium">Policyholder</label><input type="text" name="policyHolder" value={policy.policyHolder} onChange={handleChange} className="w-full text-sm font-semibold p-1 border rounded-md"/></div>
-                    <div><label className="text-xs text-medium">Provider</label><input type="text" name="provider" value={policy.provider} onChange={handleChange} className="w-full text-sm font-semibold p-1 border rounded-md"/></div>
-                    <div><label className="text-xs text-medium">Policy Type (e.g., HO-4)</label><input type="text" name="policyType" value={policy.policyType || ''} onChange={handleChange} className="w-full text-sm font-semibold p-1 border rounded-md"/></div>
-                    <div className="grid grid-cols-2 gap-2">
-                        <div><label className="text-xs text-medium">Effective Date</label><input type="date" name="effectiveDate" value={policy.effectiveDate || ''} onChange={handleChange} className="w-full text-sm font-semibold p-1 border rounded-md"/></div>
-                        <div><label className="text-xs text-medium">Expiration Date</label><input type="date" name="expirationDate" value={policy.expirationDate || ''} onChange={handleChange} className="w-full text-sm font-semibold p-1 border rounded-md"/></div>
+                    <h4 className="font-semibold text-dark border-b pb-1">Policy Info</h4>
+                    <div><p className="text-xs text-medium">Policy #</p><p className="font-semibold text-dark">{policy.policyNumber}</p></div>
+                    <div><p className="text-xs text-medium">Policyholder</p><p className="font-semibold text-dark truncate">{policy.policyHolder}</p></div>
+                    <div><p className="text-xs text-medium">Provider</p><p className="font-semibold text-dark">{policy.provider}</p></div>
+                    <div><p className="text-xs text-medium">Policy Type</p><p className="font-semibold text-dark">{policy.policyType || 'N/A'}</p></div>
+                     <div className="grid grid-cols-2 gap-2">
+                        <div><p className="text-xs text-medium">Effective Date</p><p className="font-semibold text-dark">{policy.effectiveDate || ''}</p></div>
+                        <div><p className="text-xs text-medium">Expiration Date</p><p className="font-semibold text-dark">{policy.expirationDate || ''}</p></div>
                     </div>
                 </div>
                 <div className="space-y-3">
-                    <h4 className="font-semibold text-dark">Coverage Details</h4>
-                    <div><label className="text-xs text-medium">Deductible</label><CurrencyInput value={policy.deductible} onChange={(v) => setPolicy(p => ({...p, deductible: v}))} className="w-full text-sm font-semibold p-1 border rounded-md"/></div>
-                    <div><label className="text-xs text-medium">Loss of Use (Coverage D)</label><CurrencyInput value={policy.coverageD_limit} onChange={(v) => setPolicy(p => ({...p, coverageD_limit: v}))} className="w-full text-sm font-semibold p-1 border rounded-md"/></div>
-                    <div><label className="text-xs text-medium">Settlement Method</label><select name="lossSettlementMethod" value={policy.lossSettlementMethod} onChange={handleChange} className="w-full text-sm font-semibold p-1 border rounded-md"><option>RCV</option><option>ACV</option></select></div>
-
-                    <h4 className="font-semibold text-dark pt-2">Sub-Limits</h4>
-                    <div className="space-y-2">
+                    <h4 className="font-semibold text-dark border-b pb-1">Coverage Details</h4>
+                    {mainCoverage && <div><p className="text-xs text-medium">{mainCoverage.category}</p><p className="font-bold text-lg text-dark">${mainCoverage.limit.toLocaleString()}</p></div>}
+                    <div><p className="text-xs text-medium">Deductible</p><p className="font-semibold text-dark">${policy.deductible.toLocaleString()}</p></div>
+                    <div><p className="text-xs text-medium">Loss of Use (Coverage D)</p><p className="font-semibold text-dark">${policy.coverageD_limit.toLocaleString()}</p></div>
+                    <div><p className="text-xs text-medium">Settlement Method</p><p className="font-semibold text-dark">{policy.lossSettlementMethod}</p></div>
+                    
+                    <h4 className="font-semibold text-dark pt-2 border-b pb-1">Sub-Limits</h4>
+                    <div className="space-y-2 max-h-48 overflow-y-auto pr-2 -mr-2">
                         {subLimits.map((limit, index) => (
-                             <div key={index} className="flex items-center gap-2">
-                                <input type="text" placeholder="Category" value={limit.category} onChange={(e) => handleSubLimitChange(index, 'category', e.target.value)} className="w-full text-sm p-1 border rounded-md"/>
-                                <CurrencyInput value={limit.limit} onChange={(v) => handleSubLimitChange(index, 'limit', v)} className="w-full text-sm p-1 border rounded-md"/>
+                             <div key={index} className="flex items-center justify-between">
+                                <p className="font-medium text-dark">{limit.category}</p>
+                                <p className="font-semibold text-dark">${limit.limit.toLocaleString()}</p>
                             </div>
                         ))}
-                         <p className="text-xs text-slate-500 italic text-center pt-1">Sub-limits are determined by the AI during policy analysis. To add or remove one, please re-upload an updated policy document.</p>
+                         {subLimits.length === 0 && (
+                            <p className="text-xs text-slate-500 italic text-center py-2">No sub-limits identified.</p>
+                         )}
                     </div>
                 </div>
-            </div>
-            <div className="flex justify-end gap-2 mt-4 pt-4 border-t">
-                <button onClick={handleCancel} className="px-3 py-1 text-xs font-semibold bg-white border border-slate-300 rounded-md">Cancel</button>
-                <button onClick={handleSave} className="px-3 py-1 text-xs font-semibold bg-primary text-white rounded-md">Save Changes</button>
             </div>
         </div>
     );
@@ -137,7 +91,7 @@ const UploadZone: React.FC<{ onUpload: (file: File) => void, isLoading: boolean 
     );
 };
 
-export const InsuranceSection: React.FC<InsuranceSectionProps> = ({ policies, onUpload, onUpdate, onSetActivePolicy, isLoading }) => {
+export const InsuranceSection: React.FC<InsuranceSectionProps> = ({ policies, onUpload, onSetActivePolicy, isLoading }) => {
   const [expandedPolicyId, setExpandedPolicyId] = useState<string | null>(policies.find(p => p.isActive)?.id || null);
 
   const toggleExpand = (policyId: string) => {
@@ -186,7 +140,7 @@ export const InsuranceSection: React.FC<InsuranceSectionProps> = ({ policies, on
                                 {expandedPolicyId === policy.id ? 'Hide Details' : 'Show Details'}
                             </button>
                         </div>
-                        {expandedPolicyId === policy.id && <PolicyDetails policy={policy} onUpdate={onUpdate} />}
+                        {expandedPolicyId === policy.id && <PolicyDetails policy={policy} />}
                     </div>
                 ))}
                 <div id="policy-upload-button" className={policies.length > 0 ? 'hidden' : ''}>

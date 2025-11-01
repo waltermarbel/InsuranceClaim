@@ -2,6 +2,7 @@
   "name": "VeritasVault",
   "description": "A smart asset and proof management system to create a 'forensic' inventory of all personal belongings, centralize ownership proof, and prepare data for insurance claims.",
   "requestFramePermissions": [
-    "camera"
+    "camera",
+    "microphone"
   ]
 }
