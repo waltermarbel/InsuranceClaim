@@ -50,6 +50,7 @@ interface InventoryDashboardProps {
   onBulkVisualSearch: () => void;
   onBulkGenerateImages: () => void;
   onOpenBulkImageEditModal: () => void;
+  onOpenBulkEdit: () => void;
 }
 
 interface ClaimOverviewProps {
@@ -244,6 +245,7 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
     onBulkVisualSearch,
     onBulkGenerateImages,
     onOpenBulkImageEditModal,
+    onOpenBulkEdit,
 }) => {
     const itemFileInputRef = React.useRef<HTMLInputElement>(null);
     
@@ -441,6 +443,7 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                     <div className="h-5 border-l border-slate-300 mx-1"></div>
                     <button onClick={onBulkGenerateImages} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 rounded-md transition-colors"><PhotoIcon className="h-4 w-4" />Generate Images</button>
                     <button onClick={onOpenBulkImageEditModal} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 rounded-md transition-colors"><SparklesIcon className="h-4 w-4" />Edit Images</button>
+                    <button onClick={onOpenBulkEdit} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 rounded-md transition-colors"><PencilSquareIcon className="h-4 w-4" />Bulk Edit</button>
                     <div className="h-5 border-l border-slate-300 mx-1"></div>
                     <button onClick={onBulkExtractSerialNumbers} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 rounded-md transition-colors"><QrCodeIcon className="h-4 w-4" />Extract S/N</button>
                 </div>

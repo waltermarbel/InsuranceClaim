@@ -15,6 +15,7 @@ import ImageEditorModal from './components/ImageEditorModal.tsx';
 import ImageGeneratorModal from './components/ImageGeneratorModal.tsx';
 import AudioRecorderModal from './components/AudioRecorderModal.tsx';
 import BulkImageEditModal from './components/BulkImageEditModal.tsx';
+import BulkEditModal from './components/BulkEditModal.tsx';
 import ImageAnalysisModal from './components/ImageAnalysisModal.tsx';
 import ProcessingPreview from './components/ProcessingPreview.tsx';
 import ImageZoomModal from './components/ImageZoomModal.tsx';
@@ -180,6 +181,7 @@ const App: React.FC = () => {
     const [generatingForItem, setGeneratingForItem] = useState<InventoryItem | null>(null);
     const [recordingForItem, setRecordingForItem] = useState<InventoryItem | null>(null);
     const [showBulkImageEditModal, setShowBulkImageEditModal] = useState(false);
+    const [showBulkEditModal, setShowBulkEditModal] = useState(false);
     // Fix: Declared missing state variable for bulk image editing.
     const [itemsToBulkEdit, setItemsToBulkEdit] = useState<InventoryItem[]>([]);
     const [showImageAnalysisModal, setShowImageAnalysisModal] = useState(false);
@@ -965,6 +967,21 @@ const App: React.FC = () => {
         setItemsToBulkEdit([]);
     }, [itemsToBulkEdit, logActivity]);
 
+    const handleBulkEditItems = useCallback((updates: Partial<Pick<InventoryItem, 'status' | 'itemCategory' | 'lastKnownLocation' | 'condition'>>) => {
+        setShowBulkEditModal(false);
+        if (Object.keys(updates).length === 0) return;
+
+        logActivity('BULK_EDIT', `Applying bulk edits to ${selectedItemIds.length} items: ${JSON.stringify(updates)}`);
+
+        setInventory(prev => prev.map(item => {
+            if (selectedItemIds.includes(item.id)) {
+                return { ...item, ...updates };
+            }
+            return item;
+        }));
+
+        setSelectedItemIds([]);
+    }, [selectedItemIds, logActivity]);
     
     const handleLinkMultipleProofs = useCallback((itemId: string, proofIds: string[]) => {
         const proofsToLink = unlinkedProofs.filter(p => proofIds.includes(p.id));
@@ -1280,6 +1297,7 @@ const App: React.FC = () => {
                         onBulkVisualSearch={handleBulkVisualSearch}
                         onBulkGenerateImages={handleBulkGenerateImages}
                         onOpenBulkImageEditModal={handleOpenBulkImageEditModal}
+                        onOpenBulkEdit={() => setShowBulkEditModal(true)}
                     />
                  );
              case 'room-scan':
@@ -1351,9 +1369,17 @@ const App: React.FC = () => {
             )}
             {showBulkImageEditModal && (
                 <BulkImageEditModal
-                    itemCount={selectedItemIds.length}
+                    itemCount={itemsToBulkEdit.length}
                     onClose={() => setShowBulkImageEditModal(false)}
                     onSave={handleBulkEditImages}
+                />
+            )}
+            {showBulkEditModal && (
+                <BulkEditModal
+                    itemCount={selectedItemIds.length}
+                    itemCategories={itemCategories}
+                    onClose={() => setShowBulkEditModal(false)}
+                    onSave={handleBulkEditItems}
                 />
             )}
             {showLog && <ActivityLogView log={activityLog} onClose={() => setShowLog(false)} />}
