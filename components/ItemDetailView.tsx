@@ -7,7 +7,6 @@ import { ScoreIndicator } from './ScoreIndicator.tsx';
 import { CurrencyInput } from './CurrencyInput.tsx';
 import { PROOF_PURPOSE_COLORS } from '../constants.ts';
 import AnnotationEditor from './AnnotationEditor.tsx';
-import { useProofDataUrl } from '../hooks/useProofDataUrl.ts';
 
 interface ItemDetailViewProps {
   item: InventoryItem;
@@ -73,13 +72,13 @@ const Accordion: React.FC<{
 };
 
 const ProofThumbnail: React.FC<{ proof: Proof; onClick: () => void }> = ({ proof, onClick }) => {
-    const { dataUrl, isLoading } = useProofDataUrl(proof.id);
-    if (isLoading || !dataUrl) {
-        return <div className="h-10 w-10 rounded-md bg-slate-200 flex items-center justify-center flex-shrink-0"><SpinnerIcon className="h-5 w-5 text-slate-400"/></div>
-    }
-    if (proof.type === 'image') {
+    const { dataUrl } = proof;
+
+    if (proof.type === 'image' && dataUrl) {
         return <img src={dataUrl} alt={proof.fileName} className="h-10 w-10 rounded-md object-cover flex-shrink-0 cursor-pointer" onClick={onClick} />;
     }
+    
+    // Fallback for non-image proofs or images that have no dataUrl
     return (
         <div className="h-10 w-10 rounded-md bg-slate-200 flex items-center justify-center flex-shrink-0">
             {proof.type === 'audio' ? <svg className="h-6 w-6 text-slate-500" fill="currentColor" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"></path></svg> : <DocumentTextIcon className="h-6 w-6 text-slate-500" />}
@@ -88,11 +87,7 @@ const ProofThumbnail: React.FC<{ proof: Proof; onClick: () => void }> = ({ proof
 };
 
 const PrimaryProofDisplay: React.FC<{ proof: Proof | null, onEditImage: () => void, onGenerateImage: () => void, onImageZoom: (url: string) => void }> = ({ proof, onEditImage, onGenerateImage, onImageZoom }) => {
-    const { dataUrl, isLoading } = useProofDataUrl(proof?.id);
-
-    if (isLoading) {
-        return <div className="aspect-[4/3] bg-slate-100 flex items-center justify-center"><SpinnerIcon className="h-10 w-10 text-slate-300"/></div>;
-    }
+    const dataUrl = proof?.dataUrl;
 
     if (proof && proof.type === 'image' && dataUrl) {
         return (
@@ -327,7 +322,7 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
                                 <div key={proof.id} className="group p-2 bg-slate-50 rounded-md hover:bg-slate-100">
                                     <div className="flex items-start justify-between">
                                         <div className="flex items-start gap-2 overflow-hidden">
-                                            <ProofThumbnail proof={proof} onClick={() => onImageZoom(proof.dataUrl!)} />
+                                            <ProofThumbnail proof={proof} onClick={() => proof.dataUrl && onImageZoom(proof.dataUrl)} />
                                             <div className="overflow-hidden">
                                                 <p className="text-sm text-medium truncate">{proof.fileName}</p>
                                                 {proof.purpose && (

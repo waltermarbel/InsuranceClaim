@@ -218,6 +218,7 @@ export interface ClaimDetails {
     };
     fairRentalValuePerDay?: number;
     aleProofs?: Proof[];
+    claimDocuments?: Proof[];
 }
 
 export type AppView = 'upload' | 'dashboard' | 'item-detail' | 'room-scan' | 'processing-preview' | 'autonomous-processor' | 'autonomous-review';

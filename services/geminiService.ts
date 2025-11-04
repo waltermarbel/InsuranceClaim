@@ -835,6 +835,9 @@ export const fuzzyMatchProofs = async (item: InventoryItem, unlinkedProofs: Proo
         You are an AI assistant for an insurance app. Analyze the following inventory item and a list of unlinked proofs.
         Your task is to identify which proofs likely belong to the item.
         
+        CRITICAL CONTEXT:
+        If a proof's filename suggests it is a police report (e.g., contains 'police', 'report', 'nypd', 'complaint'), it is very strong 'Proof of Possession' for any item that would be listed in a report for a burglary (e.g., electronics, jewelry, valuables). Give it a high confidence score (90+) for such items and cite the police report as the reason.
+
         Inventory Item:
         - Name: ${item.itemName}
         - Description: ${item.itemDescription}
@@ -844,7 +847,7 @@ export const fuzzyMatchProofs = async (item: InventoryItem, unlinkedProofs: Proo
         ${unlinkedProofs.map(p => `- ID: ${p.id}, Filename: ${p.fileName}`).join('\n')}
         
         For each proof that is a plausible match, provide a suggestion with its proofId, a confidence score (0-100), and a brief reason.
-        Base your reasoning on keywords in filenames, dates, and common sense associations.
+        Base your reasoning on keywords in filenames, dates, and common sense associations, paying special attention to the CRITICAL CONTEXT rule.
         `;
         
         const response = await ai.models.generateContent({

@@ -106,6 +106,7 @@ const App: React.FC = () => {
             endDate: "2024-11-28",
         },
         aleProofs: [],
+        claimDocuments: [],
     });
     
     // Derived State for Active Policy
@@ -298,6 +299,31 @@ const App: React.FC = () => {
         }
     }, [activePolicy, logActivity]);
     
+    const handleUploadClaimDocument = useCallback(async (file: File) => {
+        logActivity('CLAIM_DOC_UPLOAD', `Uploading claim document: ${file.name}`);
+        const dataUrl = await fileToDataUrl(file);
+        const newProof: Proof = {
+            id: `proof-claimdoc-${Date.now()}`,
+            type: file.type.startsWith('image/') ? 'image' : 'document',
+            fileName: file.name,
+            dataUrl,
+            mimeType: file.type,
+            createdBy: 'User',
+            purpose: 'Supporting Document',
+        };
+
+        // Add to claim details
+        setClaimDetails(prev => ({
+            ...prev,
+            claimDocuments: [...(prev.claimDocuments || []), newProof]
+        }));
+
+        // Also add to unlinked proofs to be available for matching
+        setUnlinkedProofs(prev => [...prev, newProof]);
+
+        logActivity('CLAIM_DOC_ADDED', `Added ${file.name} to claim documents and unlinked proofs.`);
+    }, [logActivity]);
+
     const handleFinalizeAutonomousReview = useCallback((approvedItems: InventoryItem[], rejectedItems: InventoryItem[]) => {
         setInventory(prev => [...prev, ...approvedItems.map(item => ({...item, status: 'enriching' as ItemStatus}))]);
         logActivity('BULK_REVIEW_COMPLETE', `User approved ${approvedItems.length} items from autonomous run. ${rejectedItems.length} were rejected.`);
@@ -1302,6 +1328,7 @@ const App: React.FC = () => {
                         onSetActivePolicy={handleSetActivePolicy}
                         onSelectItem={handleSelectItem}
                         onItemPhotosSelected={(files) => handleFileUploads(Array.from(files))}
+                        onUploadClaimDocument={handleUploadClaimDocument}
                         onStartRoomScan={() => setCurrentView('room-scan')}
                         onOpenImageAnalysis={() => setShowImageAnalysisModal(true)}
                         searchTerm={searchTerm}

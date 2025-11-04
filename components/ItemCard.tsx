@@ -4,7 +4,6 @@ import { InventoryItem, ItemStatus } from '../types.ts';
 import { SpinnerIcon, CheckCircleIcon, ExclamationIcon, PencilIcon, XCircleIcon, DocumentTextIcon, TagIcon } from './icons.tsx';
 import { ScoreIndicator } from './ScoreIndicator.tsx';
 import { CATEGORY_COLORS, CATEGORY_ICONS } from '../constants.ts';
-import { useProofDataUrl } from '../hooks/useProofDataUrl.ts';
 
 interface ItemCardProps {
   item: InventoryItem;
@@ -41,7 +40,8 @@ const StatusIndicator: React.FC<{ status: ItemStatus }> = ({ status }) => {
 
 const ItemCard: React.FC<ItemCardProps> = ({ item, onSelect, onApprove, onReject, isSelected, onToggleSelection }) => {
   const primaryProof = item.linkedProofs && item.linkedProofs.length > 0 ? item.linkedProofs[0] : null;
-  const { dataUrl: primaryProofUrl, isLoading } = useProofDataUrl(primaryProof?.id);
+  const primaryProofUrl = primaryProof?.dataUrl;
+  const isLoading = false; // Data is now directly available
   const categoryColor = CATEGORY_COLORS[item.itemCategory] || '#94a3b8';
   const ItemIcon = CATEGORY_ICONS[item.itemCategory] || TagIcon;
 

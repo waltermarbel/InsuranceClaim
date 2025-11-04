@@ -1,5 +1,5 @@
 import React from 'react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 // Fix: Added .ts extension to file path
 import { InventoryItem, AccountHolder, ParsedPolicy, OtherCosts, ClaimDetails, PipelineStage, PipelineProgress } from '../types.ts';
 import ItemCard from './ItemCard.tsx';
@@ -20,6 +20,7 @@ interface InventoryDashboardProps {
   onSetActivePolicy: (policyId: string) => void;
   onSelectItem: (itemId: string) => void;
   onItemPhotosSelected: (files: FileList) => void;
+  onUploadClaimDocument: (file: File) => void;
   onStartRoomScan: () => void;
   onOpenImageAnalysis: () => void;
   searchTerm: string;
@@ -56,10 +57,18 @@ interface ClaimOverviewProps {
     claimDetails: ClaimDetails;
     onUpdateClaimDetails: (updatedDetails: Partial<ClaimDetails>) => void;
     onCalculateFRV: () => void;
+    onUploadClaimDocument: (file: File) => void;
 }
 
-const ClaimOverview: React.FC<ClaimOverviewProps> = ({ items, policy, claimDetails, onUpdateClaimDetails, onCalculateFRV }) => {
+const ClaimOverview: React.FC<ClaimOverviewProps> = ({ items, policy, claimDetails, onUpdateClaimDetails, onCalculateFRV, onUploadClaimDocument }) => {
   const claimedItems = items.filter(item => item.status === 'claimed');
+  const claimDocInputRef = useRef<HTMLInputElement>(null);
+
+  const handleClaimDocChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      onUploadClaimDocument(e.target.files[0]);
+    }
+  };
 
   const calculateCosts = () => {
     let lossOfUse = 0;
@@ -122,6 +131,7 @@ const ClaimOverview: React.FC<ClaimOverviewProps> = ({ items, policy, claimDetai
 
   return (
     <div className="mb-10">
+      <input type="file" ref={claimDocInputRef} onChange={handleClaimDocChange} className="hidden" accept="application/pdf,image/*" />
         <h3 className="text-xl font-bold tracking-tight text-dark font-heading flex items-center gap-2 mb-4">
             <ClipboardDocumentListIcon className="h-6 w-6 text-medium"/>
             {isClaimSetup ? 'Claim Setup' : `Claim Overview: ${claimDetails.name}`}
@@ -211,6 +221,20 @@ const ClaimOverview: React.FC<ClaimOverviewProps> = ({ items, policy, claimDetai
                     <div className="flex justify-between text-left"><span className="text-medium pr-2">Location:</span><span className="font-medium text-right">{claimDetails.location}</span></div>
                     <div className="flex justify-between"><span className="text-medium">Police Report:</span><span className="font-medium">{claimDetails.policeReport}</span></div>
                 </div>
+                <div className="mt-4">
+                    <h4 className="font-bold text-dark font-heading mb-2">Claim Documents</h4>
+                    <div className="space-y-2 text-sm bg-slate-50 p-4 rounded-md border">
+                        {(claimDetails.claimDocuments || []).map(doc => (
+                            <div key={doc.id} className="flex items-center justify-between p-1">
+                                <span className="font-medium text-dark truncate pr-2">{doc.fileName}</span>
+                                <a href={doc.dataUrl} download={doc.fileName} target="_blank" rel="noopener noreferrer" className="text-primary text-xs font-semibold hover:underline">VIEW</a>
+                            </div>
+                        ))}
+                        <button onClick={() => claimDocInputRef.current?.click()} className="w-full mt-2 text-center text-xs font-semibold text-primary border-2 border-dashed border-slate-300 rounded-md py-2 hover:bg-primary/5 transition-colors">
+                            + Add Document (e.g. Police Report)
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -230,6 +254,7 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
     onSetActivePolicy,
     onSelectItem, 
     onItemPhotosSelected,
+    onUploadClaimDocument,
     onStartRoomScan,
     onOpenImageAnalysis,
     searchTerm,
@@ -362,6 +387,7 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
         claimDetails={claimDetails}
         onUpdateClaimDetails={onUpdateClaimDetails}
         onCalculateFRV={onCalculateFRV}
+        onUploadClaimDocument={onUploadClaimDocument}
       />
 
       <InsuranceSection 
