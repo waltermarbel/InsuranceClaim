@@ -19,11 +19,13 @@ import BulkEditModal from './components/BulkEditModal.tsx';
 import ImageAnalysisModal from './components/ImageAnalysisModal.tsx';
 import ProcessingPreview from './components/ProcessingPreview.tsx';
 import ImageZoomModal from './components/ImageZoomModal.tsx';
+import BulkReviewPage from './components/BulkReviewPage.tsx';
+import ProcessingPage from './components/ProcessingPage.tsx';
 
 
 import * as geminiService from './services/geminiService.ts';
-import { InventoryItem, AccountHolder, ParsedPolicy, Proof, AppView, ActivityLogEntry, UndoableAction, ClaimDetails, ItemStatus, ProofSuggestion, UploadProgress, PipelineStage, PipelineProgress, PolicyAnalysisReport, ProcessingInference } from './types.ts';
-import { fileToDataUrl, urlToDataUrl, sanitizeFileName, dataUrlToBlob, exportToCSV, exportToZip } from './utils/fileUtils.ts';
+import { InventoryItem, AccountHolder, ParsedPolicy, Proof, AppView, ActivityLogEntry, UndoableAction, ClaimDetails, ItemStatus, ProofSuggestion, UploadProgress, PipelineStage, PipelineProgress, PolicyAnalysisReport, ProcessingInference, AutonomousInventoryItem } from './types.ts';
+import { fileToDataUrl, urlToDataUrl, sanitizeFileName, dataUrlToBlob, exportToCSV, exportToZip, exportItemPackageToZip } from './utils/fileUtils.ts';
 import { CATEGORIES } from './constants.ts';
 
 // New default policy based on user-provided document
@@ -86,62 +88,6 @@ const INITIAL_INVENTORY: InventoryItem[] = [
 ];
 const INITIAL_UNLINKED_PROOFS: Proof[] = []; // Start with no unlinked proofs
 
-/**
- * Generates specific, high-quality correction strings for AI learning by comparing two policy objects.
- * @param original The original policy object (from AI or previous state).
- * @param updated The new policy object with user corrections.
- * @returns An array of human-readable correction strings.
- */
-const getPolicyCorrections = (
-    original: Partial<ParsedPolicy>, 
-    updated: Partial<ParsedPolicy>
-): string[] => {
-    const corrections: string[] = [];
-    const keysToCompare = Object.keys(updated) as (keyof ParsedPolicy)[];
-
-    for (const key of keysToCompare) {
-        if (key === 'coverage') continue; // Handle coverage separately
-
-        const originalValue = original[key];
-        const updatedValue = updated[key];
-
-        if (JSON.stringify(originalValue) !== JSON.stringify(updatedValue)) {
-            if (originalValue === undefined) {
-                corrections.push(`User set field '${key}' to '${JSON.stringify(updatedValue)}'.`);
-            } else {
-                corrections.push(`User corrected field '${key}' from '${JSON.stringify(originalValue)}' to '${JSON.stringify(updatedValue)}'.`);
-            }
-        }
-    }
-
-    // Detailed comparison for the 'coverage' array
-    const originalCoverage = original.coverage || [];
-    const updatedCoverage = updated.coverage || [];
-
-    const originalMain = originalCoverage.find(c => c.type === 'main');
-    const updatedMain = updatedCoverage.find(c => c.type === 'main');
-
-    if (originalMain?.limit !== updatedMain?.limit) {
-         corrections.push(`User corrected main coverage limit from '${originalMain?.limit}' to '${updatedMain?.limit}'.`);
-    }
-
-    const originalSubLimits = originalCoverage.filter(c => c.type === 'sub-limit');
-    // Fix: Changed .find() to .filter() to correctly iterate over all sub-limits.
-    const updatedSubLimits = updatedCoverage.filter(c => c.type === 'sub-limit');
-
-    updatedSubLimits.forEach(updatedSub => {
-        const originalSub = originalSubLimits.find(os => os.category === updatedSub.category);
-        if (originalSub && originalSub.limit !== updatedSub.limit) {
-            corrections.push(`User corrected sub-limit '${updatedSub.category}' from '${originalSub.limit}' to '${updatedSub.limit}'.`);
-        } else if (!originalSub) {
-            corrections.push(`User added new sub-limit '${updatedSub.category}' with limit '${updatedSub.limit}'.`);
-        }
-    });
-
-    return corrections;
-};
-
-
 const App: React.FC = () => {
     // Core State
     const [inventory, setInventory] = useState<InventoryItem[]>(INITIAL_INVENTORY);
@@ -158,7 +104,8 @@ const App: React.FC = () => {
         claimDateRange: {
             startDate: "2024-11-27",
             endDate: "2024-11-28",
-        }
+        },
+        aleProofs: [],
     });
     
     // Derived State for Active Policy
@@ -187,6 +134,7 @@ const App: React.FC = () => {
     const [showImageAnalysisModal, setShowImageAnalysisModal] = useState(false);
     const [proofsToProcess, setProofsToProcess] = useState<Proof[]>([]);
     const [zoomedImageUrl, setZoomedImageUrl] = useState<string | null>(null);
+    const [itemsToReview, setItemsToReview] = useState<InventoryItem[]>([]);
 
 
     // Background Processing State
@@ -313,37 +261,55 @@ const App: React.FC = () => {
             alert("Please add and activate an insurance policy before adding evidence.");
             return;
         }
-
-        const initialProgress: UploadProgress = {};
-        files.forEach(f => initialProgress[f.name] = { loaded: 0, total: f.size });
-        setUploadProgress(initialProgress);
+        logActivity('AUTONOMOUS_PROCESS_START', `Starting autonomous processing for ${files.length} files.`);
+        setCurrentView('autonomous-processor');
+        setPipelineStage('processing');
+        setPipelineProgress({ current: 0, total: files.length, fileName: `Analyzing ${files.length} files...` });
 
         try {
-            const readFilesPromises = files.map((file, i) => 
-                fileToDataUrl(file, (event) => {
-                    setUploadProgress(prev => prev ? { ...prev, [file.name]: { loaded: event.loaded, total: event.total } } : null);
-                }).then(dataUrl => ({
-                    id: `proof-upload-${Date.now()}-${i}`,
-                    type: file.type.startsWith('image/') ? 'image' as const : 'document' as const,
-                    fileName: file.name,
-                    dataUrl,
-                    mimeType: file.type,
-                    createdBy: 'User' as const,
-                }))
-            );
-            
-            const newProofs: Proof[] = await Promise.all(readFilesPromises);
-            setProofsToProcess(newProofs);
-            setUploadProgress(null);
-            setCurrentView('processing-preview');
+            const results: AutonomousInventoryItem[] = await geminiService.runAutonomousProcessor(Array.from(files));
+            logActivity('AI_ACTION_SUCCESS', `Autonomous processor identified ${results.length} potential items.`, 'Gemini');
+
+            const newItemsToReview: InventoryItem[] = results.map((item, i) => ({
+                id: `item-auto-${Date.now()}-${i}`,
+                status: 'needs-review',
+                itemName: item.description,
+                itemDescription: `${item.ainotes}\n\nSource(s): ${item.imagesource.join(', ')}`,
+                itemCategory: item.category,
+                originalCost: item.estimatedvaluercv,
+                purchaseDate: item.lastseendate,
+                brand: item.brandmodel.includes('/') ? 'Unbranded/Generic' : item.brandmodel.split(' ')[0],
+                model: item.brandmodel.includes('/') ? '' : item.brandmodel.split(' ').slice(1).join(' '),
+                serialNumber: item.serialnumber || undefined,
+                linkedProofs: [], // Proofs are not created as objects in this flow.
+                createdAt: new Date().toISOString(),
+                createdBy: 'AI Autonomous',
+            }));
+
+            setItemsToReview(newItemsToReview);
+            setCurrentView('autonomous-review');
 
         } catch (error) {
-            console.error("Error reading files:", error);
-            logActivity('ERROR', `Failed to read files for upload: ${error instanceof Error ? error.message : 'Unknown Error'}`);
-            setUploadProgress(null); // Clear progress on error
+            console.error("Autonomous processing failed:", error);
+            logActivity('ERROR', `Autonomous processing failed: ${error instanceof Error ? error.message : 'Unknown Error'}`);
+            setCurrentView('dashboard');
+        } finally {
+            setPipelineStage('idle');
         }
     }, [activePolicy, logActivity]);
     
+    const handleFinalizeAutonomousReview = useCallback((approvedItems: InventoryItem[], rejectedItems: InventoryItem[]) => {
+        setInventory(prev => [...prev, ...approvedItems.map(item => ({...item, status: 'enriching' as ItemStatus}))]);
+        logActivity('BULK_REVIEW_COMPLETE', `User approved ${approvedItems.length} items from autonomous run. ${rejectedItems.length} were rejected.`);
+        
+        // Start enrichment for newly approved items
+        approvedItems.forEach(item => runAutonomousEnrichment(item));
+
+        setItemsToReview([]);
+        setCurrentView('dashboard');
+        setStatusFilter('enriching');
+    }, [logActivity, runAutonomousEnrichment]);
+
     const handleFinalizeProcessing = useCallback((finalizedInferences: ProcessingInference[]) => {
         const approvedInferences = finalizedInferences.filter(inf => inf.userSelection === 'approved');
         logActivity('PROCESSING_FINALIZE', `User finalized processing, approving ${approvedInferences.length} of ${finalizedInferences.length} inferences.`);
@@ -351,6 +317,7 @@ const App: React.FC = () => {
         const newItems: InventoryItem[] = [];
         const itemsToUpdate = new Map<string, Proof[]>();
         const newUnlinkedProofs: Proof[] = [];
+        const newAleProofs: Proof[] = [];
 
         for (const inference of approvedInferences) {
             const finalProof: Proof = {
@@ -395,7 +362,7 @@ const App: React.FC = () => {
                             estimatedValue: inference.aleDetails.amount,
                             summary: `${inference.aleDetails.vendor} - $${inference.aleDetails.amount.toFixed(2)} on ${inference.aleDetails.date}`
                         };
-                        newUnlinkedProofs.push(aleProof);
+                        newAleProofs.push(aleProof);
                     }
                     break;
             }
@@ -416,6 +383,13 @@ const App: React.FC = () => {
             }
             return updatedInventory;
         });
+        
+        if (newAleProofs.length > 0) {
+            setClaimDetails(prev => ({
+                ...prev,
+                aleProofs: [...(prev.aleProofs || []), ...newAleProofs]
+            }));
+        }
 
         if (newUnlinkedProofs.length > 0) {
             setUnlinkedProofs(prev => [...prev, ...newUnlinkedProofs]);
@@ -686,18 +660,6 @@ const App: React.FC = () => {
         const updatedItem = { ...item, webIntelligence: [...(item.webIntelligence || []), res] };
         updateItem(updatedItem);
         logActivity('AI_ACTION_SUCCESS', `Enriched ${item.itemName} with ${res.facts.length} new facts.`, 'Gemini');
-    }, [logActivity, updateItem]);
-    
-    const handleCalculateACV = useCallback(async (item: InventoryItem) => {
-        logActivity('AI_ACTION_START', `Calculating ACV for ${item.itemName}`, 'Gemini');
-        try {
-            const res = await geminiService.calculateACV(item);
-            const updatedItem = { ...item, actualCashValueACV: res.acv };
-            updateItem(updatedItem);
-            logActivity('AI_ACTION_SUCCESS', `Calculated ACV for ${item.itemName}: $${res.acv}. Reasoning: ${res.reasoning.join(' ')}`, 'Gemini');
-        } catch (error) {
-            logActivity('AI_ACTION_ERROR', `Failed to calculate ACV for ${item.itemName}. Reason: ${error instanceof Error ? error.message : 'Unknown'}`);
-        }
     }, [logActivity, updateItem]);
     
     const handleFindHighestRCV = useCallback(async (item: InventoryItem) => {
@@ -1201,6 +1163,57 @@ const App: React.FC = () => {
         });
     }, [updateItem, logActivity]);
 
+    const handleCalculateFRV = useCallback(async () => {
+        if (!activePolicy) return;
+        logActivity('AI_ACTION_START', 'Calculating Fair Rental Value...', 'Gemini');
+        try {
+            const result = await geminiService.calculateFairRentalValue(claimDetails.location, activePolicy.policyType || 'Apartment');
+            handleUpdateClaimDetails({ fairRentalValuePerDay: result.dailyRate });
+            logActivity('AI_ACTION_SUCCESS', `Calculated FRV: $${result.dailyRate}/day. Sources: ${result.sources.map(s => s.url).join(', ')}`, 'Gemini');
+        } catch (error) {
+            logActivity('AI_ACTION_ERROR', `Failed to calculate FRV: ${error instanceof Error ? error.message : 'Unknown'}`);
+        }
+    }, [claimDetails.location, activePolicy, logActivity, handleUpdateClaimDetails]);
+
+    const handleFindRecategorizationStrategy = useCallback(async (item: InventoryItem) => {
+        if (!activePolicy) return;
+        logActivity('AI_ACTION_START', `Finding recategorization strategy for ${item.itemName}`, 'Gemini');
+        try {
+            const result = await geminiService.getRecategorizationStrategy(item, activePolicy);
+            const updatedItem = { ...item, recategorizationStrategy: result };
+            updateItem(updatedItem);
+            if (result.newCategory.toLowerCase() !== item.itemCategory.toLowerCase()) {
+                logActivity('AI_ACTION_SUCCESS', `Found strategy for ${item.itemName}: Move to ${result.newCategory}. Reason: ${result.reasoning}`, 'Gemini');
+            } else {
+                logActivity('AI_ACTION_SUCCESS', `No better category found for ${item.itemName}.`, 'Gemini');
+            }
+        } catch (error) {
+            logActivity('AI_ACTION_ERROR', `Failed to find strategy for ${item.itemName}: ${error instanceof Error ? error.message : 'Unknown'}`);
+        }
+    }, [activePolicy, logActivity, updateItem]);
+
+    const handleGenerateSubmissionPackage = useCallback(async (item: InventoryItem) => {
+        if (!activePolicy) return;
+        logActivity('ACTION_START', `Generating submission package for ${item.itemName}.`);
+        try {
+            const letter = await geminiService.generateSubmissionLetter(item, activePolicy, accountHolder, claimDetails);
+            logActivity('AI_ACTION_SUCCESS', `Generated submission letter for ${item.itemName}.`, 'Gemini');
+
+            const proofBlobs = item.linkedProofs
+                .filter(p => p.dataUrl)
+                .map(p => ({
+                    fileName: p.fileName,
+                    blob: dataUrlToBlob(p.dataUrl!)
+                }));
+            
+            await exportItemPackageToZip(item, letter, proofBlobs);
+            logActivity('ACTION_SUCCESS', `Successfully exported claim package for ${item.itemName}.`);
+
+        } catch (error) {
+            logActivity('ERROR', `Failed to generate submission package: ${error instanceof Error ? error.message : 'Unknown'}`);
+        }
+    }, [activePolicy, accountHolder, claimDetails, logActivity]);
+
     const renderContent = () => {
         switch (currentView) {
             case 'item-detail':
@@ -1216,7 +1229,6 @@ const App: React.FC = () => {
                         onFindMarketPrice={handleFindMarketPrice}
                         onEnrichAsset={handleEnrichAsset}
                         onCalculateProofStrength={handleCalculateProofStrength}
-                        onCalculateACV={handleCalculateACV}
                         onFindHighestRCV={handleFindHighestRCV}
                         onDraftClaim={handleDraftClaim}
                         onVisualSearch={handleVisualSearch}
@@ -1235,6 +1247,8 @@ const App: React.FC = () => {
                         onImageZoom={setZoomedImageUrl}
                         claimDetails={claimDetails}
                         policyHolders={policyHolders}
+                        onFindRecategorizationStrategy={handleFindRecategorizationStrategy}
+                        onGenerateSubmissionPackage={handleGenerateSubmissionPackage}
                     />
                 ) : null;
             case 'processing-preview':
@@ -1250,6 +1264,26 @@ const App: React.FC = () => {
                         policyHolders={policyHolders}
                         onImageZoom={setZoomedImageUrl}
                         claimDetails={claimDetails}
+                    />
+                );
+            case 'autonomous-processor':
+                return (
+                    <ProcessingPage
+                        progress={{
+                            stage: pipelineStage,
+                            ...pipelineProgress,
+                        }}
+                        onCancel={() => {
+                            setPipelineStage('idle');
+                            setCurrentView('dashboard');
+                        }}
+                    />
+                );
+            case 'autonomous-review':
+                 return (
+                    <BulkReviewPage
+                        items={itemsToReview}
+                        onFinalize={handleFinalizeAutonomousReview}
                     />
                 );
             case 'dashboard':
@@ -1281,10 +1315,7 @@ const App: React.FC = () => {
                         onCoverageFilterChange={setCoverageFilter}
                         onApproveItem={handleApproveItem}
                         onRejectItem={handleRejectItem}
-                        pipelineStage={pipelineStage}
-                        pipelineProgress={pipelineProgress}
-                        onCancelPipeline={() => setPipelineStage('idle')}
-                        
+                        onCalculateFRV={handleCalculateFRV}
                         selectedItemIds={selectedItemIds}
                         onToggleItemSelection={handleToggleItemSelection}
                         onSelectAllFilteredItems={handleSelectAllFilteredItems}

@@ -191,3 +191,27 @@ export const exportToZip = async (inventory: InventoryItem[], unlinkedProofs: Pr
     link.click();
     document.body.removeChild(link);
 };
+
+export const exportItemPackageToZip = async (item: InventoryItem, letter: string, proofBlobs: { fileName: string; blob: Blob }[]): Promise<void> => {
+    const zip = new JSZip();
+
+    // Add the submission letter
+    zip.file(`Submission_Letter_${sanitizeFileName(item.itemName)}.txt`, letter);
+
+    // Add all proof files
+    const proofsFolder = zip.folder("proofs");
+    if (!proofsFolder) throw new Error("Could not create proofs folder.");
+
+    for (const proof of proofBlobs) {
+        proofsFolder.file(sanitizeFileName(proof.fileName), proof.blob);
+    }
+
+    // Generate and download
+    const content = await zip.generateAsync({ type: "blob" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(content);
+    link.download = `Claim_Package_${sanitizeFileName(item.itemName)}.zip`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+};

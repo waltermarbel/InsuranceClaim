@@ -20,7 +20,6 @@ interface ItemDetailViewProps {
   onFindMarketPrice: (item: InventoryItem) => void;
   onEnrichAsset: (item: InventoryItem) => void;
   onCalculateProofStrength: (item: InventoryItem) => void;
-  onCalculateACV: (item: InventoryItem) => void;
   onFindHighestRCV: (item: InventoryItem) => void;
   onDraftClaim: (item: InventoryItem) => void;
   onFindProductImage: (item: InventoryItem) => void;
@@ -39,6 +38,8 @@ interface ItemDetailViewProps {
   onImageZoom: (imageUrl: string) => void;
   claimDetails: ClaimDetails;
   policyHolders: string[];
+  onFindRecategorizationStrategy: (item: InventoryItem) => void;
+  onGenerateSubmissionPackage: (item: InventoryItem) => void;
 }
 
 const Accordion: React.FC<{
@@ -118,9 +119,19 @@ const PrimaryProofDisplay: React.FC<{ proof: Proof | null, onEditImage: () => vo
     );
 };
 
+const AiActionButton: React.FC<{onClick: () => void; children: React.ReactNode, disabled?: boolean}> = ({ onClick, children, disabled }) => (
+    <button
+        onClick={onClick}
+        disabled={disabled}
+        className="w-full flex items-center justify-start gap-2 p-2 text-sm font-semibold text-dark bg-slate-50 border border-slate-200 rounded-md hover:bg-slate-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
+    >
+        {children}
+    </button>
+);
+
 
 const ItemDetailView: React.FC<ItemDetailViewProps> = ({
-    item, unlinkedProofs, onBack, onUpdateItem, onDeleteItem, onFindMarketPrice, onEnrichAsset, onCalculateProofStrength, onCalculateACV, onFindHighestRCV, onDraftClaim, onUnlinkProof, onAddProof, onLinkMultipleProofs, onRejectSuggestion, onFindProductImage, onVisualSearch, uploadProgress, itemCategories, onExtractSerialNumber, onExtractReceiptInfo, onEditImage, onGenerateImage, onRecordAudio, onImageZoom, claimDetails, policyHolders
+    item, unlinkedProofs, onBack, onUpdateItem, onDeleteItem, onFindMarketPrice, onEnrichAsset, onCalculateProofStrength, onFindHighestRCV, onDraftClaim, onUnlinkProof, onAddProof, onLinkMultipleProofs, onRejectSuggestion, onFindProductImage, onVisualSearch, uploadProgress, itemCategories, onExtractSerialNumber, onExtractReceiptInfo, onEditImage, onGenerateImage, onRecordAudio, onImageZoom, claimDetails, policyHolders, onFindRecategorizationStrategy, onGenerateSubmissionPackage, policy
 }) => {
     const [selectedProof, setSelectedProof] = useState<Proof | null>(null);
     const [isAnnotating, setIsAnnotating] = useState(false);
@@ -140,6 +151,8 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
         return itemDate > lossDate;
     }, [item.purchaseDate, claimDetails.dateOfLoss]);
     
+    const sublimit = policy?.coverage.find(c => c.type === 'sub-limit' && c.category === item.itemCategory);
+
     const handleProofFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         if (event.target.files && event.target.files.length > 0) {
             onAddProof(item.id, Array.from(event.target.files));
@@ -228,6 +241,34 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
                         <div className="ml-3">
                             <p className="text-sm font-bold">Coverage Warning</p>
                             <p className="text-xs">This item's acquisition date ({item.purchaseDate}) is after the date of loss ({claimDetails.dateOfLoss}) and may not be covered by your policy.</p>
+                        </div>
+                    </div>
+                </div>
+            )}
+            
+            {sublimit && (
+                <div className="p-4 mb-6 bg-warning/20 border-l-4 border-warning text-dark/80">
+                    <div className="flex">
+                        <div className="flex-shrink-0"><ExclamationTriangleIcon className="h-5 w-5 text-warning" /></div>
+                        <div className="ml-3">
+                            <p className="text-sm font-bold">Sub-Limit Warning</p>
+                            <p className="text-xs">This item's category "{item.itemCategory}" is subject to a ${sublimit.limit.toLocaleString()} sub-limit on your policy.</p>
+                            {!item.recategorizationStrategy && (
+                                <button onClick={() => onFindRecategorizationStrategy(item)} className="mt-2 text-xs font-bold text-primary hover:underline">Find a Recategorization Strategy</button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {item.recategorizationStrategy && (
+                <div className="p-4 mb-6 bg-blue-100/60 border-l-4 border-blue-500 text-dark/90">
+                    <div className="flex">
+                        <div className="flex-shrink-0"><SparklesIcon className="h-5 w-5 text-blue-500" /></div>
+                        <div className="ml-3">
+                            <p className="text-sm font-bold">AI Recategorization Strategy</p>
+                            <p className="text-xs mt-1"><strong>Suggested Category:</strong> {item.recategorizationStrategy.newCategory}</p>
+                            <p className="text-xs mt-1"><strong>Reasoning:</strong> {item.recategorizationStrategy.reasoning}</p>
                         </div>
                     </div>
                 </div>
@@ -365,7 +406,7 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
                         <div className="mt-6 border-t pt-4 grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-4">
                             <div><p className="text-xs text-medium">{item.isGift ? "Estimated Value" : "Original Cost"}</p><p className="font-semibold text-dark">${item.originalCost.toLocaleString()}</p></div>
                             <div><p className="text-xs text-medium">Replacement Cost (RCV)</p><p className="font-semibold text-dark">${(item.replacementCostValueRCV || 0).toLocaleString()}</p></div>
-                            <div><p className="text-xs text-medium">Actual Cash Value (ACV)</p><p className="font-semibold text-dark">${(item.actualCashValueACV || 0).toLocaleString()}</p></div>
+                            <div><p className="text-xs text-medium">Actual Cash Value (ACV)</p><p className="font-medium text-medium">${(item.actualCashValueACV || 0).toLocaleString()}</p></div>
                             <div><p className="text-xs text-medium">{item.isGift ? "Date Acquired" : "Purchase Date"}</p><p className="font-semibold text-dark">{item.purchaseDate ? new Date(item.purchaseDate).toLocaleDateString('en-US', { timeZone: 'UTC' }) : 'N/A'}</p></div>
                             <div><p className="text-xs text-medium">Brand</p><p className="font-semibold text-dark">{item.brand || 'N/A'}</p></div>
                             <div><p className="text-xs text-medium">Model</p><p className="font-semibold text-dark">{item.model || 'N/A'}</p></div>
@@ -404,21 +445,14 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
                                 ))}
                                 {item.valuationHistory && item.valuationHistory.length > 0 && (
                                     <div>
-                                        <h4 className="text-sm font-bold text-dark mb-2">Pricing Sources</h4>
+                                        <h4 className="text-sm font-bold text-dark mb-2 mt-4">Valuation History</h4>
                                         {item.valuationHistory.map((valuation, index) => (
-                                            <div key={`val-${index}`} className="space-y-1">
+                                            <div key={`val-${index}`} className="text-sm text-medium border-b border-slate-100 py-2 last:border-b-0">
+                                                <p><strong>RCV:</strong> ${valuation.rcv.toLocaleString()}, <strong>ACV:</strong> ${valuation.acv.toLocaleString()}</p>
                                                 {valuation.sources.map((source, sourceIndex) => (
-                                                    <div key={`source-${sourceIndex}`} className="text-sm text-medium border-b border-slate-100 py-2 last:border-b-0">
-                                                        <div className="flex justify-between items-center">
-                                                            <a href={source.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline truncate pr-4">
-                                                                {source.title || new URL(source.url).hostname}
-                                                            </a>
-                                                            {source.price > 0 && (
-                                                                <span className="font-semibold text-dark whitespace-nowrap">{`$${source.price.toLocaleString('en-US', {minimumFractionDigits: 2})} (${source.type})`}</span>
-                                                            )}
-                                                        </div>
-                                                        <p className="text-xs text-slate-400 truncate">{source.url}</p>
-                                                    </div>
+                                                    <a key={`source-${sourceIndex}`} href={source.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline truncate block">
+                                                        {source.title || source.url}
+                                                    </a>
                                                 ))}
                                             </div>
                                         ))}
@@ -427,109 +461,30 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
                             </div>
                         </Accordion>
                     )}
-                     {(item.suggestedProofs && item.suggestedProofs.length > 0) && (
-                        <Accordion title="Suggested Proofs" icon={<LinkIcon />} defaultOpen={true}>
-                            <div className="flex justify-between items-center mb-3 text-xs font-semibold">
-                                <span className="text-medium">
-                                    {item.suggestedProofs.filter(s => unlinkedProofs.some(p => p.id === s.proofId)).length} suggestions found
-                                </span>
-                                <div className="flex gap-3">
-                                    <button onClick={handleSelectAll} className="text-primary hover:underline">Select All</button>
-                                    <button onClick={handleDeselectAll} className="text-primary hover:underline">Deselect All</button>
-                                </div>
-                            </div>
-                            <div className="space-y-3">
-                                {item.suggestedProofs.map(suggestion => {
-                                    const proof = unlinkedProofs.find(p => p.id === suggestion.proofId);
-                                    if (!proof) return null;
-                                    const isSelected = selectedProofIds.includes(proof.id);
-
-                                    return (
-                                        <div 
-                                            key={suggestion.proofId} 
-                                            onClick={() => handleProofSelectionChange(proof.id)}
-                                            className={`flex items-center justify-between p-2 rounded-md transition-colors cursor-pointer ${isSelected ? 'bg-primary/10 ring-1 ring-primary' : 'bg-slate-50 hover:bg-slate-100'}`}
-                                        >
-                                            <div className="flex items-center gap-3 overflow-hidden">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={isSelected}
-                                                    onChange={() => handleProofSelectionChange(proof.id)}
-                                                    onClick={(e) => e.stopPropagation()}
-                                                    className="h-4 w-4 rounded border-slate-400 text-primary focus:ring-primary flex-shrink-0"
-                                                />
-                                                <ProofThumbnail proof={proof} onClick={() => {}} />
-                                                <div className="overflow-hidden">
-                                                    <p className="text-sm font-semibold text-dark truncate flex items-center gap-1.5">
-                                                      {/* Fix: Wrap icon in a span to apply the title attribute correctly. */}
-                                                      {proof.createdBy === 'AI' && <span title="Sourced from web by AI"><GlobeIcon className="h-4 w-4 text-blue-500 flex-shrink-0" /></span>}
-                                                      <span>{proof.fileName}</span>
-                                                       {proof.predictedCategory && (
-                                                            <span className="text-xs font-medium bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full whitespace-nowrap">{proof.predictedCategory}</span>
-                                                        )}
-                                                    </p>
-                                                    <p className="text-xs text-medium italic">
-                                                        {suggestion.sourceUrl ? (
-                                                            <a href={suggestion.sourceUrl} target="_blank" rel="noopener noreferrer" className="hover:underline text-blue-600">
-                                                                {suggestion.reason}
-                                                            </a>
-                                                        ) : (
-                                                            `"${suggestion.reason}"`
-                                                        )}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-2 flex-shrink-0 ml-4">
-                                                <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-1 rounded-full">{suggestion.confidence}%</span>
-                                                <button onClick={(e) => { e.stopPropagation(); onRejectSuggestion(item.id, proof.id); }} className="p-1.5 text-medium hover:bg-danger/10 hover:text-danger rounded-full transition-colors" title="Reject Suggestion">
-                                                    <XCircleIcon className="h-5 w-5"/>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                             {selectedProofIds.length > 0 && (
-                                <div className="mt-4 pt-4 border-t border-slate-200">
-                                    <button 
-                                        onClick={handleBulkLink}
-                                        className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold bg-primary text-white rounded-md shadow-sm hover:bg-primary-dark transition"
-                                    >
-                                        <LinkIcon className="h-5 w-5"/>
-                                        Link {selectedProofIds.length} Selected Proof(s)
-                                    </button>
-                                </div>
-                            )}
-                        </Accordion>
-                    )}
-
                     <Accordion title="AI Actions" icon={<SparklesIcon />} defaultOpen={false}>
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                            <button onClick={() => onFindMarketPrice(item)} className="p-3 text-center bg-slate-50 hover:bg-primary/10 rounded-md"><GlobeIcon className="h-6 w-6 mx-auto text-slate-500"/><span className="text-xs font-semibold mt-1 block text-medium">Market Price</span></button>
-                            <button onClick={() => onEnrichAsset(item)} className="p-3 text-center bg-slate-50 hover:bg-primary/10 rounded-md"><DocumentMagnifyingGlassIcon className="h-6 w-6 mx-auto text-slate-500"/><span className="text-xs font-semibold mt-1 block text-medium">Enrich Data</span></button>
-                             <button onClick={() => onCalculateProofStrength(item)} className="p-3 text-center bg-slate-50 hover:bg-primary/10 rounded-md"><CheckCircleIcon className="h-6 w-6 mx-auto text-slate-500"/><span className="text-xs font-semibold mt-1 block text-medium">Proof Strength</span></button>
-                             <button onClick={() => onCalculateACV(item)} className="p-3 text-center bg-slate-50 hover:bg-primary/10 rounded-md"><CalculatorIcon className="h-6 w-6 mx-auto text-slate-500"/><span className="text-xs font-semibold mt-1 block text-medium">Calculate ACV</span></button>
-                             <button onClick={() => onFindHighestRCV(item)} className="p-3 text-center bg-slate-50 hover:bg-primary/10 rounded-md"><TrophyIcon className="h-6 w-6 mx-auto text-slate-500"/><span className="text-xs font-semibold mt-1 block text-medium">Find Max RCV</span></button>
-                            <button onClick={() => onFindProductImage(item)} className="p-3 text-center bg-slate-50 hover:bg-primary/10 rounded-md"><TagIcon className="h-6 w-6 mx-auto text-slate-500"/><span className="text-xs font-semibold mt-1 block text-medium">Find Image</span></button>
-                             <button
-                                onClick={() => onVisualSearch(item)}
-                                disabled={!primaryProof || primaryProof.type !== 'image'}
-                                className="p-3 text-center bg-slate-50 hover:bg-primary/10 rounded-md disabled:opacity-50 disabled:cursor-not-allowed">
-                                <CameraIcon className="h-6 w-6 mx-auto text-slate-500"/>
-                                <span className="text-xs font-semibold mt-1 block text-medium">Visual Search</span>
-                            </button>
-                            <button
-                                onClick={() => onExtractSerialNumber(item)}
-                                disabled={!item.linkedProofs.some(p => p.type === 'image')}
-                                className="p-3 text-center bg-slate-50 hover:bg-primary/10 rounded-md disabled:opacity-50 disabled:cursor-not-allowed">
-                                <QrCodeIcon className="h-6 w-6 mx-auto text-slate-500"/>
-                                <span className="text-xs font-semibold mt-1 block text-medium">Extract S/N</span>
-                            </button>
-                             {item.status !== 'claimed' ? (
-                                <button onClick={() => onDraftClaim(item)} className="p-3 text-center bg-slate-50 hover:bg-primary/10 rounded-md"><PaperAirplaneIcon className="h-6 w-6 mx-auto text-slate-500"/><span className="text-xs font-semibold mt-1 block text-medium">Draft Claim</span></button>
-                            ) : (
-                                <button onClick={() => onUpdateItem({...item, status: 'active'})} className="p-3 text-center bg-slate-50 hover:bg-amber-100 rounded-md"><XCircleIcon className="h-6 w-6 mx-auto text-slate-500"/><span className="text-xs font-semibold mt-1 block text-medium">Remove from Claim</span></button>
-                            )}
+                        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                           <AiActionButton onClick={() => onFindMarketPrice(item)}><GlobeIcon className="h-5 w-5 text-primary" /> Find Market Price</AiActionButton>
+                           <AiActionButton onClick={() => onEnrichAsset(item)}><DocumentMagnifyingGlassIcon className="h-5 w-5 text-primary" /> Enrich with Web Data</AiActionButton>
+                           <AiActionButton onClick={() => onFindHighestRCV(item)}><TrophyIcon className="h-5 w-5 text-primary" /> Find Highest RCV</AiActionButton>
+                           <AiActionButton onClick={() => onVisualSearch(item)} disabled={!item.linkedProofs.some(p => p.type === 'image')}><CameraIcon className="h-5 w-5 text-primary" /> Visual Search</AiActionButton>
+                           <AiActionButton onClick={() => onExtractSerialNumber(item)} disabled={!item.linkedProofs.some(p => p.type === 'image')}><QrCodeIcon className="h-5 w-5 text-primary" /> Extract Serial Number</AiActionButton>
+                           <AiActionButton onClick={() => onCalculateProofStrength(item)}><CubeIcon className="h-5 w-5 text-primary" /> Calculate Proof Strength</AiActionButton>
+                        </div>
+                    </Accordion>
+                    <Accordion title="Claim Actions" icon={<PaperAirplaneIcon />} defaultOpen={true}>
+                       <div className="space-y-4">
+                            <div>
+                                <button onClick={() => onDraftClaim(item)} disabled={item.status === 'claimed'} className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold bg-blue-600 text-white rounded-md shadow-sm hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                                    {item.status === 'claimed' ? 'Item Claimed' : 'Draft Claim Narrative'}
+                                </button>
+                                {item.status === 'claimed' && <p className="text-xs text-center mt-1 text-medium">This item has been included in a draft claim.</p>}
+                            </div>
+                            <div>
+                                <button onClick={() => onGenerateSubmissionPackage(item)} className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold bg-primary text-white rounded-md shadow-sm hover:bg-primary-dark transition">
+                                    Generate Submission Package
+                                </button>
+                                <p className="text-xs text-center mt-1 text-medium">Export a .zip file with a formal letter and all proofs for this item.</p>
+                            </div>
                         </div>
                     </Accordion>
                 </div>
@@ -537,5 +492,5 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
         </div>
     );
 };
-
+// Fix: Add default export to make the component importable.
 export default ItemDetailView;

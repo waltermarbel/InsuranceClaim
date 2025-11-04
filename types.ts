@@ -80,6 +80,7 @@ export interface InventoryItem {
     provenance?: string;
     isGift?: boolean;
     giftedBy?: string;
+    recategorizationStrategy?: { newCategory: string; reasoning: string; };
 }
 
 export interface AccountHolder {
@@ -215,9 +216,11 @@ export interface ClaimDetails {
         startDate?: string;
         endDate?: string;
     };
+    fairRentalValuePerDay?: number;
+    aleProofs?: Proof[];
 }
 
-export type AppView = 'upload' | 'dashboard' | 'item-detail' | 'room-scan' | 'processing-preview' | 'autonomous-processor';
+export type AppView = 'upload' | 'dashboard' | 'item-detail' | 'room-scan' | 'processing-preview' | 'autonomous-processor' | 'autonomous-review';
 
 export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error';
 
@@ -283,6 +286,7 @@ export interface AutonomousInventoryItem {
     category: string;
     description: string;
     brandmodel: string;
+    serialnumber?: string;
     estimatedvaluercv: number;
     quantity: number;
     lastseendate: string;

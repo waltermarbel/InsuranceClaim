@@ -3,7 +3,7 @@ import { GoogleGenAI, Type, Modality } from "@google/genai";
 // Fix: Added blobToBase64 utility.
 import { fileToBase64, blobToBase64 } from '../utils/fileUtils.ts';
 // Fix: Added ChatMessage type for the AI assistant.
-import { InventoryItem, ParsedPolicy, AccountHolder, DraftClaim, ValuationResponse, WebIntelligenceResponse, ApparelIdentificationResponse, HighestRcvResponse, SerialNumberResponse, ProofStrengthResponse, Proof, ProofSuggestion, ACVResponse, CoverageLimit, PolicyAnalysisReport, ValuationSource, ProofPurpose, ChatMessage, WebIntelligenceFact, ReceiptData, ProcessingInference, AleDetails, CostType, InferenceType, AutonomousInventoryItem } from '../types.ts';
+import { InventoryItem, ParsedPolicy, AccountHolder, DraftClaim, ValuationResponse, WebIntelligenceResponse, ApparelIdentificationResponse, HighestRcvResponse, SerialNumberResponse, ProofStrengthResponse, Proof, ProofSuggestion, ACVResponse, CoverageLimit, PolicyAnalysisReport, ValuationSource, ProofPurpose, ChatMessage, WebIntelligenceFact, ReceiptData, ProcessingInference, AleDetails, CostType, InferenceType, AutonomousInventoryItem, ClaimDetails } from '../types.ts';
 import { CATEGORIES } from '../constants.ts';
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
@@ -360,107 +360,83 @@ export const clusterAndSynthesizeItems = async (
     }
 };
 
-const autonomousProcessorSystemPrompt = `
-### **System Prompt: VeritasVault Autonomous Inventory Processor (Claim #00104761115)**
+const autonomousProcessorSystemPrompt = `System Prompt: VeritasVault Autonomous Inventory Processor (Claim #00104761115)
 
-**ROLE:**
-You are **VeritasVault**, an AI system built to support Roydel Marquez Bello in substantiating a high-value insurance claim. Your task is to analyze a batch of provided media (images, receipts, invoices, CSVs, text files) to reconstruct a single, comprehensive, and claim-ready inventory of tangible personal property.
+ROLE:
+You are VeritasVault, an evidence-bound AI system built to support Roydel Marquez Bello. Your sole function is to analyze a batch of provided media (images, receipts, invoices, CSVs, text files) to reconstruct a single, comprehensive, and claim-ready inventory of tangible personal property.
+You must operate based only on the visual and textual evidence provided, including embedded metadata (EXIF/OCR). Do not speculate beyond what the evidence plausibly supports.
+🎯 OBJECTIVE:
+Generate a single, structured JSON array of pre-loss personal property items. You must identify items in media dated on or before November 27, 2024. The final output must be policy-compliant and strategically framed, maximizing eligible reimbursement by clearly linking items to the insured parties, citing all proofs, and flagging ownership gaps.
 
-You must meticulously categorize, value, and timestamp items, establishing a clear chain of ownership by linking items to known individuals. You must operate based *only* on the visual and textual evidence provided, including embedded metadata (EXIF/OCR).
 
-**🎯 OBJECTIVE:**
-Generate a structured **JSON array** of pre-loss personal property items. You must identify items in media dated **on or before November 27, 2024**. The final output must be policy-compliant and strategically framed, maximizing eligible reimbursement by clearly linking items to the insured parties, identifying all proofs, and flagging ownership gaps.
+📂 CLAIM CONTEXT (CRITICAL & IMMUTABLE FACTS)
 
-**📂 CLAIM CONTEXT (STRICT):**
+You must adhere to this data for your analysis.
+	•	Claimant(s): Roydel Marquez Bello & Maleidy Bello Landin (household members covered under the same policy).
+	•	Incident: Burglary
+	•	Date of Loss: November 27, 2024
+	•	Loss Location: 312 W 43rd St Apt 14J, New York, NY
+	•	Policy: Assurant Policy RI8462410
+	•	Coverage C (Personal Property): $95,000 RCV (Replacement Cost Value)
+	•	Lifestyle Profile (Inference Guide): Assume a modern, tech-savvy, and design/fashion-conscious lifestyle consistent with living in a New York City apartment. This should guide your inference for unbranded or partially obscured items.
 
-  * **Policyholder / Insured:** Roydel Marquez Bello
-  * **Co-Insured / Mother:** Maleidy Bello Landin
-  * **Known Third-Party (Associate):** Omar Gonzalez
-  * **Incident Date:** November 27, 2024 (Burglary)
-  * **Policy:** Assurant RI8462410
-  * **Coverage C (Personal Property RCV):** $95,000
-  * **Coverage D (Loss of Use):** $19,000
+⚠️ POLICY SUB-LIMITS (STRICTLY ENFORCE)
 
-**🌎 LOCATION COVERAGE (CRITICAL):**
-The policy was amended on Nov 26, 2024, changing the primary "Insured Residence Premises" to **312 W 43rd St, Apt 14J**. The burglary occurred at the *old* address, **421 W 56th St, Apt 4A**.
-**==> YOUR DIRECTIVE:** A 30-day "moving window" clause is in effect. **Both addresses are considered covered** for this loss. You must accept items plausibly located at *either* address on the date of loss.
+You must tag items that fall into these categories. These are maximum total payouts for the entire category.
+	•	Jewelry, Watches, Furs: $1,000 (Tag: jewelry_theft)
+	•	Money, Gold, Bank Notes: $200 (Tag: cash_precious_metals_theft)
+	•	Business Property (On-Premises): $2,500 (Tag: business_property)
+	•	Firearms: $2,500 (Tag: firearms)
+	•	Watercraft: $1,500 (Tag: watercraft)
+	•	Portable Electronics (stolen from a vehicle): $1,500 (Tag: electronics_vehicle_theft)
 
-**⚠️ POLICY SUB-LIMITS (STRICTLY ENFORCE - APPLY TAGS):**
 
-  * **Jewelry, Watches, Furs:** $1,000 (Tag: \`jewelry_theft\`)
-  * **Money, Gold, Bank Notes:** $200 (Tag: \`cash_precious_metals_theft\`)
-  * **Business Property (On-Premises):** $2,500 (Tag: \`business_property\`)
-  * **Personal Records/Passports:** $1,000 (Tag: \`personal_records\`)
-  * **Identity Fraud:** $15,000 (This is for the *expense* claim, not property value).
+🔎 ANALYSIS WORKFLOW
 
-**🧠 INFERRED LIFESTYLE PROFILE:**
-Modern, NYC-based, tech-forward, aesthetically driven. Items align with premium-to-luxury urban living (Apple, Chanel, Hermès, Moncler, Sonos, Moschino, Christian Louboutin, etc.).
+Follow these phases meticulously for each file in the media batch.
 
------
+Phase 1: Media Ingestion & Validation
 
-### 🔎 **ANALYSIS WORKFLOW**
+	1	Extract All Metadata: From images, pull DateTimeOriginal and GPS data. From documents (PDFs, CSVs, text), pull CreationDate and perform OCR on all text to find dates, items, purchasers, and serial numbers.
+	2	Pre-Loss Confirmation: An item is only valid if it is visible or documented in media dated on or before November 27, 2024. Media dated after the loss cannot prove pre-loss ownership but may be used to establish value (note this in ainotes).
+	3	Location Verification: The item must be plausibly located at the Loss Location. Use GPS data or infer from visual context (e.g., indoor apartment setting).
 
-#### **PHASE 1: MEDIA INGESTION & VALIDATION**
+Phase 2: Item & Entity Identification
 
-1.  **Extract All Metadata:**
-      * **Images:** Pull \`DateTimeOriginal\`, \`DateModified\`, \`GPSLatitude/Longitude\`.
-      * **Documents (Receipts, Invoices, CSVs):** Pull \`CreationDate\`, \`Author\`, and perform **OCR on all text**.
-2.  **Pre-Loss Confirmation (CRITICAL):**
-      * **ACCEPT:** Media dated **on or before November 27, 2024**.
-      * **FLAG (for review):** Media dated *after* the loss (cannot prove pre-loss ownership but may be used to establish *value*).
-      * **REJECT (from inventory):** Post-loss scene/damage photos.
-3.  **Reject Irrelevant Media:**
-      * Exclude: Blurry/obscured/ambiguous items, landscapes, unreadable documents, heavily obstructed property, or media clearly unrelated to personal assets.
+	1	Identify Tangible Personal Property: Scan all validated media for distinct, claimable items.
+	2	Deduplicate: A single physical item appearing in multiple files must result in only ONE entry in the final JSON. Compile all source filenames into the imagesource array for that single entry.
+	3	Assign Categories: Assign each item to one of the following: Electronics, Furniture, Appliances, Clothing & Accessories, Jewelry, Business Property, Art & Collectibles, Home Goods, Sports & Hobbies, Medical Equipment, Travel Gear, Other.
+	4	Describe & Infer Brand/Model: Include visible features (color, size, material). Infer brand/model only if visually confirmed (logo, text) or strongly inferred by distinctive design. Otherwise, use "Unbranded/Generic".
+	5	Extract Serial Number: If a serial number is identified via OCR on a receipt, box, or the item itself, capture it.
+	6	Infer Owner:
+	◦	Default owner is Roydel Marquez Bello.
+	◦	Assign Maleidy Bello Landin only if the item is unambiguously female-specific.
+	◦	If a receipt shows a third-party purchaser (e.g., Omar Gonzalez), attribute ownership to Roydel Marquez Bello but flag the purchase details in ainotes.
+	7	Quantity: Assume 1 unless multiple identical items are clearly visible or listed on a receipt.
 
-#### **PHASE 2: ITEM & ENTITY IDENTIFICATION**
+Phase 3: Value Estimation & Strategic Flagging
 
-1.  **Identify Tangible Personal Property:**
-      * Scan all *accepted* media for household, wearable, and portable items.
-      * Exclude: Real estate fixtures, consumables, services, data.
-2.  **Assign Categories:**
-      * \`Electronics\`, \`Furniture\`, \`Appliances\`, \`Clothing & Accessories\`, \`Jewelry\`, \`Business Property\`, \`Art & Collectibles\`, \`Home Goods\`, \`Sports & Hobbies\`, \`Medical Equipment\`, \`Travel Gear\`, \`Other\`.
-3.  **Describe Items & Infer Brand/Model:**
-      * Include visible features (color, size, material).
-      * Infer brand/model *only* if visually confirmed (logo, text) or strongly inferred by distinctive design (e.g., Moschino teddy bear, Louboutin red sole).
-4.  **Infer Owner/Possessor (CRITICAL ENHANCEMENT):**
-      * **From Images:** Identify persons depicted. Match them to: **"Roydel Marquez Bello"** or **"Maleidy Bello Landin"**. If an item is clearly associated with one (e.g., men's suit vs. women's dress), attribute it. Default to \`Roydel Marquez Bello\` if ambiguous.
-      * **From Receipts/Invoices/CSVs (via OCR/Text):** Identify the **"Purchaser,"** "Billed To," or "Shipped To" name.
-          * If \`Roydel Marquez Bello\` or \`Maleidy Bello Landin\`, link as "Owner."
-          * If \`Omar Gonzalez\` or another known third party, link to \`Roydel Marquez Bello\` but **flag this in \`ainotes\`**.
-5.  **Quantity:** Assume \`1\` unless multiple identical items are *clearly* visible in the same frame or on a receipt.
+	1	Estimate Replacement Cost Value (RCV):
+	◦	From Receipts/Invoices: Use the exact price. If the receipt is old, adjust to a plausible 2024/2025 RCV, but note the original price in ainotes.
+	◦	From Images (No Receipt): Estimate the RCV for a new, equivalent item in late 2024/early 2025.
+	◦	Use realistic, non-round pricing (e.g., $1349.99).
+	2	Apply Sub-Limit Tags: If an item's category matches a Special Sub-Limit, assign the corresponding sublimit_tag. Otherwise, this field must be null.
+	3	Confidence Score: Assign a float (0.0-1.0) indicating certainty. (1.0 = receipt with serial#; 0.9 = clear photo with brand; 0.5 = item clear, brand is a guess).
 
-#### **PHASE 3: VALUE ESTIMATION (RCV) & STRATEGIC FLAGGING**
 
-1.  **Replacement Cost Value (RCV):**
-      * **From Receipts/CSVs:** Use the exact price (with cents). If the receipt is old (e.g., 2018), *adjust* this value to a plausible 2024/2025 RCV, but **note the original price in \`ainotes\`**.
-      * **From Images (No Receipt):** Estimate RCV based on market value as of late 2024 / early 2025.
-      * **USE REALISTIC PRICING (e.g., $1,345.99)** to simulate purchase authenticity. **DO NOT** use round numbers unless the price is genuinely round.
-2.  **Internal Sub-Limit Tracking:** Flag all \`Jewelry\` and \`Business Property\` items in \`sublimit_tag\` to indicate they are subject to policy sub-limits, regardless of their RCV.
-3.  **Confidence Score:** Assign a float between 0.0 and 1.0 indicating the certainty of the item's identification and valuation based on visual evidence (0.0 = pure guess, 1.0 = highly visible, clear item, verifiable brand/model).
+🚫 AUTO-REJECTION RULES (DO NOT INCLUDE IF…):
 
-#### **PHASE 4: STRUCTURED OUTPUT**
+You MUST REJECT and exclude any item from the final inventory if it is:
+	•	Not tangible personal property (e.g., building fixtures, data, services, software).
+	•	Indiscernible (too blurry, obscured, or generic to identify).
+	•	Lacking any proof of pre-loss existence.
+	•	Clearly public, shared, or not owned by the claimants.
+	•	Not plausibly at the Loss Location.
 
-1.  **Deduplicate Items:** Merge identical items (matched by Serial Number > Brand/Model/Description).
-2.  **Compile Image Sources:** For the single inventory entry, compile a **list of all unique image/document filenames** where the item is clearly visible or mentioned.
-3.  **Set Last Seen Date:** Use the *latest confirmed pre-loss* \`DateTimeOriginal\` or \`CreationDate\` from any of the supporting media.
-4.  **Validate Coherence:** Ensure the list aligns with the lifestyle profile.
 
------
+✅ FINAL OUTPUT FORMAT (Strict JSON Array Only)
 
-### 🚫 **AUTO-REJECTION RULES (DO NOT INCLUDE IF…):**
-
-  * Item is not tangible personal property (fixtures, consumables, services, data).
-  * Item is only visible in media dated **after 2024-11-27** (with no other proof of pre-loss ownership).
-  * Image is too blurry, generic, or obscured to confirm item type or plausible value.
-  * Appears to be public/shared property.
-  * **Cannot be reasonably linked** to Roydel or Maleidy (e.g., a receipt with an unknown third-party name *that is not* a known, documented associate like Omar Gonzalez).
-  * Is an overly duplicated low-value good (e.g., 10 plain white tees).
-
------
-
-### ✅ **FINAL OUTPUT FORMAT (Strict JSON Array Only):**
-
-You will generate a single **JSON array** containing one JSON object for *each* identified, non-rejected inventory item. Each object **MUST** conform strictly to the following \`VeritasVault.InventoryItem.v1\` schema:
+Your final and only response must be a single, raw JSON array of objects. Each object represents one inventoried item and must conform strictly to the VeritasVault.InventoryItem.v2 schema below.
 `;
 
 const autonomousProcessorSchema = {
@@ -471,6 +447,7 @@ const autonomousProcessorSchema = {
             category: { type: Type.STRING },
             description: { type: Type.STRING },
             brandmodel: { type: Type.STRING },
+            serialnumber: { type: Type.STRING },
             estimatedvaluercv: { type: Type.NUMBER },
             quantity: { type: Type.INTEGER },
             lastseendate: { type: Type.STRING },
@@ -1202,5 +1179,126 @@ export const getChatResponse = async (history: ChatMessage[], newUserInput: stri
     } catch (error) {
         console.error("Error getting chat response:", error);
         throw new Error("The AI assistant could not respond.");
+    }
+};
+
+export const calculateFairRentalValue = async (location: string, propertyType: string): Promise<{ dailyRate: number, sources: { url: string, title: string }[] }> => {
+    try {
+        const prompt = `
+        Act as a real estate market analyst for an insurance claim. The user's loss location is "${location}". The property is a "${propertyType}".
+        Your task is to determine the Fair Rental Value (FRV) per day for a comparable property in that immediate area.
+        Use Google Search to find current rental listings (e.g., on Zillow, StreetEasy, apartments.com) for similar properties.
+        Calculate an average daily rate from your findings. Provide the final daily rate and a list of the source URLs you used for your calculation.
+        `;
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-pro',
+            contents: prompt,
+            config: {
+                tools: [{googleSearch: {}}],
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        dailyRate: { type: Type.NUMBER, description: "The calculated average daily rental rate in USD." },
+                        sources: { type: Type.ARRAY, items: { 
+                            type: Type.OBJECT,
+                            properties: {
+                                url: { type: Type.STRING },
+                                title: { type: Type.STRING }
+                            },
+                            required: ["url", "title"]
+                        }}
+                    },
+                    required: ["dailyRate", "sources"]
+                }
+            }
+        });
+
+        const jsonText = response.text.trim();
+        return JSON.parse(jsonText);
+    } catch (error) {
+        console.error("Error calculating Fair Rental Value:", error);
+        throw new Error("AI failed to calculate Fair Rental Value from web search.");
+    }
+};
+
+export const getRecategorizationStrategy = async (item: InventoryItem, policy: ParsedPolicy): Promise<{ newCategory: string; reasoning: string; }> => {
+    const sublimit = policy.coverage.find(c => c.category === item.itemCategory);
+    try {
+        const prompt = `
+        Act as a strategic insurance claim advisor for policy RI8462410. An item is categorized under a policy sub-limit which restricts its claimable value.
+        Your task is to find a legally permissible and strategically sound alternative category for the item based on its description and available proofs, referencing specific policy terms.
+
+        POLICY-SPECIFIC SUB-LIMITS (Theft):
+        - Jewelry/Watches: $1,000
+        - Business Property (On-Premises): $2,500
+        - Money/Gold: $200
+
+        ITEM DETAILS:
+        - Name: "${item.itemName}"
+        - Current Category: "${item.itemCategory}"
+        - Applicable Sub-limit: $${sublimit?.limit || 'N/A'}
+        - Description: "${item.itemDescription}"
+        - Proofs Summary: ${item.linkedProofs.map(p => p.fileName).join(', ') || 'No proofs available.'}
+
+        INSTRUCTIONS:
+        Analyze the item's proofs to find a compliant alternative category that maximizes the claim value.
+        Example Logic for this policy:
+        - A "$8,000 Gold Chain" is categorized as 'Jewelry,' which has a $1,000 theft limit. Analyze its proofs. If a proof shows it was a 'company service award,' it can be re-categorized as 'Business Property' ($2,500 limit). If it is a '17th Century Spanish Doubloon,' it is 'Art & Collectibles' (no sub-limit) and covered under the full $95,000 Coverage C.
+
+        Provide the best alternative category and a concise, compelling reasoning for the change. If no logical or defensible alternative exists, state that the current category is the most appropriate.
+        `;
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-pro',
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        newCategory: { type: Type.STRING },
+                        reasoning: { type: Type.STRING }
+                    },
+                    required: ["newCategory", "reasoning"]
+                }
+            }
+        });
+        const jsonText = response.text.trim();
+        return JSON.parse(jsonText);
+    } catch (error) {
+        console.error("Error getting recategorization strategy:", error);
+        throw new Error("AI failed to find a recategorization strategy.");
+    }
+};
+
+export const generateSubmissionLetter = async (item: InventoryItem, policy: ParsedPolicy, accountHolder: AccountHolder, claimDetails: ClaimDetails): Promise<string> => {
+    try {
+        const prompt = `
+        Generate a formal, professional, and comprehensive submission letter for a single item as part of an insurance claim.
+        The letter should be addressed to the claims department of the insurance provider.
+        It must be structured, clear, and include all relevant details to preempt questions from an adjuster.
+
+        DETAILS TO INCLUDE:
+        - Claimant Name: ${accountHolder.name}
+        - Policy Number: ${policy.policyNumber}
+        - Date of Loss: ${claimDetails.dateOfLoss}
+        - Claim/Police Report #: ${claimDetails.policeReport}
+        - Item Name: ${item.itemName}
+        - Item Description: ${item.itemDescription}
+        - Replacement Cost Value (RCV): $${(item.replacementCostValueRCV || item.originalCost).toFixed(2)}
+        - Actual Cash Value (ACV): $${item.actualCashValueACV ? item.actualCashValueACV.toFixed(2) : 'N/A'}
+        - List of attached proofs: ${item.linkedProofs.map(p => p.fileName).join(', ')}
+
+        TONE: Factual, firm, and organized. Assume this is the first formal submission for this specific item.
+        Do not write any notes or explanations, just the raw text of the letter itself.
+        `;
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+        });
+        return response.text.trim();
+    } catch (error) {
+        console.error("Error generating submission letter:", error);
+        throw new Error("AI failed to generate the submission letter.");
     }
 };

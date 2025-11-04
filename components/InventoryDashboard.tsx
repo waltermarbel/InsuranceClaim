@@ -6,7 +6,6 @@ import ItemCard from './ItemCard.tsx';
 import { PlusIcon, SearchIcon, VideoCameraIcon, ClipboardDocumentListIcon, ExclamationTriangleIcon, WrenchScrewdriverIcon, PencilIcon, CheckCircleIcon, InformationCircleIcon, CubeIcon, ShieldExclamationIcon, XCircleIcon, QrCodeIcon, PencilSquareIcon, GlobeIcon, DocumentMagnifyingGlassIcon, CameraIcon, SparklesIcon, PhotoIcon } from './icons.tsx';
 import { InsuranceSection } from './InsuranceSection.tsx';
 import { CategoryPieChart } from './CategoryPieChart.tsx';
-import { AIPipelineMonitor } from './AIPipelineMonitor.tsx';
 
 interface InventoryDashboardProps {
   items: InventoryItem[];
@@ -34,9 +33,7 @@ interface InventoryDashboardProps {
   onCoverageFilterChange: (value: string) => void;
   onApproveItem: (itemId: string) => void;
   onRejectItem: (itemId: string) => void;
-  pipelineStage: PipelineStage;
-  pipelineProgress: PipelineProgress;
-  onCancelPipeline: () => void;
+  onCalculateFRV: () => void;
   
   selectedItemIds: string[];
   onToggleItemSelection: (itemId: string) => void;
@@ -58,33 +55,42 @@ interface ClaimOverviewProps {
     policy: ParsedPolicy | null;
     claimDetails: ClaimDetails;
     onUpdateClaimDetails: (updatedDetails: Partial<ClaimDetails>) => void;
+    onCalculateFRV: () => void;
 }
 
-const ClaimOverview: React.FC<ClaimOverviewProps> = ({ items, policy, claimDetails, onUpdateClaimDetails }) => {
+const ClaimOverview: React.FC<ClaimOverviewProps> = ({ items, policy, claimDetails, onUpdateClaimDetails, onCalculateFRV }) => {
   const claimedItems = items.filter(item => item.status === 'claimed');
 
   const calculateCosts = () => {
     let lossOfUse = 0;
     let propertyDamage = 0;
     let identityFraud = 0;
+    const aleProofs = claimDetails.aleProofs || [];
 
-    claimedItems.forEach(item => {
-      item.linkedProofs.forEach(proof => {
-        const value = proof.estimatedValue || 0;
-        switch (proof.costType) {
-          case 'Loss of Use':
-            lossOfUse += value;
+    if (claimDetails.fairRentalValuePerDay && claimDetails.claimDateRange?.startDate && claimDetails.claimDateRange?.endDate) {
+        const start = new Date(claimDetails.claimDateRange.startDate);
+        const end = new Date(claimDetails.claimDateRange.endDate);
+        const diffTime = Math.abs(end.getTime() - start.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // Inclusive
+        const calculatedLossOfUse = diffDays * claimDetails.fairRentalValuePerDay;
+        lossOfUse = policy ? Math.min(calculatedLossOfUse, policy.coverageD_limit) : calculatedLossOfUse;
+    }
+
+    aleProofs.forEach(proof => {
+      const value = proof.estimatedValue || 0;
+      switch (proof.costType) {
+        case 'Loss of Use':
+            if (!claimDetails.fairRentalValuePerDay) lossOfUse += value;
             break;
-          case 'Property Damage & Debris Removal':
-            propertyDamage += value;
-            break;
-          case 'Identity Fraud Expenses':
-            identityFraud += value;
-            break;
-          default:
-            break;
-        }
-      });
+        case 'Property Damage & Debris Removal':
+          propertyDamage += value;
+          break;
+        case 'Identity Fraud Expenses':
+          identityFraud += value;
+          break;
+        default:
+          break;
+      }
     });
     return { lossOfUse, propertyDamage, identityFraud };
   };
@@ -145,7 +151,14 @@ const ClaimOverview: React.FC<ClaimOverviewProps> = ({ items, policy, claimDetai
                         </div>
                         <div className="space-y-2 text-sm">
                             <div className="flex justify-between items-center py-1 border-b"><span className="text-medium">Personal Property (Coverage C)</span><span className="font-semibold text-dark">${personalPropertyTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
-                            <div className="flex justify-between items-center py-1 border-b"><span className="text-medium">Loss of Use (Coverage D)</span><span className="font-semibold text-dark">${calculatedCosts.lossOfUse.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
+                            <div className="flex justify-between items-center py-1 border-b">
+                                <span className="text-medium">Loss of Use (Coverage D)</span>
+                                {claimDetails.fairRentalValuePerDay ? (
+                                    <span className="font-semibold text-dark">${calculatedCosts.lossOfUse.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                                ) : (
+                                    <button onClick={onCalculateFRV} className="text-xs font-semibold text-primary hover:underline">Calculate FRV</button>
+                                )}
+                            </div>
                             <div className="flex justify-between items-center py-1 border-b"><span className="text-medium">Property Damage & Debris Removal</span><span className="font-semibold text-dark">${calculatedCosts.propertyDamage.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
                             <div className="flex justify-between items-center py-1 border-b"><span className="text-medium">Identity Fraud Expenses</span><span className="font-semibold text-dark">${calculatedCosts.identityFraud.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
                             <div className="flex justify-between items-center pt-2 font-bold text-lg"><span className="text-dark font-heading">Total Claim Value</span><span className="text-primary">${totalClaimValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
@@ -230,9 +243,7 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
     onCoverageFilterChange,
     onApproveItem,
     onRejectItem,
-    pipelineStage,
-    pipelineProgress,
-    onCancelPipeline,
+    onCalculateFRV,
     selectedItemIds,
     onToggleItemSelection,
     onSelectAllFilteredItems,
@@ -296,13 +307,6 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
 
   return (
     <div className="relative">
-        {pipelineStage !== 'idle' && (
-            <AIPipelineMonitor 
-                stage={pipelineStage}
-                progress={pipelineProgress}
-                onCancel={onCancelPipeline}
-            />
-        )}
       <div className="mb-8 p-6 bg-white rounded-lg shadow-sm border border-slate-200">
         <h2 className="text-3xl font-bold tracking-tight text-dark font-heading mb-4">
             Welcome, {accountHolder.name.split(' ')[0]}!
@@ -357,6 +361,7 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
         policy={activePolicy || null}
         claimDetails={claimDetails}
         onUpdateClaimDetails={onUpdateClaimDetails}
+        onCalculateFRV={onCalculateFRV}
       />
 
       <InsuranceSection 
