@@ -141,6 +141,8 @@ const App: React.FC = () => {
     // Background Processing State
     const [pipelineStage, setPipelineStage] = useState<PipelineStage>('idle');
     const [pipelineProgress, setPipelineProgress] = useState<PipelineProgress>({ current: 0, total: 0, fileName: '' });
+    const [processingQueue, setProcessingQueue] = useState<File[]>([]);
+    const [accumulatedReviewItems, setAccumulatedReviewItems] = useState<InventoryItem[]>([]);
     
     // Filter State
     const [searchTerm, setSearchTerm] = useState('');
@@ -262,42 +264,88 @@ const App: React.FC = () => {
             alert("Please add and activate an insurance policy before adding evidence.");
             return;
         }
-        logActivity('AUTONOMOUS_PROCESS_START', `Starting autonomous processing for ${files.length} files.`);
+        const filesArray = Array.from(files);
+        logActivity('AUTONOMOUS_PROCESS_START', `Queueing ${filesArray.length} files for autonomous processing.`);
+        
+        setAccumulatedReviewItems([]); // Clear previous results
+        setProcessingQueue(filesArray);
         setCurrentView('autonomous-processor');
         setPipelineStage('processing');
-        setPipelineProgress({ current: 0, total: files.length, fileName: `Analyzing ${files.length} files...` });
-
-        try {
-            const results: AutonomousInventoryItem[] = await geminiService.runAutonomousProcessor(Array.from(files));
-            logActivity('AI_ACTION_SUCCESS', `Autonomous processor identified ${results.length} potential items.`, 'Gemini');
-
-            const newItemsToReview: InventoryItem[] = results.map((item, i) => ({
-                id: `item-auto-${Date.now()}-${i}`,
-                status: 'needs-review',
-                itemName: item.description,
-                itemDescription: `${item.ainotes}\n\nSource(s): ${item.imagesource.join(', ')}`,
-                itemCategory: item.category,
-                originalCost: item.estimatedvaluercv,
-                purchaseDate: item.lastseendate,
-                brand: item.brandmodel.includes('/') ? 'Unbranded/Generic' : item.brandmodel.split(' ')[0],
-                model: item.brandmodel.includes('/') ? '' : item.brandmodel.split(' ').slice(1).join(' '),
-                serialNumber: item.serialnumber || undefined,
-                linkedProofs: [], // Proofs are not created as objects in this flow.
-                createdAt: new Date().toISOString(),
-                createdBy: 'AI Autonomous',
-            }));
-
-            setItemsToReview(newItemsToReview);
-            setCurrentView('autonomous-review');
-
-        } catch (error) {
-            console.error("Autonomous processing failed:", error);
-            logActivity('ERROR', `Autonomous processing failed: ${error instanceof Error ? error.message : 'Unknown Error'}`);
-            setCurrentView('dashboard');
-        } finally {
-            setPipelineStage('idle');
-        }
+        setPipelineProgress({ current: 0, total: filesArray.length, fileName: `Preparing to process ${filesArray.length} files...` });
     }, [activePolicy, logActivity]);
+
+    useEffect(() => {
+        if (pipelineStage !== 'processing') {
+            return;
+        }
+
+        if (processingQueue.length === 0) {
+            // Queue is empty, processing is done
+            setPipelineStage('idle');
+            if (accumulatedReviewItems.length > 0) {
+                setItemsToReview(accumulatedReviewItems);
+                setCurrentView('autonomous-review');
+            } else {
+                // Finished but no items were found, or all batches failed.
+                setCurrentView('dashboard');
+            }
+            return;
+        }
+
+        const BATCH_SIZE = 5;
+        let isCancelled = false;
+
+        const processNextBatch = async () => {
+            const batch = processingQueue.slice(0, BATCH_SIZE);
+            const remainingInQueue = processingQueue.slice(BATCH_SIZE);
+            
+            const processedCount = pipelineProgress.total - processingQueue.length;
+            setPipelineProgress(prev => ({
+                ...prev,
+                current: processedCount,
+                fileName: `Processing files ${processedCount + 1} to ${processedCount + batch.length} of ${prev.total}...`
+            }));
+            
+            try {
+                const results: AutonomousInventoryItem[] = await geminiService.runAutonomousProcessor(batch);
+                logActivity('AI_ACTION_SUCCESS', `Batch complete. Identified ${results.length} items.`, 'Gemini');
+
+                if (isCancelled) return;
+
+                const newItems: InventoryItem[] = results.map((item, i) => ({
+                    id: `item-auto-${Date.now()}-${i}-${processedCount}`,
+                    status: 'needs-review',
+                    itemName: item.description,
+                    itemDescription: `${item.ainotes}\n\nSource(s): ${item.imagesource.join(', ')}`,
+                    itemCategory: item.category,
+                    originalCost: item.estimatedvaluercv,
+                    purchaseDate: item.lastseendate,
+                    brand: item.brandmodel.includes('/') ? 'Unbranded/Generic' : item.brandmodel.split(' ')[0],
+                    model: item.brandmodel.includes('/') ? '' : item.brandmodel.split(' ').slice(1).join(' '),
+                    serialNumber: item.serialnumber || undefined,
+                    linkedProofs: [],
+                    createdAt: new Date().toISOString(),
+                    createdBy: 'AI Autonomous',
+                }));
+                
+                setAccumulatedReviewItems(prev => [...prev, ...newItems]);
+                setProcessingQueue(remainingInQueue);
+
+            } catch (error) {
+                console.error("Autonomous processing batch failed:", error);
+                logActivity('ERROR', `Batch failed: ${error instanceof Error ? error.message : 'Unknown Error'}`);
+                if (isCancelled) return;
+                // Skip the failed batch and continue
+                setProcessingQueue(remainingInQueue);
+            }
+        };
+
+        processNextBatch();
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [pipelineStage, processingQueue, accumulatedReviewItems, logActivity, pipelineProgress.total]);
     
     const handleUploadClaimDocument = useCallback(async (file: File) => {
         logActivity('CLAIM_DOC_UPLOAD', `Uploading claim document: ${file.name}`);
@@ -646,20 +694,21 @@ const App: React.FC = () => {
     }, [logActivity]);
     
     const handleUndo = useCallback(() => {
-        if (undoAction?.type === 'DELETE_ITEM') {
+        if (!undoAction) return;
+        if (undoAction.type === 'DELETE_ITEM') {
             setInventory(prev => [...prev, undoAction.payload.item]);
             logActivity('ITEM_RESTORED', `Restored item: ${undoAction.payload.item.itemName}`);
-        } else if (undoAction?.type === 'REJECT_SUGGESTION') {
-            // Find the item and add the suggestion back
+        } else if (undoAction.type === 'REJECT_SUGGESTION') {
             setInventory(prev => prev.map(item => {
                 if (item.id === undoAction.payload.itemId) {
-                     const suggestionToRestore = item.suggestedProofs?.find(s => s.proofId === undoAction.payload.proofId);
-                     // This part is simplified; a real implementation would need to store the suggestion details
-                     // For now, we assume it's lost, which is a limitation.
+                    return {
+                        ...item,
+                        suggestedProofs: [...(item.suggestedProofs || []), undoAction.payload.suggestion]
+                    };
                 }
                 return item;
             }));
-            logActivity('SUGGESTION_RESTORED', `User undid rejection of proof suggestion for item ID ${undoAction.payload.itemId}.`);
+            logActivity('SUGGESTION_RESTORED', `Restored suggestion for item ID ${undoAction.payload.itemId}.`);
         }
         setUndoAction(null);
     }, [undoAction, logActivity]);
@@ -1009,17 +1058,23 @@ const App: React.FC = () => {
     }, [inventory, updateItem, logActivity]);
 
     const handleRejectSuggestion = useCallback((itemId: string, proofId: string) => {
-        setInventory(prev => prev.map(item => {
-            if (item.id === itemId) {
-                return {
-                    ...item,
-                    suggestedProofs: item.suggestedProofs?.filter(s => s.proofId !== proofId)
-                };
-            }
-            return item;
-        }));
-        logActivity('SUGGESTION_REJECTED', `User rejected a proof suggestion.`);
-    }, [logActivity]);
+        const item = inventory.find(i => i.id === itemId);
+        const suggestion = item?.suggestedProofs?.find(s => s.proofId === proofId);
+
+        if (item && suggestion) {
+            setInventory(prev => prev.map(item => {
+                if (item.id === itemId) {
+                    return {
+                        ...item,
+                        suggestedProofs: item.suggestedProofs?.filter(s => s.proofId !== proofId)
+                    };
+                }
+                return item;
+            }));
+            logActivity('SUGGESTION_REJECTED', `User rejected a proof suggestion for ${item.itemName}.`);
+            setUndoAction({ type: 'REJECT_SUGGESTION', payload: { suggestion, itemId } });
+        }
+    }, [inventory, logActivity]);
     
     const handleSaveToFile = useCallback(() => {
         const data = {
@@ -1240,6 +1295,56 @@ const App: React.FC = () => {
         }
     }, [activePolicy, accountHolder, claimDetails, logActivity]);
 
+    // New Bulk Proof Handlers
+    const handleBulkRejectSuggestions = useCallback((itemId: string, proofIds: string[]) => {
+        setInventory(prev => prev.map(item => {
+            if (item.id === itemId) {
+                return {
+                    ...item,
+                    suggestedProofs: item.suggestedProofs?.filter(s => !proofIds.includes(s.proofId))
+                };
+            }
+            return item;
+        }));
+        logActivity('BULK_SUGGESTIONS_REJECTED', `User rejected ${proofIds.length} proof suggestions for item ID ${itemId}.`);
+    }, [logActivity]);
+
+    const handleBulkDeleteUnlinkedProofs = useCallback((proofIds: string[]) => {
+        const proofIdsSet = new Set(proofIds);
+        // Remove from unlinkedProofs
+        setUnlinkedProofs(prev => prev.filter(p => !proofIdsSet.has(p.id)));
+
+        // Also remove from any suggestions in any inventory item
+        setInventory(prev => prev.map(item => {
+            if (item.suggestedProofs && item.suggestedProofs.some(s => proofIdsSet.has(s.proofId))) {
+                return {
+                    ...item,
+                    suggestedProofs: item.suggestedProofs.filter(s => !proofIdsSet.has(s.proofId))
+                };
+            }
+            return item;
+        }));
+
+        logActivity('BULK_UNLINKED_PROOFS_DELETED', `User permanently deleted ${proofIds.length} unlinked proofs.`);
+    }, [logActivity]);
+
+    const handleBulkUnlinkProofs = useCallback((itemId: string, proofIds: string[]) => {
+        const item = inventory.find(i => i.id === itemId);
+        if (!item) return;
+
+        const proofsToUnlink = item.linkedProofs.filter(p => proofIds.includes(p.id));
+        if (proofsToUnlink.length === 0) return;
+
+        const updatedItem = {
+            ...item,
+            linkedProofs: item.linkedProofs.filter(p => !proofIds.includes(p.id))
+        };
+
+        updateItem(updatedItem);
+        setUnlinkedProofs(prev => [...prev, ...proofsToUnlink]);
+        logActivity('BULK_PROOFS_UNLINKED', `Unlinked ${proofsToUnlink.length} proof(s) from ${item.itemName}.`);
+    }, [inventory, updateItem, logActivity]);
+
     const renderContent = () => {
         switch (currentView) {
             case 'item-detail':
@@ -1275,6 +1380,9 @@ const App: React.FC = () => {
                         policyHolders={policyHolders}
                         onFindRecategorizationStrategy={handleFindRecategorizationStrategy}
                         onGenerateSubmissionPackage={handleGenerateSubmissionPackage}
+                        onBulkRejectSuggestions={handleBulkRejectSuggestions}
+                        onBulkDeleteUnlinkedProofs={handleBulkDeleteUnlinkedProofs}
+                        onBulkUnlinkProofs={handleBulkUnlinkProofs}
                     />
                 ) : null;
             case 'processing-preview':
@@ -1301,7 +1409,10 @@ const App: React.FC = () => {
                         }}
                         onCancel={() => {
                             setPipelineStage('idle');
+                            setProcessingQueue([]);
+                            setAccumulatedReviewItems([]);
                             setCurrentView('dashboard');
+                            logActivity('AUTONOMOUS_PROCESS_CANCELLED', 'User cancelled the autonomous processing queue.');
                         }}
                     />
                 );
@@ -1356,6 +1467,7 @@ const App: React.FC = () => {
                         onBulkGenerateImages={handleBulkGenerateImages}
                         onOpenBulkImageEditModal={handleOpenBulkImageEditModal}
                         onOpenBulkEdit={() => setShowBulkEditModal(true)}
+                        onImageZoom={setZoomedImageUrl}
                     />
                  );
              case 'room-scan':

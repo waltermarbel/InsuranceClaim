@@ -1274,31 +1274,55 @@ export const getRecategorizationStrategy = async (item: InventoryItem, policy: P
     }
 };
 
-export const generateSubmissionLetter = async (item: InventoryItem, policy: ParsedPolicy, accountHolder: AccountHolder, claimDetails: ClaimDetails): Promise<string> => {
+// Fix: Added missing 'generateSubmissionLetter' function.
+export const generateSubmissionLetter = async (
+    item: InventoryItem,
+    policy: ParsedPolicy,
+    accountHolder: AccountHolder,
+    claimDetails: ClaimDetails
+): Promise<string> => {
     try {
         const prompt = `
-        Generate a formal, professional, and comprehensive submission letter for a single item as part of an insurance claim.
-        The letter should be addressed to the claims department of the insurance provider.
-        It must be structured, clear, and include all relevant details to preempt questions from an adjuster.
+        You are an expert insurance claim assistant. Your task is to draft a formal and comprehensive submission letter for a single claimed item on behalf of the policyholder.
 
-        DETAILS TO INCLUDE:
-        - Claimant Name: ${accountHolder.name}
+        **POLICYHOLDER INFORMATION:**
+        - Name: ${accountHolder.name}
+        - Address: ${accountHolder.address}
+
+        **POLICY DETAILS:**
+        - Provider: ${policy.provider}
         - Policy Number: ${policy.policyNumber}
-        - Date of Loss: ${claimDetails.dateOfLoss}
-        - Claim/Police Report #: ${claimDetails.policeReport}
-        - Item Name: ${item.itemName}
-        - Item Description: ${item.itemDescription}
-        - Replacement Cost Value (RCV): $${(item.replacementCostValueRCV || item.originalCost).toFixed(2)}
-        - Actual Cash Value (ACV): $${item.actualCashValueACV ? item.actualCashValueACV.toFixed(2) : 'N/A'}
-        - List of attached proofs: ${item.linkedProofs.map(p => p.fileName).join(', ')}
+        - Settlement Method: ${policy.lossSettlementMethod}
 
-        TONE: Factual, firm, and organized. Assume this is the first formal submission for this specific item.
-        Do not write any notes or explanations, just the raw text of the letter itself.
+        **CLAIM DETAILS:**
+        - Date of Loss: ${claimDetails.dateOfLoss}
+        - Incident Type: ${claimDetails.incidentType}
+        - Police Report #: ${claimDetails.policeReport}
+        - Incident Summary: ${claimDetails.propertyDamageDetails}
+
+        **ITEM BEING CLAIMED:**
+        - Item Name: ${item.itemName}
+        - Brand/Model: ${item.brand || ''} ${item.model || ''}
+        - Serial Number: ${item.serialNumber || 'N/A'}
+        - Category: ${item.itemCategory}
+        - Description: ${item.itemDescription}
+        - Purchase Date: ${item.purchaseDate || 'N/A'}
+        - Original Cost: $${item.originalCost.toFixed(2)}
+        - Replacement Cost Value (RCV): $${(item.replacementCostValueRCV || item.originalCost).toFixed(2)}
+
+        **INSTRUCTIONS:**
+        1.  **Format as a formal letter.** Include today's date, the insurance provider's details (use a placeholder if unknown), a clear subject line (e.g., "Re: Claim for Stolen Property - [Item Name]"), a professional salutation, body paragraphs, and a closing.
+        2.  **State the purpose clearly.** The letter should state that it is a formal claim for the replacement cost of the specified item, lost as part of the burglary on ${claimDetails.dateOfLoss}.
+        3.  **Reference the item and proofs.** Clearly identify the item and mention that supporting documentation (receipts, photos, etc.) is attached in the package.
+        4.  **Request action.** Conclude by formally requesting reimbursement for the item's Replacement Cost Value ($${(item.replacementCostValueRCV || item.originalCost).toFixed(2)}) as per the terms of the policy.
+        5.  **Maintain a professional and factual tone.** Do not use emotional language. Stick to the facts provided.
         `;
+        
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-2.5-pro',
             contents: prompt,
         });
+
         return response.text.trim();
     } catch (error) {
         console.error("Error generating submission letter:", error);

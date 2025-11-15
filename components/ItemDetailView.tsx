@@ -39,6 +39,9 @@ interface ItemDetailViewProps {
   policyHolders: string[];
   onFindRecategorizationStrategy: (item: InventoryItem) => void;
   onGenerateSubmissionPackage: (item: InventoryItem) => void;
+  onBulkRejectSuggestions: (itemId: string, proofIds: string[]) => void;
+  onBulkDeleteUnlinkedProofs: (proofIds: string[]) => void;
+  onBulkUnlinkProofs: (itemId: string, proofIds: string[]) => void;
 }
 
 const Accordion: React.FC<{
@@ -126,16 +129,21 @@ const AiActionButton: React.FC<{onClick: () => void; children: React.ReactNode, 
 
 
 const ItemDetailView: React.FC<ItemDetailViewProps> = ({
-    item, unlinkedProofs, onBack, onUpdateItem, onDeleteItem, onFindMarketPrice, onEnrichAsset, onCalculateProofStrength, onFindHighestRCV, onDraftClaim, onUnlinkProof, onAddProof, onLinkMultipleProofs, onRejectSuggestion, onFindProductImage, onVisualSearch, uploadProgress, itemCategories, onExtractSerialNumber, onExtractReceiptInfo, onEditImage, onGenerateImage, onRecordAudio, onImageZoom, claimDetails, policyHolders, onFindRecategorizationStrategy, onGenerateSubmissionPackage, policy
+    item, unlinkedProofs, onBack, onUpdateItem, onDeleteItem, onFindMarketPrice, onEnrichAsset, onCalculateProofStrength, onFindHighestRCV, onDraftClaim, onUnlinkProof, onAddProof, onLinkMultipleProofs, onRejectSuggestion, onFindProductImage, onVisualSearch, uploadProgress, itemCategories, onExtractSerialNumber, onExtractReceiptInfo, onEditImage, onGenerateImage, onRecordAudio, onImageZoom, claimDetails, policyHolders, onFindRecategorizationStrategy, onGenerateSubmissionPackage, policy,
+    onBulkRejectSuggestions,
+    onBulkDeleteUnlinkedProofs,
+    onBulkUnlinkProofs
 }) => {
     const [selectedProof, setSelectedProof] = useState<Proof | null>(null);
     const [isAnnotating, setIsAnnotating] = useState(false);
     const [selectedProofIds, setSelectedProofIds] = useState<string[]>([]);
+    const [selectedLinkedProofIds, setSelectedLinkedProofIds] = useState<string[]>([]);
     const [proofSearchTerm, setProofSearchTerm] = useState('');
     const proofInputRef = React.useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         setSelectedProofIds([]); // Reset selections when item changes
+        setSelectedLinkedProofIds([]);
     }, [item]);
 
     const isItemDateInvalid = useMemo(() => {
@@ -198,6 +206,34 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
         onLinkMultipleProofs(item.id, selectedProofIds);
         setSelectedProofIds([]);
     };
+    
+    const handleBulkReject = () => {
+        onBulkRejectSuggestions(item.id, selectedProofIds);
+        setSelectedProofIds([]);
+    };
+
+    const handleBulkDelete = () => {
+        if (window.confirm(`Are you sure you want to permanently delete ${selectedProofIds.length} proof(s)? This cannot be undone.`)) {
+            onBulkDeleteUnlinkedProofs(selectedProofIds);
+            setSelectedProofIds([]);
+        }
+    };
+
+    const handleToggleLinkedProofSelection = (proofId: string) => {
+        setSelectedLinkedProofIds(prev =>
+            prev.includes(proofId)
+                ? prev.filter(id => id !== proofId)
+                : [...prev, proofId]
+        );
+    };
+
+    const handleBulkUnlink = () => {
+        if (window.confirm(`Are you sure you want to unlink ${selectedLinkedProofIds.length} proof(s)?`)) {
+            onBulkUnlinkProofs(item.id, selectedLinkedProofIds);
+            setSelectedLinkedProofIds([]);
+        }
+    };
+
 
     const isProofDateOutOfRange = (proof: Proof): boolean => {
         const { startDate, endDate } = claimDetails.claimDateRange || {};
@@ -213,6 +249,16 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
     const filteredProofs = item.linkedProofs.filter(proof =>
         proof.fileName.toLowerCase().includes(proofSearchTerm.toLowerCase())
     );
+    
+    const visibleSuggestedProofs = useMemo(() => {
+        return (item.suggestedProofs || []).map(suggestion => {
+            const proof = unlinkedProofs.find(p => p.id === suggestion.proofId);
+            return proof ? { ...suggestion, proof } : null;
+        }).filter(Boolean) as ({ proof: Proof } & typeof item.suggestedProofs[0])[];
+    }, [item.suggestedProofs, unlinkedProofs]);
+
+    const isAllSuggestedSelected = selectedProofIds.length > 0 && selectedProofIds.length === visibleSuggestedProofs.length;
+
 
     return (
         <div className="max-w-7xl mx-auto">
@@ -281,28 +327,7 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
                         />
                     </div>
 
-                    <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
-                        <div className="flex justify-between items-center mb-3 gap-2">
-                             <h3 className="font-bold text-dark font-heading flex-shrink-0">Linked Proofs</h3>
-                             <div className="relative w-full max-w-xs">
-                                <span className="absolute inset-y-0 left-0 flex items-center pl-2">
-                                    <SearchIcon className="h-4 w-4 text-slate-400" />
-                                </span>
-                                <input
-                                    type="text"
-                                    placeholder="Search proofs..."
-                                    value={proofSearchTerm}
-                                    onChange={(e) => setProofSearchTerm(e.target.value)}
-                                    className="block w-full pl-8 pr-2 py-1 border border-slate-300 rounded-md leading-5 bg-white placeholder-slate-500 focus:outline-none focus:placeholder-slate-400 focus:ring-1 focus:ring-primary focus:border-primary sm:text-xs"
-                                />
-                            </div>
-                            <div className="flex-shrink-0 flex items-center gap-1">
-                                <button onClick={() => onRecordAudio(item)} title="Record Audio Note" className="p-1.5 text-primary hover:bg-slate-100 rounded-md"><svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3zm0 12.5a4.5 4.5 0 0 1-4.5-4.5H6a6 6 0 0 0 5.25 5.95V21h1.5v-2.55A6 6 0 0 0 18 10h-1.5a4.5 4.5 0 0 1-4.5 4.5z" /></svg></button>
-                                <button onClick={() => proofInputRef.current?.click()} className="flex items-center gap-1 text-xs font-semibold text-primary hover:underline flex-shrink-0">
-                                    <PlusIcon className="h-3 w-3" /> Add
-                                </button>
-                            </div>
-                        </div>
+                    <Accordion title={`Linked Proofs (${item.linkedProofs.length})`} icon={<FolderIcon/>}>
                         <div className="space-y-2">
                             {uploadProgress && Object.entries(uploadProgress).map(([fileName, progress]) => {
                                 const percentage = (progress as any).total > 0 ? Math.round(((progress as any).loaded / (progress as any).total) * 100) : 0;
@@ -318,10 +343,19 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
                                     </div>
                                 );
                             })}
+                            {selectedLinkedProofIds.length > 0 && (
+                                <div className="p-2 bg-slate-100 rounded-md flex items-center justify-between">
+                                    <span className="text-sm font-semibold">{selectedLinkedProofIds.length} selected</span>
+                                    <button onClick={handleBulkUnlink} className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-danger bg-danger/10 hover:bg-danger/20 rounded-md transition-colors">
+                                        <TrashIcon className="h-4 w-4" /> Unlink Selected
+                                    </button>
+                                </div>
+                             )}
                             {filteredProofs.map(proof => (
                                 <div key={proof.id} className="group p-2 bg-slate-50 rounded-md hover:bg-slate-100">
                                     <div className="flex items-start justify-between">
-                                        <div className="flex items-start gap-2 overflow-hidden">
+                                        <div className="flex items-start gap-3 overflow-hidden w-full">
+                                            <input type="checkbox" checked={selectedLinkedProofIds.includes(proof.id)} onChange={() => handleToggleLinkedProofSelection(proof.id)} className="mt-3 h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary flex-shrink-0" />
                                             <ProofThumbnail proof={proof} onClick={() => proof.dataUrl && onImageZoom(proof.dataUrl)} />
                                             <div className="overflow-hidden">
                                                 <p className="text-sm text-medium truncate">{proof.fileName}</p>
@@ -342,7 +376,7 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
                                         </div>
                                     </div>
                                      {proof.receiptData && (
-                                        <div className="mt-2 text-xs text-slate-600 border-t border-slate-200 pt-2 ml-12 space-y-0.5">
+                                        <div className="mt-2 text-xs text-slate-600 border-t border-slate-200 pt-2 ml-14 space-y-0.5">
                                             <div className="flex items-center gap-2">
                                                 <p><strong>Date:</strong> {proof.receiptData.transactionDate}</p>
                                                 {/* Fix: Wrap icon in a span to apply the title attribute correctly. */}
@@ -364,7 +398,7 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
                                             )}
                                         </div>
                                     )}
-                                    <div className="ml-12 mt-2 space-y-1 text-xs text-medium">
+                                    <div className="ml-14 mt-2 space-y-1 text-xs text-medium">
                                         {proof.owner && <p><strong>Owner:</strong> {proof.owner}</p>}
                                         {proof.notes && <p className="whitespace-pre-wrap"><strong>Notes:</strong> {proof.notes}</p>}
                                     </div>
@@ -375,7 +409,45 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
                             )}
                             {item.linkedProofs.length === 0 && !uploadProgress && <p className="text-sm text-center text-medium py-4">No proofs linked.</p>}
                         </div>
-                    </div>
+                    </Accordion>
+
+                    <Accordion title={`AI Suggested Proofs (${visibleSuggestedProofs.length})`} icon={<LinkIcon />} defaultOpen={true}>
+                        {visibleSuggestedProofs.length > 0 ? (
+                            <>
+                                <div className="p-2 bg-slate-100 rounded-md flex items-center justify-between mb-2 flex-wrap gap-2">
+                                    <div className="flex items-center gap-2">
+                                        <input type="checkbox" checked={isAllSuggestedSelected} onChange={isAllSuggestedSelected ? handleDeselectAll : handleSelectAll} id="select-all-suggested" className="h-4 w-4 rounded border-slate-400 text-primary focus:ring-primary"/>
+                                        <label htmlFor="select-all-suggested" className="text-sm font-semibold text-medium cursor-pointer">{isAllSuggestedSelected ? 'Deselect All' : 'Select All'}</label>
+                                    </div>
+                                    {selectedProofIds.length > 0 && (
+                                        <div className="flex items-center gap-2">
+                                            <button onClick={handleBulkLink} className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 rounded-md transition-colors"><LinkIcon className="h-4 w-4" /> Link ({selectedProofIds.length})</button>
+                                            <button onClick={handleBulkReject} className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-medium bg-slate-200 hover:bg-slate-300 rounded-md transition-colors"><XCircleIcon className="h-4 w-4" /> Reject</button>
+                                            <button onClick={handleBulkDelete} className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-danger bg-danger/10 hover:bg-danger/20 rounded-md transition-colors"><TrashIcon className="h-4 w-4" /> Delete</button>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="space-y-2 max-h-96 overflow-y-auto">
+                                    {visibleSuggestedProofs.map(({ proof, confidence, reason }) => (
+                                        <div key={proof.id} className="group p-2 bg-slate-50 rounded-md hover:bg-slate-100">
+                                            <div className="flex items-start justify-between">
+                                                 <div className="flex items-start gap-3 overflow-hidden w-full">
+                                                    <input type="checkbox" checked={selectedProofIds.includes(proof.id)} onChange={() => handleProofSelectionChange(proof.id)} className="mt-3 h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary flex-shrink-0" />
+                                                    <ProofThumbnail proof={proof} onClick={() => proof.dataUrl && onImageZoom(proof.dataUrl)} />
+                                                    <div className="overflow-hidden">
+                                                        <p className="text-sm text-medium truncate" title={proof.fileName}>{proof.fileName}</p>
+                                                        <p className="text-xs text-slate-500 italic mt-1">{reason} ({confidence}%)</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </>
+                        ) : (
+                            <p className="text-sm text-center text-medium py-4">No suggestions from AI.</p>
+                        )}
+                    </Accordion>
                 </div>
 
                 {/* Middle Column: Details & Actions */}

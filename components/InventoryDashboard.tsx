@@ -49,6 +49,7 @@ interface InventoryDashboardProps {
   onBulkGenerateImages: () => void;
   onOpenBulkImageEditModal: () => void;
   onOpenBulkEdit: () => void;
+  onImageZoom: (imageUrl: string) => void;
 }
 
 interface ClaimOverviewProps {
@@ -282,6 +283,7 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
     onBulkGenerateImages,
     onOpenBulkImageEditModal,
     onOpenBulkEdit,
+    onImageZoom,
 }) => {
     const itemFileInputRef = React.useRef<HTMLInputElement>(null);
     
@@ -507,6 +509,7 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
             onReject={onRejectItem}
             isSelected={selectedItemIds.includes(item.id)}
             onToggleSelection={onToggleItemSelection}
+            onImageZoom={onImageZoom}
           />
         ))}
       </div>

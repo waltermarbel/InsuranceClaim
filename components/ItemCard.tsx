@@ -1,7 +1,7 @@
 import React from 'react';
 // Fix: Added .ts extension to file path
 import { InventoryItem, ItemStatus } from '../types.ts';
-import { SpinnerIcon, CheckCircleIcon, ExclamationIcon, PencilIcon, XCircleIcon, DocumentTextIcon, TagIcon } from './icons.tsx';
+import { SpinnerIcon, CheckCircleIcon, ExclamationIcon, PencilIcon, XCircleIcon, DocumentTextIcon, TagIcon, SearchIcon } from './icons.tsx';
 import { ScoreIndicator } from './ScoreIndicator.tsx';
 import { CATEGORY_COLORS, CATEGORY_ICONS } from '../constants.ts';
 
@@ -12,6 +12,7 @@ interface ItemCardProps {
   onReject: (itemId: string) => void;
   isSelected: boolean;
   onToggleSelection: (itemId: string) => void;
+  onImageZoom: (imageUrl: string) => void;
 }
 
 const StatusIndicator: React.FC<{ status: ItemStatus }> = ({ status }) => {
@@ -38,7 +39,7 @@ const StatusIndicator: React.FC<{ status: ItemStatus }> = ({ status }) => {
   );
 };
 
-const ItemCard: React.FC<ItemCardProps> = ({ item, onSelect, onApprove, onReject, isSelected, onToggleSelection }) => {
+const ItemCard: React.FC<ItemCardProps> = ({ item, onSelect, onApprove, onReject, isSelected, onToggleSelection, onImageZoom }) => {
   const primaryProof = item.linkedProofs && item.linkedProofs.length > 0 ? item.linkedProofs[0] : null;
   const primaryProofUrl = primaryProof?.dataUrl;
   const isLoading = false; // Data is now directly available
@@ -53,6 +54,13 @@ const ItemCard: React.FC<ItemCardProps> = ({ item, onSelect, onApprove, onReject
   const handleReject = (e: React.MouseEvent) => {
     e.stopPropagation();
     onReject(item.id);
+  };
+  
+  const handleImageClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (primaryProofUrl) {
+      onImageZoom(primaryProofUrl);
+    }
   };
 
   if (item.status === 'processing' || item.status === 'clustering') {
@@ -85,14 +93,22 @@ const ItemCard: React.FC<ItemCardProps> = ({ item, onSelect, onApprove, onReject
             />
         </div>
         <div onClick={onSelect} className="cursor-pointer">
-          <div className="aspect-[4/3] w-full bg-slate-100 flex items-center justify-center">
+          <div
+            className="relative group/image aspect-[4/3] w-full bg-slate-100 flex items-center justify-center"
+            onClick={primaryProofUrl ? handleImageClick : undefined}
+          >
             {isLoading && <SpinnerIcon className="h-8 w-8 text-slate-300" />}
             {!isLoading && primaryProof && primaryProof.type === 'image' && primaryProofUrl ? (
+              <>
                 <img
                   src={primaryProofUrl}
                   alt={primaryProof.fileName}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover cursor-zoom-in group-hover/image:brightness-75 transition-all"
                 />
+                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/image:opacity-100 transition-opacity pointer-events-none">
+                    <SearchIcon className="h-10 w-10 text-white drop-shadow-lg" />
+                </div>
+              </>
             ) : !isLoading && (
                 <DocumentTextIcon className="h-16 w-16 text-slate-300" />
             )}

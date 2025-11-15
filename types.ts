@@ -235,7 +235,7 @@ export interface ActivityLogEntry {
 
 export type UndoableAction = 
   | { type: 'DELETE_ITEM', payload: { item: InventoryItem } }
-  | { type: 'REJECT_SUGGESTION', payload: { proofId: string, itemId: string } };
+  | { type: 'REJECT_SUGGESTION', payload: { suggestion: ProofSuggestion, itemId: string } };
 
 export type UploadProgress = Record<string, {
     loaded: number;
