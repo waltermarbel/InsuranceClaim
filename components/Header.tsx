@@ -62,6 +62,12 @@ export const Header: React.FC<HeaderProps> = ({
                 Ask Gemini
             </button>
             <div className="h-6 border-l border-slate-200"></div>
+            <button
+              onClick={() => window.dispatchEvent(new CustomEvent('OPEN_BURGLARY_WIZARD'))}
+              className="bg-red-600 text-white text-sm px-3 py-1.5 rounded-full font-bold hover:bg-red-700 shadow-sm animate-pulse"
+            >
+              🚨 Start Burglary Claim
+            </button>
              {showDownload && (
                 <button
                     onClick={onDownloadVault}

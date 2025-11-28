@@ -21,6 +21,7 @@ import ProcessingPreview from './components/ProcessingPreview.tsx';
 import ImageZoomModal from './components/ImageZoomModal.tsx';
 import BulkReviewPage from './components/BulkReviewPage.tsx';
 import ProcessingPage from './components/ProcessingPage.tsx';
+import BurglaryClaimWizard from './components/BurglaryClaimWizard.tsx';
 
 
 import * as geminiService from './services/geminiService.ts';
@@ -85,6 +86,13 @@ const INITIAL_INVENTORY: InventoryItem[] = [
     { id: `item-import-${Date.now()}-22`, status: 'claimed', itemName: 'Sonos Sound System', itemDescription: 'Stolen sound system, as per police report.', itemCategory: 'Electronics', originalCost: 2000, linkedProofs: [], createdAt: '2024-11-28', createdBy: 'System Import' },
     { id: `item-import-${Date.now()}-23`, status: 'claimed', itemName: 'NAS Computer System', itemDescription: 'Stolen NAS, as per police report.', itemCategory: 'Electronics', originalCost: 50, linkedProofs: [], createdAt: '2024-11-28', createdBy: 'System Import' },
     { id: `item-import-${Date.now()}-24`, status: 'claimed', itemName: 'Home Server', itemDescription: 'Stolen server, as per police report.', itemCategory: 'Electronics', originalCost: 50, linkedProofs: [], createdAt: '2024-11-28', createdBy: 'System Import' },
+    // Additional items to match ~$62k Claim Value
+    { id: `item-import-${Date.now()}-25`, status: 'claimed', itemName: 'Custom Gaming PC (RTX 4090)', itemDescription: 'High-end custom built gaming PC.', itemCategory: 'Electronics', originalCost: 4500, linkedProofs: [], createdAt: '2024-11-28', createdBy: 'System Import' },
+    { id: `item-import-${Date.now()}-26`, status: 'claimed', itemName: 'Sony Alpha a7R V Camera Kit', itemDescription: 'Professional camera body and lens kit.', itemCategory: 'Electronics', originalCost: 6000, linkedProofs: [], createdAt: '2024-11-28', createdBy: 'System Import' },
+    { id: `item-import-${Date.now()}-27`, status: 'claimed', itemName: 'Designer Clothing Collection (Jackets/Suits)', itemDescription: 'Various high-value designer clothing items.', itemCategory: 'Clothing', originalCost: 10000, linkedProofs: [], createdAt: '2024-11-28', createdBy: 'System Import' },
+    { id: `item-import-${Date.now()}-28`, status: 'claimed', itemName: '4K Laser Projector', itemDescription: 'Home theater projector.', itemCategory: 'Electronics', originalCost: 3000, linkedProofs: [], createdAt: '2024-11-28', createdBy: 'System Import' },
+    { id: `item-import-${Date.now()}-29`, status: 'claimed', itemName: 'Audiophile Amplifier & Speakers', itemDescription: 'High-fidelity audio equipment.', itemCategory: 'Electronics', originalCost: 5000, linkedProofs: [], createdAt: '2024-11-28', createdBy: 'System Import' },
+    { id: `item-import-${Date.now()}-30`, status: 'claimed', itemName: 'Limited Edition Sneaker Collection', itemDescription: 'Collectible footwear (Jordan/Yeezy).', itemCategory: 'Clothing', originalCost: 8000, linkedProofs: [], createdAt: '2024-11-28', createdBy: 'System Import' },
 ];
 const INITIAL_UNLINKED_PROOFS: Proof[] = []; // Start with no unlinked proofs
 
@@ -135,6 +143,7 @@ const App: React.FC = () => {
     const [proofsToProcess, setProofsToProcess] = useState<Proof[]>([]);
     const [zoomedImageUrl, setZoomedImageUrl] = useState<string | null>(null);
     const [itemsToReview, setItemsToReview] = useState<InventoryItem[]>([]);
+    const [showBurglaryWizard, setShowBurglaryWizard] = useState(false);
 
 
     // Background Processing State
@@ -154,6 +163,13 @@ const App: React.FC = () => {
     // Selection State
     const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
     const imageAnalysisInputRef = useRef<HTMLInputElement>(null);
+
+    // Event Listener for Burglary Wizard
+    useEffect(() => {
+        const handleOpenWizard = () => setShowBurglaryWizard(true);
+        window.addEventListener('OPEN_BURGLARY_WIZARD', handleOpenWizard);
+        return () => window.removeEventListener('OPEN_BURGLARY_WIZARD', handleOpenWizard);
+    }, []);
 
     const logActivity = useCallback((action: string, details: string, app: 'VeritasVault' | 'Gemini' = 'VeritasVault') => {
         const newEntry: ActivityLogEntry = {
@@ -1420,6 +1436,12 @@ const App: React.FC = () => {
                     onClose={() => setShowSaveModal(false)}
                     onQuickBackup={handleSaveToFile}
                     onForensicExport={() => exportToZip(inventory, unlinkedProofs)}
+                />
+            )}
+            {showBurglaryWizard && (
+                <BurglaryClaimWizard
+                    onClose={() => setShowBurglaryWizard(false)}
+                    inventory={inventory}
                 />
             )}
             {undoAction && <UndoToast action={undoAction} onUndo={handleUndo} onDismiss={() => setUndoAction(null)} />}
