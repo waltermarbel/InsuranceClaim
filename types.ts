@@ -1,3 +1,4 @@
+
 // Fix: Removed invalid file marker that was causing a parsing error.
 export type ItemStatus = 'processing' | 'enriching' | 'clustering' | 'needs-review' | 'active' | 'claimed' | 'archived' | 'error' | 'rejected';
 export type ProofStatus = 'unprocessed' | 'categorizing' | 'categorized' | 'error';
@@ -221,7 +222,7 @@ export interface ClaimDetails {
     claimDocuments?: Proof[];
 }
 
-export type AppView = 'upload' | 'dashboard' | 'item-detail' | 'room-scan' | 'processing-preview' | 'autonomous-processor' | 'autonomous-review';
+export type AppView = 'upload' | 'dashboard' | 'item-detail' | 'room-scan' | 'processing-preview' | 'autonomous-processor' | 'autonomous-review' | 'strategic-dashboard';
 
 export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error';
 
@@ -298,3 +299,63 @@ export interface AutonomousInventoryItem {
     confidencescore: number;
     sublimit_tag: string | null;
 }
+
+// --- NEW: Types for Strategic Optimization ---
+export interface OptimalPolicyResult {
+    bestPolicyId: string;
+    reasoning: string;
+    financialAdvantage: number;
+    originalPolicyId: string;
+}
+
+export interface WebScrapeResult {
+    itemName: string;
+    itemDescription: string;
+    itemCategory: string;
+    originalCost: number;
+    brand?: string;
+    model?: string;
+    imageUrl?: string;
+    sourceUrl: string;
+}
+
+
+// --- NEW: Types for State Management ---
+export interface AppState {
+    inventory: InventoryItem[];
+    policies: ParsedPolicy[];
+    unlinkedProofs: Proof[];
+    accountHolder: AccountHolder;
+    claimDetails: ClaimDetails;
+    activityLog: ActivityLogEntry[];
+    undoAction: UndoableAction | null;
+    currentView: AppView;
+    selectedItemId: string | null;
+    isInitialized: boolean;
+}
+
+export type Action =
+  | { type: 'INITIALIZE_STATE'; payload: AppState }
+  | { type: 'RESET_STATE' }
+  | { type: 'LOAD_FROM_FILE'; payload: Omit<AppState, 'isInitialized' | 'currentView' | 'selectedItemId'> }
+  | { type: 'UPDATE_ITEM'; payload: InventoryItem }
+  | { type: 'ADD_INVENTORY_ITEMS'; payload: InventoryItem[] }
+  | { type: 'BULK_UPDATE_ITEM_STATUS'; payload: { ids: string[], status: ItemStatus } }
+  | { type: 'BULK_EDIT_ITEMS'; payload: { ids: string[], updates: Partial<InventoryItem> } }
+  | { type: 'DELETE_ITEM'; payload: { itemId: string } }
+  | { type: 'LOG_ACTIVITY'; payload: { action: string; details: string; app?: 'VeritasVault' | 'Gemini' } }
+  | { type: 'CLEAR_UNDO_ACTION' }
+  | { type: 'UNDO_ACTION'; payload: UndoableAction }
+  | { type: 'SAVE_POLICY_FROM_REPORT'; payload: PolicyAnalysisReport }
+  | { type: 'SET_ACTIVE_POLICY'; payload: string }
+  | { type: 'UPDATE_CLAIM_DETAILS'; payload: Partial<ClaimDetails> }
+  | { type: 'ADD_CLAIM_DOCUMENT'; payload: Proof }
+  | { type: 'ADD_PROOFS_TO_ITEM'; payload: { itemId: string; proofs: Proof[] } }
+  | { type: 'SET_VIEW'; payload: AppView }
+  | { type: 'SELECT_ITEM'; payload: string }
+  | { type: 'UNSELECT_ITEM' }
+  | { type: 'FINALIZE_INTERACTIVE_PROCESSING', payload: ProcessingInference[] }
+  | { type: 'SUGGEST_PROOF_FOR_ITEM', payload: { itemId: string; proof: Proof, suggestion: Omit<ProofSuggestion, 'sourceUrl'> & { sourceUrl?: string } } }
+  | { type: 'ADD_SUGGESTIONS_TO_ITEM', payload: { itemId: string; suggestions: ProofSuggestion[] } }
+  | { type: 'ACCEPT_SUGGESTION', payload: { itemId: string; proofId: string } }
+  | { type: 'REJECT_SUGGESTION_PERMANENT', payload: { itemId: string; proofId: string } };

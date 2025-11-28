@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { GoogleGenAI, LiveSession, LiveServerMessage, Modality, Blob as GenaiBlob } from "@google/genai";
 import { XIcon, SparklesIcon, CubeIcon, CheckIcon } from './icons.tsx';
 import { InventoryItem, ParsedPolicy, ChatMessage } from '../types.ts';
 import * as geminiService from '../services/geminiService.ts';
+import { useAppState } from '../context/AppContext.tsx';
 
 // Audio encoding/decoding utilities for Live API & TTS
 function decode(base64: string): Uint8Array {
@@ -45,11 +46,12 @@ function encode(bytes: Uint8Array): string {
 
 interface GeminiAssistantProps {
   onClose: () => void;
-  inventory: InventoryItem[];
-  policy?: ParsedPolicy;
 }
 
-const GeminiAssistant: React.FC<GeminiAssistantProps> = ({ onClose, inventory, policy }) => {
+const GeminiAssistant: React.FC<GeminiAssistantProps> = ({ onClose }) => {
+  const { inventory, policies } = useAppState();
+  const policy = useMemo(() => policies.find(p => p.isActive), [policies]);
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [isThinkingMode, setIsThinkingMode] = useState(false);

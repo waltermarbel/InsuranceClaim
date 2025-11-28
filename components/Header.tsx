@@ -1,107 +1,96 @@
 
 import React, { useRef } from 'react';
-import { CubeIcon, SparklesIcon } from './icons.tsx';
+import { CubeIcon, SparklesIcon, ClipboardDocumentListIcon, FolderIcon, ShieldCheckIcon, ArrowDownTrayIcon } from './icons.tsx';
 
 interface HeaderProps {
-    onReset: () => void;
-    onShowGuide: () => void;
-    onShowLog: () => void;
-    onDownloadVault: () => void;
-    showDownload: boolean;
-    onSaveToFile: () => void;
-    onLoadFromFile: (file: File) => void;
+    activeTab: 'evidence' | 'inventory' | 'claim';
+    onNavigate: (tab: 'evidence' | 'inventory' | 'claim') => void;
     onAskGemini: () => void;
+    onSave: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({ 
-    onReset, 
-    onShowGuide, 
-    onShowLog, 
-    onDownloadVault, 
-    showDownload,
-    onSaveToFile,
-    onLoadFromFile,
-    onAskGemini
+    activeTab,
+    onNavigate,
+    onAskGemini,
+    onSave
 }) => {
-  const loadFileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleLoadClick = () => {
-    loadFileInputRef.current?.click();
-  };
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      onLoadFromFile(event.target.files[0]);
-      event.target.value = ''; // Reset file input to allow loading the same file again
-    }
+  
+  const getTabClass = (tabName: string) => {
+      const baseClass = "flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200";
+      if (activeTab === tabName) {
+          return `${baseClass} bg-primary text-white shadow-md ring-1 ring-primary-dark/20`;
+      }
+      return `${baseClass} text-slate-600 hover:bg-slate-100 hover:text-slate-900`;
   };
 
   return (
-    <header className="bg-white shadow-sm">
-      <input
-        type="file"
-        ref={loadFileInputRef}
-        onChange={handleFileChange}
-        className="hidden"
-        accept=".json"
-      />
+    <header className="bg-white/80 backdrop-blur-md border-b border-slate-200/60 sticky top-0 z-40 transition-all duration-300">
       <div className="container mx-auto px-4 md:px-8">
-        <div className="flex justify-between items-center py-4">
-          <div className="flex items-center space-x-3 cursor-pointer" onClick={onReset}>
-            <CubeIcon className="h-8 w-8 text-primary" />
-            <span className="text-2xl font-bold text-dark tracking-tight font-heading">
-              VeritasVault
-            </span>
+        <div className="flex justify-between items-center h-18 py-3">
+          {/* Logo Area */}
+          <div className="flex items-center space-x-3 cursor-pointer group" onClick={() => onNavigate('inventory')}>
+            <div className="bg-gradient-to-br from-primary to-blue-600 p-2 rounded-xl shadow-lg shadow-primary/20 group-hover:shadow-primary/40 transition-shadow duration-300">
+                <CubeIcon className="h-6 w-6 text-white" />
+            </div>
+            <div>
+                <span className="block text-xl font-extrabold text-slate-900 tracking-tight font-heading leading-none">
+                VeritasVault
+                </span>
+                <span className="block text-[10px] uppercase tracking-widest text-slate-500 font-bold mt-1">
+                Forensic Claim System
+                </span>
+            </div>
           </div>
-          <div className="flex items-center space-x-4">
+
+          {/* Main Workflow Navigation */}
+          <nav className="hidden md:flex items-center space-x-1 bg-slate-50/80 p-1.5 rounded-xl border border-slate-200/60 backdrop-blur-sm">
+            <button onClick={() => onNavigate('evidence')} className={getTabClass('evidence')}>
+                <FolderIcon className="h-4 w-4"/>
+                <span>Evidence Locker</span>
+            </button>
+            <button onClick={() => onNavigate('inventory')} className={getTabClass('inventory')}>
+                <ClipboardDocumentListIcon className="h-4 w-4"/>
+                <span>Schedule of Loss</span>
+            </button>
+            <button onClick={() => onNavigate('claim')} className={getTabClass('claim')}>
+                <ShieldCheckIcon className="h-4 w-4"/>
+                <span>Claim Strategy</span>
+            </button>
+          </nav>
+
+          {/* Actions */}
+          <div className="flex items-center gap-2">
+             <button
+                onClick={onSave}
+                className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-slate-600 hover:text-primary hover:bg-slate-100 rounded-lg transition-colors"
+                title="Save & Export"
+             >
+                <ArrowDownTrayIcon className="h-5 w-5"/>
+                <span className="hidden sm:inline">Export</span>
+             </button>
+             <div className="h-6 w-px bg-slate-200 mx-1"></div>
              <button
                 onClick={onAskGemini}
-                className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold bg-primary/10 text-primary rounded-full shadow-sm hover:bg-primary/20 transition"
+                className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-primary bg-white border border-primary/20 rounded-full shadow-sm hover:shadow-md hover:bg-primary/5 transition-all duration-200 group"
              >
-                <SparklesIcon className="h-5 w-5"/>
-                Ask Gemini
-            </button>
-            <div className="h-6 border-l border-slate-200"></div>
-             {showDownload && (
-                <button
-                    onClick={onDownloadVault}
-                    className="text-sm font-medium text-medium hover:text-primary transition-colors"
-                >
-                    Export CSV
-                </button>
-             )}
-             <button
-                onClick={onSaveToFile}
-                className="text-sm font-medium text-medium hover:text-primary transition-colors"
-              >
-                Save to File
-              </button>
-             <button
-                onClick={handleLoadClick}
-                className="text-sm font-medium text-medium hover:text-primary transition-colors"
-              >
-                Load from File
-              </button>
-             <div className="h-6 border-l border-slate-200"></div>
-             <button
-                onClick={onShowLog}
-                className="text-sm font-medium text-medium hover:text-primary transition-colors"
-              >
-                Log
-              </button>
-             <button
-                onClick={onShowGuide}
-                className="text-sm font-medium text-medium hover:text-primary transition-colors"
-              >
-                Guide
-              </button>
-            <button
-              onClick={onReset}
-              className="text-sm font-medium text-medium hover:text-primary transition-colors"
-            >
-              New
+                <SparklesIcon className="h-4 w-4 transition-transform group-hover:scale-110"/>
+                <span className="hidden sm:inline">AI Assistant</span>
             </button>
           </div>
+        </div>
+        
+        {/* Mobile Nav (Simplified) */}
+        <div className="md:hidden flex justify-around py-3 border-t border-slate-100">
+             <button onClick={() => onNavigate('evidence')} className={`flex flex-col items-center gap-1 text-[10px] font-bold uppercase tracking-wide ${activeTab === 'evidence' ? 'text-primary' : 'text-slate-400'}`}>
+                <FolderIcon className="h-5 w-5"/> Evidence
+             </button>
+             <button onClick={() => onNavigate('inventory')} className={`flex flex-col items-center gap-1 text-[10px] font-bold uppercase tracking-wide ${activeTab === 'inventory' ? 'text-primary' : 'text-slate-400'}`}>
+                <ClipboardDocumentListIcon className="h-5 w-5"/> Schedule
+             </button>
+             <button onClick={() => onNavigate('claim')} className={`flex flex-col items-center gap-1 text-[10px] font-bold uppercase tracking-wide ${activeTab === 'claim' ? 'text-primary' : 'text-slate-400'}`}>
+                <ShieldCheckIcon className="h-5 w-5"/> Strategy
+             </button>
         </div>
       </div>
     </header>

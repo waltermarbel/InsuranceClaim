@@ -4,18 +4,20 @@ import { WorkflowProgressBar } from './WorkflowProgressBar.tsx';
 import * as geminiService from '../services/geminiService.ts';
 import InferenceCard from './InferenceCard.tsx';
 import { CheckCircleIcon, XCircleIcon } from './icons.tsx';
+import { useAppState } from '../context/AppContext.tsx';
 
 interface ProcessingPreviewProps {
     proofs: Proof[];
-    inventory: InventoryItem[];
     onFinalize: (inferences: ProcessingInference[]) => void;
     onCancel: () => void;
-    policyHolders: string[];
     onImageZoom: (imageUrl: string) => void;
-    claimDetails: ClaimDetails;
 }
 
-const ProcessingPreview: React.FC<ProcessingPreviewProps> = ({ proofs, inventory, onFinalize, onCancel, policyHolders, onImageZoom, claimDetails }) => {
+const ProcessingPreview: React.FC<ProcessingPreviewProps> = ({ proofs, onFinalize, onCancel, onImageZoom }) => {
+    const { inventory, policies, claimDetails } = useAppState();
+    const policy = useMemo(() => policies.find(p => p.isActive), [policies]);
+    const policyHolders = useMemo(() => policy?.policyHolder.split(/ & | and /i).map(s => s.trim()).filter(Boolean) || [], [policy]);
+    
     const [inferences, setInferences] = useState<ProcessingInference[]>([]);
     const [processingIndex, setProcessingIndex] = useState(0);
 

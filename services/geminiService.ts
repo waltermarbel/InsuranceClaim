@@ -3,7 +3,7 @@ import { GoogleGenAI, Type, Modality } from "@google/genai";
 // Fix: Added blobToBase64 utility.
 import { fileToBase64, blobToBase64 } from '../utils/fileUtils.ts';
 // Fix: Added ChatMessage type for the AI assistant.
-import { InventoryItem, ParsedPolicy, AccountHolder, DraftClaim, ValuationResponse, WebIntelligenceResponse, ApparelIdentificationResponse, HighestRcvResponse, SerialNumberResponse, ProofStrengthResponse, Proof, ProofSuggestion, ACVResponse, CoverageLimit, PolicyAnalysisReport, ValuationSource, ProofPurpose, ChatMessage, WebIntelligenceFact, ReceiptData, ProcessingInference, AleDetails, CostType, InferenceType, AutonomousInventoryItem, ClaimDetails } from '../types.ts';
+import { InventoryItem, ParsedPolicy, AccountHolder, DraftClaim, ValuationResponse, WebIntelligenceResponse, ApparelIdentificationResponse, HighestRcvResponse, SerialNumberResponse, ProofStrengthResponse, Proof, ProofSuggestion, ACVResponse, CoverageLimit, PolicyAnalysisReport, ValuationSource, ProofPurpose, ChatMessage, WebIntelligenceFact, ReceiptData, ProcessingInference, AleDetails, CostType, InferenceType, AutonomousInventoryItem, ClaimDetails, OptimalPolicyResult, WebScrapeResult } from '../types.ts';
 import { CATEGORIES } from '../constants.ts';
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
@@ -64,7 +64,7 @@ export const analyzeAndComparePolicy = async (file: File, existingPolicies: Pars
         const pdfPart = { inlineData: { mimeType: 'application/pdf', data: base64pdf } };
 
         const prompt = `
-        Act as an expert insurance policy analyst for an intelligent inventory app. Your task is to analyze a new policy document, paying close attention to the Declarations Page, and compare it against the user's existing policies.
+        Act as an expert insurance policy analyst for VeritasVault. Your task is to analyze a new policy document, paying close attention to the Declarations Page, and compare it against the user's existing policies.
 
         CONTEXT:
         - Primary Account Holder: ${accountHolder.name}
@@ -82,12 +82,13 @@ export const analyzeAndComparePolicy = async (file: File, existingPolicies: Pars
         4.  **Generate Warnings:**
             - If the 'policyHolder' name is significantly different from '${accountHolder.name}', add a warning.
             - If you cannot find critical information like a deductible or main coverage limit, add a warning.
-        5.  **AI Self-Improvement (Most Important Task):** The user has provided these past corrections: ${userCorrections.length > 0 ? userCorrections.join('; ') : "None"}. This is direct feedback on your previous mistakes. You MUST learn from them. For example, if a user corrected a deductible you misread, be extremely cautious with deductibles this time. Demonstrating you have learned from this feedback is critical for user trust.
-        6.  **Return Result:** Respond with the full analysis in the specified JSON format.
+        5.  **Exclusions:** Be extremely thorough in listing exclusions found in the document.
+        6.  **AI Self-Improvement (Most Important Task):** The user has provided these past corrections: ${userCorrections.length > 0 ? userCorrections.join('; ') : "None"}. This is direct feedback on your previous mistakes. You MUST learn from them.
+        7.  **Return Result:** Respond with the full analysis in the specified JSON format.
         `;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-pro',
+            model: 'gemini-3-pro-preview',
             contents: { parts: [{text: prompt}, pdfPart] },
             config: {
                 responseMimeType: "application/json",
@@ -163,7 +164,7 @@ export const analyzeProofForClaimableItem = async (proof: Proof, existingInvento
     };
 
     const prompt = `
-    You are an AI insurance claim assistant. Your task is to analyze a single piece of evidence (a "proof") and determine what it represents in the context of an insurance claim.
+    You are VeritasVault's AI Evidence Analyst. Your task is to analyze a single piece of evidence (a "proof") and determine what it represents in the context of an insurance claim.
 
     CONTEXT:
     - **Existing Inventory Items:** ${existingInventory.length > 0 ? JSON.stringify(existingInventory.map(i => ({ id: i.id, name: i.itemName, category: i.itemCategory, description: i.itemDescription }))) : "None"}
@@ -193,7 +194,7 @@ export const analyzeProofForClaimableItem = async (proof: Proof, existingInvento
 
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-pro',
+            model: 'gemini-3-pro-preview',
             contents: { parts: [{ text: prompt }, filePart] },
             config: {
                 responseMimeType: "application/json",
@@ -343,7 +344,7 @@ export const clusterAndSynthesizeItems = async (
         `;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-pro',
+            model: 'gemini-3-pro-preview',
             contents: [{ parts: [{ text: prompt }, ...fileParts] }],
             config: {
                 responseMimeType: "application/json",
@@ -360,83 +361,50 @@ export const clusterAndSynthesizeItems = async (
     }
 };
 
-const autonomousProcessorSystemPrompt = `System Prompt: VeritasVault Autonomous Inventory Processor (Claim #00104761115)
+const autonomousProcessorSystemPrompt = `System Prompt: VeritasVault Autonomous Inventory Processor
 
 ROLE:
-You are VeritasVault, an evidence-bound AI system built to support Roydel Marquez Bello. Your sole function is to analyze a batch of provided media (images, receipts, invoices, CSVs, text files) to reconstruct a single, comprehensive, and claim-ready inventory of tangible personal property.
-You must operate based only on the visual and textual evidence provided, including embedded metadata (EXIF/OCR). Do not speculate beyond what the evidence plausibly supports.
+You are VeritasVault, an evidence-bound AI system built to support a specific insurance claim. Your sole function is to analyze a batch of provided media (images, receipts, invoices, CSVs, text files) to reconstruct a single, comprehensive, and claim-ready inventory of tangible personal property.
+
+CONTEXT:
+- Claim #: 00104761115
+- Policyholder: Roydel Marquez Bello
+- Incident: Burglary on Nov 27, 2024
+- Loss Location: 312 W 43rd St Apt 14J, New York, NY 10036
+- Policy Limits: Personal Property $95,000 (RCV), Jewelry Sub-limit $1,000.
+
 🎯 OBJECTIVE:
-Generate a single, structured JSON array of pre-loss personal property items. You must identify items in media dated on or before November 27, 2024. The final output must be policy-compliant and strategically framed, maximizing eligible reimbursement by clearly linking items to the insured parties, citing all proofs, and flagging ownership gaps.
-
-
-📂 CLAIM CONTEXT (CRITICAL & IMMUTABLE FACTS)
-
-You must adhere to this data for your analysis.
-	•	Claimant(s): Roydel Marquez Bello & Maleidy Bello Landin (household members covered under the same policy).
-	•	Incident: Burglary
-	•	Date of Loss: November 27, 2024
-	•	Loss Location: 312 W 43rd St Apt 14J, New York, NY
-	•	Policy: Assurant Policy RI8462410
-	•	Coverage C (Personal Property): $95,000 RCV (Replacement Cost Value)
-	•	Lifestyle Profile (Inference Guide): Assume a modern, tech-savvy, and design/fashion-conscious lifestyle consistent with living in a New York City apartment. This should guide your inference for unbranded or partially obscured items.
-
-⚠️ POLICY SUB-LIMITS (STRICTLY ENFORCE)
-
-You must tag items that fall into these categories. These are maximum total payouts for the entire category.
-	•	Jewelry, Watches, Furs: $1,000 (Tag: jewelry_theft)
-	•	Money, Gold, Bank Notes: $200 (Tag: cash_precious_metals_theft)
-	•	Business Property (On-Premises): $2,500 (Tag: business_property)
-	•	Firearms: $2,500 (Tag: firearms)
-	•	Watercraft: $1,500 (Tag: watercraft)
-	•	Portable Electronics (stolen from a vehicle): $1,500 (Tag: electronics_vehicle_theft)
-
-
-🔎 ANALYSIS WORKFLOW
-
-Follow these phases meticulously for each file in the media batch.
+Generate a single, structured JSON array of pre-loss personal property items. You must identify items in media dated on or before the date of loss. The final output must be policy-compliant and strategically framed, maximizing eligible reimbursement by clearly linking items to the insured parties, citing all proofs, and flagging ownership gaps.
 
 Phase 1: Media Ingestion & Validation
-
 	1	Extract All Metadata: From images, pull DateTimeOriginal and GPS data. From documents (PDFs, CSVs, text), pull CreationDate and perform OCR on all text to find dates, items, purchasers, and serial numbers.
-	2	Pre-Loss Confirmation: An item is only valid if it is visible or documented in media dated on or before November 27, 2024. Media dated after the loss cannot prove pre-loss ownership but may be used to establish value (note this in ainotes).
+	2	Pre-Loss Confirmation: An item is only valid if it is visible or documented in media dated on or before the Loss Date. Media dated after the loss cannot prove pre-loss ownership but may be used to establish value (note this in ainotes).
 	3	Location Verification: The item must be plausibly located at the Loss Location. Use GPS data or infer from visual context (e.g., indoor apartment setting).
 
 Phase 2: Item & Entity Identification
-
 	1	Identify Tangible Personal Property: Scan all validated media for distinct, claimable items.
 	2	Deduplicate: A single physical item appearing in multiple files must result in only ONE entry in the final JSON. Compile all source filenames into the imagesource array for that single entry.
 	3	Assign Categories: Assign each item to one of the following: Electronics, Furniture, Appliances, Clothing & Accessories, Jewelry, Business Property, Art & Collectibles, Home Goods, Sports & Hobbies, Medical Equipment, Travel Gear, Other.
 	4	Describe & Infer Brand/Model: Include visible features (color, size, material). Infer brand/model only if visually confirmed (logo, text) or strongly inferred by distinctive design. Otherwise, use "Unbranded/Generic".
 	5	Extract Serial Number: If a serial number is identified via OCR on a receipt, box, or the item itself, capture it.
-	6	Infer Owner:
-	◦	Default owner is Roydel Marquez Bello.
-	◦	Assign Maleidy Bello Landin only if the item is unambiguously female-specific.
-	◦	If a receipt shows a third-party purchaser (e.g., Omar Gonzalez), attribute ownership to Roydel Marquez Bello but flag the purchase details in ainotes.
-	7	Quantity: Assume 1 unless multiple identical items are clearly visible or listed on a receipt.
+	6	Quantity: Assume 1 unless multiple identical items are clearly visible or listed on a receipt.
 
 Phase 3: Value Estimation & Strategic Flagging
-
 	1	Estimate Replacement Cost Value (RCV):
-	◦	From Receipts/Invoices: Use the exact price. If the receipt is old, adjust to a plausible 2024/2025 RCV, but note the original price in ainotes.
-	◦	From Images (No Receipt): Estimate the RCV for a new, equivalent item in late 2024/early 2025.
+	◦	From Receipts/Invoices: Use the exact price. If the receipt is old, adjust to a plausible current RCV, but note the original price in ainotes.
+	◦	From Images (No Receipt): Estimate the RCV for a new, equivalent item in the current market.
 	◦	Use realistic, non-round pricing (e.g., $1349.99).
-	2	Apply Sub-Limit Tags: If an item's category matches a Special Sub-Limit, assign the corresponding sublimit_tag. Otherwise, this field must be null.
-	3	Confidence Score: Assign a float (0.0-1.0) indicating certainty. (1.0 = receipt with serial#; 0.9 = clear photo with brand; 0.5 = item clear, brand is a guess).
-
+	2	Confidence Score: Assign a float (0.0-1.0) indicating certainty. (1.0 = receipt with serial#; 0.9 = clear photo with brand; 0.5 = item clear, brand is a guess).
+    3   Sub-Limit Tags: IF an item falls into 'Jewelry' and value > $1000, mark sublimit_tag as 'Jewelry Limit'.
 
 🚫 AUTO-REJECTION RULES (DO NOT INCLUDE IF…):
-
 You MUST REJECT and exclude any item from the final inventory if it is:
 	•	Not tangible personal property (e.g., building fixtures, data, services, software).
 	•	Indiscernible (too blurry, obscured, or generic to identify).
 	•	Lacking any proof of pre-loss existence.
-	•	Clearly public, shared, or not owned by the claimants.
-	•	Not plausibly at the Loss Location.
-
 
 ✅ FINAL OUTPUT FORMAT (Strict JSON Array Only)
-
-Your final and only response must be a single, raw JSON array of objects. Each object represents one inventoried item and must conform strictly to the VeritasVault.InventoryItem.v2 schema below.
+Your final and only response must be a single, raw JSON array of objects. Each object represents one inventoried item.
 `;
 
 const autonomousProcessorSchema = {
@@ -484,7 +452,7 @@ export const runAutonomousProcessor = async (files: File[]): Promise<AutonomousI
         const prompt = `Process the attached files and produce the JSON output as instructed in your system prompt. The files are: ${files.map(f => f.name).join(', ')}`;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-pro',
+            model: 'gemini-3-pro-preview',
             contents: { parts: [{ text: prompt }, ...fileParts] },
             config: {
                 systemInstruction: autonomousProcessorSystemPrompt,
@@ -676,31 +644,32 @@ export const identifyApparel = async (imageDataUrl: string): Promise<ApparelIden
     }
 };
 
-const highestRcvSchema = {
-    type: Type.OBJECT,
-    properties: {
-        price: { type: Type.NUMBER, description: "The highest retail price found for a new version of the item in USD." },
-        source: { type: Type.STRING, description: "The direct URL to the product listing with the highest price." }
-    },
-    required: ["price", "source"]
-};
-
 export const findHighestRCV = async (item: InventoryItem): Promise<HighestRcvResponse> => {
     try {
-        const prompt = `Act as an expert price researcher for insurance claims. For the item "${item.itemName}" (Description: ${item.itemDescription}), find the absolute highest retail price for a brand new equivalent model. Search official brand websites, high-end retailers (like Neiman Marcus, B&H Photo), and avoid marketplaces like eBay or Amazon unless it's a direct listing from the manufacturer. The goal is to establish the maximum possible Replacement Cost Value (RCV). Provide the single highest price and its source URL.`;
+        const prompt = `Act as an expert price researcher for insurance claims. For the item "${item.itemName}" (Description: ${item.itemDescription}), find the absolute highest retail price for a brand new equivalent model. Search official brand websites, high-end retailers (like Neiman Marcus, B&H Photo), and avoid marketplaces like eBay or Amazon unless it's a direct listing from the manufacturer. The goal is to establish the maximum possible Replacement Cost Value (RCV). 
+        
+        Return ONLY a valid JSON object with the following structure:
+        {
+          "price": number,
+          "source": "string URL"
+        }
+        Do not use markdown formatting.`;
         
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3-pro-preview',
             contents: prompt,
             config: {
-                responseMimeType: "application/json",
-                responseSchema: highestRcvSchema,
                 tools: [{googleSearch: {}}],
             },
         });
 
-        const jsonText = response.text.trim();
-        return JSON.parse(jsonText) as HighestRcvResponse;
+        const text = response.text || "";
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        
+        if (jsonMatch) {
+             return JSON.parse(jsonMatch[0]) as HighestRcvResponse;
+        }
+        throw new Error("AI did not return valid JSON.");
     } catch (error) {
         console.error("Error finding highest RCV:", error);
         throw new Error("AI failed to find the highest RCV. The web search may have been unsuccessful.");
@@ -797,28 +766,32 @@ export const calculateProofStrength = async (item: InventoryItem): Promise<Proof
 
 export const findProductImageFromWeb = async (item: InventoryItem): Promise<{ imageUrl: string, source: string } | null> => {
     try {
-        const prompt = `Find a high-quality product image from the web for the following item: ${item.itemName} (${item.brand} ${item.model}). Provide a direct image URL and the source page URL.`;
+        const prompt = `Find a high-quality product image from the web for the following item: ${item.itemName} (${item.brand} ${item.model}). 
+        
+        Return ONLY a valid JSON object with the following structure:
+        {
+            "imageUrl": "Direct URL to the image file",
+            "source": "URL of the page where the image was found"
+        }
+        Do not use markdown formatting. Do not include introductory text.`;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3-pro-preview',
             contents: prompt,
             config: {
                 tools: [{ googleSearch: {} }],
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                        imageUrl: { type: Type.STRING, description: "Direct URL to the image file." },
-                        source: { type: Type.STRING, description: "URL of the page where the image was found." }
-                    },
-                    required: ["imageUrl", "source"]
-                }
             },
         });
 
-        const jsonText = response.text.trim();
-        const result = JSON.parse(jsonText);
-        return result.imageUrl ? result : null;
+        const text = response.text || "";
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        
+        if (jsonMatch) {
+             const result = JSON.parse(jsonMatch[0]);
+             return result.imageUrl ? result : null;
+        }
+        
+        return null;
 
     } catch (error) {
         console.error("Error finding product image from web:", error);
@@ -851,7 +824,7 @@ export const fuzzyMatchProofs = async (item: InventoryItem, unlinkedProofs: Proo
         `;
         
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-pro',
+            model: 'gemini-3-pro-preview',
             contents: prompt,
             config: {
                 responseMimeType: "application/json",
@@ -942,8 +915,8 @@ export const findItemWithGoogleLens = async (item: InventoryItem): Promise<Visua
         const imagePart = { inlineData: { mimeType: imageProof.mimeType, data: base64Image } };
         
         const prompt = `
-        Analyze this image as if you were Google Lens. Identify the primary product in the image.
-        Provide the most likely product name and a source URL (like a shopping or review page) where this product can be found.
+        Analyze this image to identify the specific make, model, and estimated retail value of the item shown.
+        Provide the most likely product name and a source URL (like a shopping or review page) where this exact product or its nearest equivalent can be found.
         `;
 
         const response = await ai.models.generateContent({
@@ -981,7 +954,7 @@ export const extractReceiptInfo = async (imageDataUrl: string): Promise<ReceiptD
         - A list of line items with description, quantity, and price.
         `;
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-pro',
+            model: 'gemini-3-pro-preview',
             contents: { parts: [{ text: prompt }, imagePart] },
             config: {
                 responseMimeType: "application/json",
@@ -1084,7 +1057,7 @@ export const analyzeVideoForItems = async (videoBlob: Blob): Promise<{ items: { 
         `;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-pro',
+            model: 'gemini-3-pro-preview',
             contents: { parts: [{ text: prompt }, videoPart] },
             config: {
                 responseMimeType: "application/json",
@@ -1125,7 +1098,7 @@ export const analyzeImages = async (images: { data: string, mimeType: string }[]
         const textPart = { text: prompt };
 
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-pro',
+            model: 'gemini-3-pro-preview',
             contents: { parts: [textPart, ...imageParts] },
         });
 
@@ -1155,28 +1128,56 @@ export const transcribeAudio = async (audioBlob: Blob): Promise<string> => {
 };
 
 export const getAssistantContext = (inventory: InventoryItem[], policy?: ParsedPolicy): string => {
-    const inventorySummary = inventory.slice(0, 10).map(i => `- ${i.itemName} ($${i.originalCost})`).join('\n');
+    const inventorySummary = inventory.slice(0, 20).map(i => `- ${i.itemName} (Valued at $${i.replacementCostValueRCV || i.originalCost})`).join('\n');
     const policySummary = policy ? `Policy #${policy.policyNumber} with ${policy.provider}. Coverage limit: $${policy.coverage.find(c => c.type === 'main')?.limit}.` : 'No active policy.';
 
-    return `You are an expert AI assistant for VeritasVault, an insurance inventory app.
-    The user's current vault contains ${inventory.length} items. Here's a sample:
+    return `You are VeritasVault's dedicated Claims Specialist AI. Your role is to assist the policyholder in managing their inventory and preparing for an insurance claim, specifically for a recent burglary.
+    
+    TONE & PERSONA:
+    - Professional, empathetic, and forensic.
+    - You are thorough and detail-oriented.
+    - You provide actionable advice based on insurance industry standards.
+
+    CONTEXT:
+    The user's current vault contains ${inventory.length} items.
+    Here is a summary of their high-value items:
     ${inventorySummary}
     
-    Active policy details: ${policySummary}
+    Active Policy Details: ${policySummary}
     
-    Answer the user's questions about their inventory, policy, or general insurance claim strategies. Be helpful and concise. Format responses with markdown.`;
+    INSTRUCTIONS:
+    - Answer questions about the user's inventory, policy coverage, and claim strategy.
+    - If the user asks about missing items, refer to the police report or suggest looking for receipts.
+    - Always format your responses with clear Markdown.
+    `;
 };
 
 export const getChatResponse = async (history: ChatMessage[], newUserInput: string, useThinking: boolean, inventory: InventoryItem[], policy?: ParsedPolicy): Promise<string> => {
     const systemInstruction = getAssistantContext(inventory, policy);
     
     try {
+        // Convert history to Content objects. Note: history passed from component is previous state.
+        const contents = history
+            .filter(msg => !msg.isLoading) // Filter out loading messages
+            .map(msg => ({
+                role: msg.role,
+                parts: [{ text: msg.text }]
+            }));
+            
+        contents.push({ role: 'user', parts: [{ text: newUserInput }] });
+
+        const config: any = {
+            systemInstruction: systemInstruction,
+        };
+
+        if (useThinking) {
+            config.thinkingConfig = { thinkingBudget: 2048 };
+        }
+
         const response = await ai.models.generateContent({
-            model: useThinking ? 'gemini-2.5-pro' : 'gemini-2.5-flash',
-            contents: newUserInput,
-            config: {
-                systemInstruction: systemInstruction,
-            },
+            model: useThinking ? 'gemini-3-pro-preview' : 'gemini-2.5-flash',
+            contents: contents,
+            config: config,
         });
         return response.text.trim();
     } catch (error) {
@@ -1191,34 +1192,32 @@ export const calculateFairRentalValue = async (location: string, propertyType: s
         Act as a real estate market analyst for an insurance claim. The user's loss location is "${location}". The property is a "${propertyType}".
         Your task is to determine the Fair Rental Value (FRV) per day for a comparable property in that immediate area.
         Use Google Search to find current rental listings (e.g., on Zillow, StreetEasy, apartments.com) for similar properties.
-        Calculate an average daily rate from your findings. Provide the final daily rate and a list of the source URLs you used for your calculation.
+        Calculate an average daily rate from your findings. 
+        
+        Return ONLY a valid JSON object with the following structure:
+        {
+            "dailyRate": number,
+            "sources": [
+                { "url": "string", "title": "string" }
+            ]
+        }
+        Do not use markdown formatting.
         `;
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-pro',
+            model: 'gemini-3-pro-preview',
             contents: prompt,
             config: {
                 tools: [{googleSearch: {}}],
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                        dailyRate: { type: Type.NUMBER, description: "The calculated average daily rental rate in USD." },
-                        sources: { type: Type.ARRAY, items: { 
-                            type: Type.OBJECT,
-                            properties: {
-                                url: { type: Type.STRING },
-                                title: { type: Type.STRING }
-                            },
-                            required: ["url", "title"]
-                        }}
-                    },
-                    required: ["dailyRate", "sources"]
-                }
             }
         });
 
-        const jsonText = response.text.trim();
-        return JSON.parse(jsonText);
+        const text = response.text || "";
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        
+        if (jsonMatch) {
+             return JSON.parse(jsonMatch[0]);
+        }
+        throw new Error("AI did not return valid JSON.");
     } catch (error) {
         console.error("Error calculating Fair Rental Value:", error);
         throw new Error("AI failed to calculate Fair Rental Value from web search.");
@@ -1252,7 +1251,7 @@ export const getRecategorizationStrategy = async (item: InventoryItem, policy: P
         Provide the best alternative category and a concise, compelling reasoning for the change. If no logical or defensible alternative exists, state that the current category is the most appropriate.
         `;
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-pro',
+            model: 'gemini-3-pro-preview',
             contents: prompt,
             config: {
                 responseMimeType: "application/json",
@@ -1274,7 +1273,6 @@ export const getRecategorizationStrategy = async (item: InventoryItem, policy: P
     }
 };
 
-// Fix: Added missing 'generateSubmissionLetter' function.
 export const generateSubmissionLetter = async (
     item: InventoryItem,
     policy: ParsedPolicy,
@@ -1315,11 +1313,11 @@ export const generateSubmissionLetter = async (
         2.  **State the purpose clearly.** The letter should state that it is a formal claim for the replacement cost of the specified item, lost as part of the burglary on ${claimDetails.dateOfLoss}.
         3.  **Reference the item and proofs.** Clearly identify the item and mention that supporting documentation (receipts, photos, etc.) is attached in the package.
         4.  **Request action.** Conclude by formally requesting reimbursement for the item's Replacement Cost Value ($${(item.replacementCostValueRCV || item.originalCost).toFixed(2)}) as per the terms of the policy.
-        5.  **Maintain a professional and factual tone.** Do not use emotional language. Stick to the facts provided.
+        5.  **Maintain a professional, assertive, and factual tone.** Do not use emotional language. Stick to the facts provided.
         `;
         
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-pro',
+            model: 'gemini-3-pro-preview',
             contents: prompt,
         });
 
@@ -1327,5 +1325,201 @@ export const generateSubmissionLetter = async (
     } catch (error) {
         console.error("Error generating submission letter:", error);
         throw new Error("AI failed to generate the submission letter.");
+    }
+};
+
+export const generateClaimNarrative = async (
+    claimDetails: ClaimDetails,
+    accountHolder: AccountHolder,
+    claimedItems: InventoryItem[],
+    policy: ParsedPolicy
+): Promise<string> => {
+    const totalClaimValue = claimedItems.reduce((acc, item) => acc + (item.replacementCostValueRCV || item.originalCost || 0), 0);
+    const itemSummary = claimedItems.map(item => `- ${item.itemName} (RCV: $${(item.replacementCostValueRCV || item.originalCost).toFixed(2)})`).join('\n');
+
+    try {
+        const prompt = `
+        Act as a professional public adjuster drafting a formal claim summary and narrative on behalf of your client, ${accountHolder.name}.
+        The summary is for a claim under policy #${policy.policyNumber} with ${policy.provider}.
+
+        **Incident Details:**
+        - Type: ${claimDetails.incidentType}
+        - Date of Loss: ${claimDetails.dateOfLoss}
+        - Location: ${claimDetails.location}
+        - Police Report: ${claimDetails.policeReport}
+        - Summary: ${claimDetails.propertyDamageDetails}
+
+        **Claim Summary:**
+        - Total Claimed Items: ${claimedItems.length}
+        - Total Claimed RCV: $${totalClaimValue.toFixed(2)}
+        - Itemization Summary:
+        ${itemSummary}
+
+        **Instructions:**
+        Draft a comprehensive, professional, and respectful narrative for the insurance adjuster.
+        1.  Start with a clear subject line referencing the policy number and claim.
+        2.  In the first paragraph, clearly state the purpose of the communication: to formally submit the enclosed claim for personal property lost during the specified incident.
+        3.  In the following paragraphs, provide a narrative of the loss event based on the incident summary. Be factual and objective.
+        4.  Summarize the scope of the loss, mentioning the total number of items and the total replacement cost value being claimed.
+        5.  Conclude by stating that a detailed inventory and all supporting proofs are attached for their review, and express willingness to provide any further information required.
+        6.  Do not invent any facts. Base the entire narrative on the information provided.
+        `;
+        
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-pro-preview',
+            contents: prompt,
+        });
+
+        return response.text.trim();
+    } catch (error) {
+        console.error("Error generating claim narrative:", error);
+        throw new Error("AI failed to generate the claim narrative.");
+    }
+};
+
+// --- NEW STRATEGIC OPTIMIZATION FUNCTIONS ---
+
+export const findOptimalPolicyForItem = async (item: InventoryItem, policies: ParsedPolicy[]): Promise<OptimalPolicyResult> => {
+    try {
+        const prompt = `
+        Act as a claims optimization expert. Your goal is to find the absolute best policy to file a claim for a specific item to maximize the user's payout.
+        
+        ITEM TO CLAIM:
+        - Name: ${item.itemName}
+        - Category: ${item.itemCategory}
+        - RCV: $${item.replacementCostValueRCV || item.originalCost}
+
+        AVAILABLE POLICIES:
+        ${JSON.stringify(policies.map(p => ({id: p.id, name: p.policyName, deductible: p.deductible, sublimits: p.coverage.filter(c => c.type === 'sub-limit')}))) }
+
+        ANALYSIS CRITERIA:
+        1.  **Deductible:** The primary factor. A lower deductible means a higher payout.
+        2.  **Sub-limits:** Check if the item's category falls under a sub-limit for each policy. A policy with no sub-limit for the category is strongly preferred. If all have sub-limits, choose the one with the highest limit.
+        3.  **Calculation:** Payout = MIN(Item RCV, Sub-limit) - Deductible.
+        
+        TASK:
+        - Analyze all policies.
+        - Identify the policy that results in the highest net payout for this specific item.
+        - Calculate the financial advantage of using the best policy over the currently active one.
+        - Provide a concise reasoning for your choice.
+        `;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-pro-preview',
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        bestPolicyId: { type: Type.STRING },
+                        reasoning: { type: Type.STRING },
+                        financialAdvantage: { type: Type.NUMBER },
+                        originalPolicyId: { type: Type.STRING }
+                    },
+                    required: ["bestPolicyId", "reasoning", "financialAdvantage", "originalPolicyId"]
+                }
+            }
+        });
+
+        const jsonText = response.text.trim();
+        return JSON.parse(jsonText) as OptimalPolicyResult;
+
+    } catch (error) {
+        console.error("Error finding optimal policy:", error);
+        throw new Error("AI failed to determine the optimal policy for this item.");
+    }
+};
+
+export const generateOptimizedNarrative = async (item: InventoryItem, policy: ParsedPolicy, claimDetails: ClaimDetails): Promise<string> => {
+    try {
+        const prompt = `
+        Act as a professional claims writer. Your task is to refine an incident description for an insurance claim to align it with covered perils under the specified policy, while remaining strictly factual.
+
+        BASE INCIDENT DETAILS:
+        - Incident Type: ${claimDetails.incidentType}
+        - User's Description: "${claimDetails.propertyDamageDetails}"
+
+        ITEM INVOLVED:
+        - Name: ${item.itemName}
+        - Category: ${item.itemCategory}
+
+        POLICY CONTEXT:
+        - Provider: ${policy.provider}
+        - Policy Type: ${policy.policyType}
+        - Known Exclusions: ${policy.exclusions.join(', ')}
+
+        INSTRUCTIONS:
+        Rewrite the user's description. The new narrative must:
+        1. Be factually consistent with the original description. Do not invent events.
+        2. Use precise, unambiguous language that is common in insurance claims.
+        3. Frame the event in a way that clearly points towards a covered peril (e.g., for a burglary, focus on forced entry and theft). For accidental damage, use neutral language describing a sudden and unforeseen event.
+        4. Be concise and professional.
+        
+        Return only the refined narrative text.
+        `;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-pro-preview',
+            contents: prompt,
+        });
+
+        return response.text.trim();
+
+    } catch(error) {
+        console.error("Error generating optimized narrative:", error);
+        throw new Error("AI failed to generate the optimized narrative.");
+    }
+};
+
+export const extractItemDetailsFromUrl = async (url: string): Promise<WebScrapeResult> => {
+    try {
+        const prompt = `
+        Act as a web scraping agent. Analyze the content of the provided URL: ${url}.
+        Your goal is to extract key details about the product on the page to create a new inventory item.
+        
+        Find and extract the following information:
+        - Item Name (the product title)
+        - Item Description (a summary or key features)
+        - Item Category (select the best fit from: ${CATEGORIES.join(', ')})
+        - Price (extract the primary price listed on the page as a number)
+        - Brand
+        - Model
+        - A direct URL to a high-quality product image.
+        
+        Return ONLY a valid JSON object with the following fields:
+        {
+            "itemName": "string",
+            "itemDescription": "string",
+            "itemCategory": "string",
+            "originalCost": number,
+            "brand": "string",
+            "model": "string",
+            "imageUrl": "string",
+            "sourceUrl": "${url}"
+        }
+        If you cannot find a piece of information, leave it blank or 0.
+        Do not use markdown formatting.
+        `;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-pro-preview',
+            contents: prompt,
+            config: {
+                tools: [{googleSearch: {}}],
+            }
+        });
+        
+        const text = response.text || "";
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        
+        if (jsonMatch) {
+             return JSON.parse(jsonMatch[0]);
+        }
+        throw new Error("AI did not return valid JSON.");
+
+    } catch (error) {
+        console.error("Error extracting item details from URL:", error);
+        throw new Error("AI failed to extract details from the provided URL.");
     }
 };
