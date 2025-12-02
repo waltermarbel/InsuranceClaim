@@ -9,12 +9,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "react-dom": "^19.1.1",
     "@google/genai": "^1.21.0",
-    "react": "^19.1.1",
-    "url": "^0.11.4",
+    "idb": "7",
+    "jspdf": "^3.0.4",
+    "jspdf-autotable": "^5.0.2",
     "jszip": "3.10.1",
-    "idb": "7"
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "url": "^0.11.4"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
