@@ -1,33 +1,35 @@
 
 import React, { createContext, useReducer, useContext, Dispatch, useEffect, useRef } from 'react';
-import { AppState, Action, InventoryItem, ParsedPolicy, Proof, AccountHolder, ClaimDetails, ActivityLogEntry, AppView, UndoableAction, ProofSuggestion, ProcessingInference } from '../types.ts';
+import { AppState, Action, InventoryItem, ParsedPolicy, Proof, AccountHolder, ClaimDetails, ActivityLogEntry, AppView, UndoableAction, ProofSuggestion, ProcessingInference, ActiveClaim, ClaimItem } from '../types.ts';
 import * as storageService from '../services/storageService.ts';
 import { exportToCSV, exportToZip } from '../utils/fileUtils.ts';
 
 // --- INITIAL STATE ---
 const DEFAULT_POLICY: ParsedPolicy = { 
-    id: 'policy-00104761115', 
-    policyName: "Renter's Policy (Premier)", 
+    id: 'policy-RI8462410', 
+    policyName: "Assurant Renters (Premier)", 
     isActive: true, 
     isVerified: true, 
-    provider: "Assurant / Geico", 
-    policyNumber: "00104761115", 
-    policyHolder: "Roydel Marquez Bello", 
+    provider: "Assurant", 
+    policyNumber: "RI8462410", 
+    policyHolder: "Roydel Marquez Bello & Maleidy Bello Landin", 
     effectiveDate: "2024-08-26", 
     expirationDate: "2025-08-26", 
     deductible: 500, 
     lossSettlementMethod: 'RCV', 
     policyType: 'HO-4 Renters Insurance', 
-    coverageD_limit: 19000, // Per Spec
+    coverageD_limit: 19000, // Loss of Use
     coverage: [
         { category: "Personal Property", limit: 95000, type: "main" }, 
         { category: "Personal Liability", limit: 100000, type: "main" },
-        { category: "Jewelry", limit: 1000, type: "sub-limit" }, 
+        { category: "Medical Payments", limit: 1000, type: "main" },
+        { category: "Jewelry/Watches/Furs", limit: 1000, type: "sub-limit" }, 
         { category: "Electronics", limit: 5000, type: "sub-limit" }, 
         { category: "Business Property", limit: 2500, type: "sub-limit" },
         { category: "Firearms", limit: 2500, type: "sub-limit" }
     ], 
-    exclusions: ["Flood", "Earthquake", "Intentional Loss", "Neglect"], 
+    exclusions: ["Flood", "Earthquake", "Intentional Loss", "Neglect", "Business Data"], 
+    conditions: ["Notify police in case of theft", "Protect property from further damage", "File proof of loss within 60 days"],
     confidenceScore: 100 
 };
 
@@ -41,26 +43,37 @@ const INITIAL_INVENTORY: InventoryItem[] = [
     {
         id: `item-1`,
         status: 'active',
-        itemName: 'Apple MacBook Pro 16-inch',
-        itemDescription: 'Space Black, M3 Max Chip. Primary work laptop.',
+        itemName: 'MacBook Pro 16-inch (Core i7/16GB/256GB)',
+        itemDescription: 'Space Gray. Purchased specifically for personal media editing. Verified via Apple ID logs.',
         itemCategory: 'Electronics',
-        originalCost: 2499.99,
-        replacementCostValueRCV: 2499.99,
-        purchaseDate: '2023-11-15',
+        originalCost: 2499.00,
+        replacementCostValueRCV: 2499.00,
+        purchaseDate: '2019-02-21',
         brand: 'Apple',
         model: 'MacBook Pro 16"',
-        serialNumber: 'H4K92L1M9P',
+        serialNumber: 'C02Y...',
         condition: 'Like New',
-        linkedProofs: [],
-        createdAt: '2024-01-10',
-        createdBy: 'User',
-        lastKnownLocation: 'Home Office Desk'
+        linkedProofs: [
+            {
+                id: 'proof-macbook-receipt',
+                type: 'document',
+                fileName: 'macbook_receipt.pdf',
+                mimeType: 'application/pdf',
+                createdBy: 'User',
+                purpose: 'Proof of Purchase',
+                notes: 'Uploaded from ./uploads/macbook_receipt.pdf'
+            }
+        ],
+        createdAt: '2024-11-28',
+        createdBy: 'VeritasVault AI',
+        lastKnownLocation: '421 W 56th St (Packed for Move)',
+        proofStrengthScore: 95
     },
     {
         id: `item-2`,
         status: 'needs-review',
         itemName: 'Hermès Birkin 30',
-        itemDescription: 'Black Togo leather with Gold hardware. Purchased 2022.',
+        itemDescription: 'Black Togo leather with Gold hardware. Stored in dust bag.',
         itemCategory: 'Clothing',
         originalCost: 10025.50,
         replacementCostValueRCV: 11500.00,
@@ -69,15 +82,16 @@ const INITIAL_INVENTORY: InventoryItem[] = [
         model: 'Birkin 30',
         condition: 'Like New',
         linkedProofs: [],
-        createdAt: '2024-02-15',
+        createdAt: '2024-11-28',
         createdBy: 'VeritasVault AI',
-        lastKnownLocation: 'Master Closet'
+        lastKnownLocation: '421 W 56th St (Packed for Move)',
+        proofStrengthScore: 85
     },
     {
         id: `item-3`,
         status: 'active',
         itemName: 'Cartier Tank Watch',
-        itemDescription: 'Tank Must de Cartier, Large model, steel. Stolen from jewelry box.',
+        itemDescription: 'Tank Must de Cartier, Large model, steel. Gift from Omar Gonzalez (Affidavit Attached).',
         itemCategory: 'Jewelry',
         originalCost: 7500.00,
         replacementCostValueRCV: 7500.00,
@@ -87,46 +101,86 @@ const INITIAL_INVENTORY: InventoryItem[] = [
         serialNumber: '8291L0P',
         condition: 'Like New',
         linkedProofs: [],
-        createdAt: '2023-01-05',
-        createdBy: 'User',
-        lastKnownLocation: 'Master Bedroom'
+        createdAt: '2024-11-28',
+        createdBy: 'VeritasVault AI',
+        lastKnownLocation: '421 W 56th St (Packed for Move)',
+        proofStrengthScore: 90
     },
     {
         id: `item-4`,
         status: 'active',
-        itemName: 'Sony A95L BRAVIA XR OLED (65")',
-        itemDescription: '65-inch 4K HDR OLED Google TV. Wall mounted.',
+        itemName: 'Samsung 65" 8000 Series 4K UHD Smart TV',
+        itemDescription: '4K UHD Smart TV. Wall mounted previously.',
         itemCategory: 'Electronics',
-        originalCost: 3299.99,
-        replacementCostValueRCV: 3299.99,
-        purchaseDate: '2023-09-10',
-        brand: 'Sony',
-        model: 'XR-65A95L',
-        serialNumber: 'S0NY-8829-X',
+        originalCost: 2011.71,
+        replacementCostValueRCV: 2011.71,
+        purchaseDate: '2021-09-08',
+        brand: 'Samsung',
+        model: 'UN65RU8000',
         condition: 'Like New',
         linkedProofs: [],
-        createdAt: '2023-10-01',
-        createdBy: 'User',
-        lastKnownLocation: 'Living Room'
+        createdAt: '2024-11-28',
+        createdBy: 'VeritasVault AI',
+        lastKnownLocation: '421 W 56th St'
     },
     {
         id: `item-5`,
         status: 'active',
-        itemName: 'Leica Q3 Digital Camera',
-        itemDescription: 'Full-frame compact camera, fixed 28mm f/1.7 lens.',
+        itemName: 'Alienware Gaming Laptop (M15)',
+        itemDescription: 'High-performance gaming laptop.',
         itemCategory: 'Electronics',
-        originalCost: 5995.00,
-        replacementCostValueRCV: 6195.00,
-        purchaseDate: '2023-08-20',
-        brand: 'Leica',
-        model: 'Q3',
-        serialNumber: '5829103',
-        condition: 'Like New',
+        originalCost: 3000.00,
+        replacementCostValueRCV: 3000.00,
+        purchaseDate: '2023-01-15',
+        brand: 'Alienware',
+        model: 'M15 R7',
+        condition: 'Good',
         linkedProofs: [],
-        createdAt: '2024-02-15',
-        createdBy: 'User',
-        lastKnownLocation: 'Bedroom Closet'
+        createdAt: '2024-11-28',
+        createdBy: 'VeritasVault AI',
+        lastKnownLocation: '421 W 56th St'
     },
+    {
+        id: `item-6`,
+        status: 'active',
+        itemName: 'Sony WH-1000XM3 Headphones (Qty 2)',
+        itemDescription: 'Noise canceling headphones. One black, one silver.',
+        itemCategory: 'Electronics',
+        originalCost: 762.10,
+        replacementCostValueRCV: 762.10,
+        purchaseDate: '2018-12-24',
+        brand: 'Sony',
+        model: 'WH-1000XM3',
+        condition: 'Good',
+        linkedProofs: [],
+        createdAt: '2024-11-28',
+        createdBy: 'VeritasVault AI',
+        lastKnownLocation: '421 W 56th St'
+    }
+];
+
+const INITIAL_CLAIMS: ActiveClaim[] = [
+    {
+        id: 'claim-default-001',
+        name: "Claim #00104761115",
+        status: 'draft',
+        linkedPolicyId: 'policy-RI8462410',
+        generatedAt: new Date().toISOString(),
+        totalClaimValue: 0,
+        claimItems: [],
+        incidentDetails: {
+            name: "Claim #00104761115 (Burglary)", 
+            dateOfLoss: "2024-11-27", 
+            incidentType: "Burglary (Forced Entry)", 
+            location: "421 West 56th Street, Apt 4A, New York, NY 10019", 
+            policeReport: "NYPD: 2024-018-12043", 
+            propertyDamageDetails: "Burglary occurred on Nov 27, 2024 during relocation. Premises entered via forced entry (window/door). Apartment ransacked. Items were packed in boxes for move to 312 W 43rd St.", 
+            claimDateRange: { startDate: "2024-11-27", endDate: "2024-11-28" }, 
+            fairRentalValuePerDay: 350,
+            aleProofs: [], 
+            claimDocuments: [], 
+        }
+    }
 ];
 
 const INITIAL_STATE: AppState = {
@@ -134,18 +188,10 @@ const INITIAL_STATE: AppState = {
     policies: [DEFAULT_POLICY],
     unlinkedProofs: [],
     accountHolder: DEFAULT_ACCOUNT_HOLDER,
-    claimDetails: { 
-        name: "Claim #00104761115 (Burglary)", 
-        dateOfLoss: "2024-11-27", 
-        incidentType: "Burglary", 
-        location: "312 W 43rd St, Apt 14J, New York, NY 10036", 
-        policeReport: "NYPD: 2024-018-012043", 
-        propertyDamageDetails: "Burglary occurred on Nov 27, 2024. Premises entered via forced entry. Apartment ransacked. Major high-value items (electronics, luxury goods) missing. Police report filed.", 
-        claimDateRange: { startDate: "2024-11-27", endDate: "2024-11-28" }, 
-        fairRentalValuePerDay: 350,
-        aleProofs: [], 
-        claimDocuments: [], 
-    },
+    
+    claims: INITIAL_CLAIMS,
+    currentClaimId: 'claim-default-001',
+
     activityLog: [],
     undoAction: null,
     currentView: 'dashboard',
@@ -193,8 +239,6 @@ const appReducer = (state: AppState, action: Action): AppState => {
             return { ...state, policies: [...state.policies.map(p => ({...p, isActive: false})), { ...newPolicy, isActive: true }] };
         }
         case 'SET_ACTIVE_POLICY': return { ...state, policies: state.policies.map(p => ({ ...p, isActive: p.id === action.payload })) };
-        case 'UPDATE_CLAIM_DETAILS': return { ...state, claimDetails: { ...state.claimDetails, ...action.payload } };
-        case 'ADD_CLAIM_DOCUMENT': return { ...state, claimDetails: { ...state.claimDetails, claimDocuments: [...(state.claimDetails.claimDocuments || []), action.payload] }, unlinkedProofs: [...state.unlinkedProofs, action.payload] };
         case 'ADD_PROOFS_TO_ITEM': return { ...state, inventory: state.inventory.map(item => item.id === action.payload.itemId ? { ...item, linkedProofs: [...item.linkedProofs, ...action.payload.proofs] } : item) };
         case 'SET_VIEW': return { ...state, currentView: action.payload };
         case 'SELECT_ITEM': return { ...state, selectedItemId: action.payload, currentView: 'item-detail' };
@@ -202,8 +246,8 @@ const appReducer = (state: AppState, action: Action): AppState => {
         case 'FINALIZE_INTERACTIVE_PROCESSING': {
             const approved = action.payload.filter(inf => inf.userSelection === 'approved');
             let newInventory = [...state.inventory];
-            let newClaimDetails = { ...state.claimDetails };
-
+            // Note: ALE handling would need update for specific claims, but leaving simple for now
+            
             approved.forEach((inference, i) => {
                 const finalProof: Proof = { ...inference.proof, notes: inference.notes, owner: inference.owner };
                 if (inference.analysisType === 'NEW_ITEM') {
@@ -211,11 +255,9 @@ const appReducer = (state: AppState, action: Action): AppState => {
                     newInventory.push({ id: `item-final-${Date.now()}-${i}`, status: 'needs-review', itemName: synthItem.itemName || 'Untitled Item', itemDescription: synthItem.itemDescription || 'No description provided.', itemCategory: synthItem.itemCategory || 'Other', originalCost: synthItem.originalCost || 0, purchaseDate: synthItem.purchaseDate, isGift: synthItem.isGift, giftedBy: synthItem.giftedBy, linkedProofs: [finalProof], createdAt: new Date().toISOString(), createdBy: 'AI Interactive' });
                 } else if (inference.analysisType === 'EXISTING_ITEM_MATCH' && inference.matchedItemId) {
                     newInventory = newInventory.map(item => item.id === inference.matchedItemId ? { ...item, linkedProofs: [...item.linkedProofs, finalProof] } : item);
-                } else if (inference.analysisType === 'ALE_EXPENSE' && inference.aleDetails) {
-                    newClaimDetails.aleProofs = [...(newClaimDetails.aleProofs || []), { ...finalProof, purpose: 'Supporting Document', costType: inference.aleDetails.costType, estimatedValue: inference.aleDetails.amount, summary: `${inference.aleDetails.vendor} - $${inference.aleDetails.amount.toFixed(2)} on ${inference.aleDetails.date}` }];
                 }
             });
-            return { ...state, inventory: newInventory, claimDetails: newClaimDetails };
+            return { ...state, inventory: newInventory };
         }
          case 'SUGGEST_PROOF_FOR_ITEM': {
             const { itemId, proof, suggestion } = action.payload;
@@ -279,6 +321,47 @@ const appReducer = (state: AppState, action: Action): AppState => {
                 undoAction: { type: 'REJECT_SUGGESTION', payload: { suggestion, itemId } }
             };
         }
+        case 'REMOVE_UNLINKED_PROOF': {
+            return { ...state, unlinkedProofs: state.unlinkedProofs.filter(p => p.id !== action.payload) };
+        }
+        // CLAIMS ACTIONS
+        case 'CREATE_CLAIM': {
+            return {
+                ...state,
+                claims: [...state.claims, action.payload],
+                currentClaimId: action.payload.id
+            };
+        }
+        case 'UPDATE_CLAIM_ITEM': {
+            const { claimId, item } = action.payload;
+            const updatedClaims = state.claims.map(claim => {
+                if (claim.id !== claimId) return claim;
+                
+                const updatedItems = claim.claimItems.map(i => i.id === item.id ? item : i);
+                const totalValue = updatedItems.filter(i => i.status === 'included').reduce((acc, i) => acc + i.claimedValue, 0);
+                return { ...claim, claimItems: updatedItems, totalClaimValue: totalValue };
+            });
+            return { ...state, claims: updatedClaims };
+        }
+        case 'UPDATE_CLAIM_DETAILS': {
+            const { claimId, details } = action.payload;
+            const updatedClaims = state.claims.map(claim => {
+                if (claim.id !== claimId) return claim;
+                return { ...claim, incidentDetails: { ...claim.incidentDetails, ...details } };
+            });
+            return { ...state, claims: updatedClaims };
+        }
+        case 'SET_CURRENT_CLAIM': {
+            return { ...state, currentClaimId: action.payload };
+        }
+        case 'DELETE_CLAIM': {
+            const remaining = state.claims.filter(c => c.id !== action.payload);
+            let nextId = state.currentClaimId;
+            if (state.currentClaimId === action.payload) {
+                nextId = remaining.length > 0 ? remaining[0].id : null;
+            }
+            return { ...state, claims: remaining, currentClaimId: nextId };
+        }
         default: return state;
     }
 };
@@ -294,6 +377,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const load = async () => {
             const loadedState = await storageService.loadState();
             if (loadedState) {
+                // Ensure claims array exists if loading old state
+                if (!loadedState.claims) {
+                    loadedState.claims = INITIAL_CLAIMS;
+                    loadedState.currentClaimId = INITIAL_CLAIMS[0].id;
+                }
                 dispatch({ type: 'INITIALIZE_STATE', payload: loadedState });
             } else {
                 // Mark as initialized even if no state was loaded

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { ParsedPolicy, PolicyAnalysisReport } from '../types.ts';
 import { XIcon, CheckCircleIcon, InformationCircleIcon, TrashIcon, PlusIcon, ExclamationTriangleIcon } from './icons.tsx';
@@ -83,6 +84,18 @@ const PolicyReviewModal: React.FC<PolicyReviewModalProps> = ({ report, onSave, o
                         <DetailRow label="Effective Date" value={policy.effectiveDate} />
                         <DetailRow label="Expiration Date" value={policy.expirationDate} />
                     </div>
+                    
+                    {/* Exclusions */}
+                    <div className="pt-4">
+                        <h4 className="font-semibold text-dark border-b pb-1 mb-2">Exclusions</h4>
+                        {policy.exclusions && policy.exclusions.length > 0 ? (
+                            <ul className="list-disc list-inside text-xs text-slate-600 space-y-1">
+                                {policy.exclusions.map((ex, i) => <li key={i}>{ex}</li>)}
+                            </ul>
+                        ) : (
+                            <p className="text-xs text-slate-400 italic">No exclusions extracted.</p>
+                        )}
+                    </div>
                 </div>
                  <div className="space-y-4">
                     <h4 className="font-semibold text-dark border-b pb-1">Coverage Details</h4>
@@ -102,6 +115,18 @@ const PolicyReviewModal: React.FC<PolicyReviewModalProps> = ({ report, onSave, o
                          {subLimits.length === 0 && (
                             <p className="text-xs text-slate-500 italic text-center py-2">No sub-limits were identified by the AI.</p>
                          )}
+                    </div>
+
+                    {/* Conditions */}
+                    <div className="pt-4">
+                        <h4 className="font-semibold text-dark border-b pb-1 mb-2">Conditions & Duties</h4>
+                        {policy.conditions && policy.conditions.length > 0 ? (
+                            <ul className="list-disc list-inside text-xs text-slate-600 space-y-1">
+                                {policy.conditions.map((con, i) => <li key={i}>{con}</li>)}
+                            </ul>
+                        ) : (
+                            <p className="text-xs text-slate-400 italic">No specific conditions extracted.</p>
+                        )}
                     </div>
                 </div>
             </div>

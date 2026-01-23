@@ -1,3 +1,4 @@
+
 import { openDB, IDBPDatabase } from 'idb';
 import { Proof, AppState } from '../types.ts';
 

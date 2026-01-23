@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { GoogleGenAI, LiveSession, LiveServerMessage, Modality, Blob as GenaiBlob } from "@google/genai";
-import { XIcon, SparklesIcon, CubeIcon, CheckIcon } from './icons.tsx';
+import { XIcon, SparklesIcon, CubeIcon, CheckIcon, ArrowDownTrayIcon, MagnifyingGlassIcon } from './icons.tsx';
 import { InventoryItem, ParsedPolicy, ChatMessage } from '../types.ts';
 import * as geminiService from '../services/geminiService.ts';
 import { useAppState } from '../context/AppContext.tsx';
@@ -46,9 +47,11 @@ function encode(bytes: Uint8Array): string {
 
 interface GeminiAssistantProps {
   onClose: () => void;
+  onNavigate: (tab: 'evidence' | 'inventory' | 'claim') => void;
+  onSearch: (query: string) => void;
 }
 
-const GeminiAssistant: React.FC<GeminiAssistantProps> = ({ onClose }) => {
+const GeminiAssistant: React.FC<GeminiAssistantProps> = ({ onClose, onNavigate, onSearch }) => {
   const { inventory, policies } = useAppState();
   const policy = useMemo(() => policies.find(p => p.isActive), [policies]);
 
@@ -177,7 +180,32 @@ const GeminiAssistant: React.FC<GeminiAssistantProps> = ({ onClose }) => {
     setInputText('');
 
     try {
-      const responseText = await geminiService.getChatResponse(messages, inputText, isThinkingMode, inventory, policy);
+      const response = await geminiService.getChatResponse(messages, inputText, isThinkingMode, inventory, policy);
+      
+      let responseText = response.text || "";
+      const toolCalls = response.functionCalls;
+
+      if (toolCalls && toolCalls.length > 0) {
+          for (const call of toolCalls) {
+              if (call.name === 'navigate') {
+                  const view = call.args['view'] as 'evidence' | 'inventory' | 'claim' | 'dashboard';
+                  if (view === 'dashboard') {
+                      onNavigate('inventory'); // Map dashboard to inventory view
+                  } else {
+                      onNavigate(view);
+                  }
+                  if (!responseText) responseText = `Navigating to ${view}...`;
+                  else responseText += `\n\n(Navigating to ${view})`;
+              } else if (call.name === 'searchVault') {
+                  const query = call.args['query'] as string;
+                  onSearch(query);
+                  onNavigate('inventory'); // Ensure we are on inventory page to see results
+                  if (!responseText) responseText = `Searching inventory for "${query}"...`;
+                  else responseText += `\n\n(Searching for "${query}")`;
+              }
+          }
+      }
+
       const finalMessage: ChatMessage = { ...loadingMessage, text: responseText, isLoading: false };
       setMessages(prev => prev.map(m => m.id === loadingMessage.id ? finalMessage : m));
     } catch (error) {
@@ -221,7 +249,7 @@ const GeminiAssistant: React.FC<GeminiAssistantProps> = ({ onClose }) => {
               <input type="checkbox" id="thinking-mode" checked={isThinkingMode} onChange={(e) => setIsThinkingMode(e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"/>
               Thinking Mode
             </label>
-            <p className="text-xs text-medium">(Slower, more powerful)</p>
+            <p className="text-xs text-medium">(Gemini 3.0 Pro + Reasoning)</p>
           </div>
           <div className="flex items-center gap-3">
             <input
@@ -229,7 +257,7 @@ const GeminiAssistant: React.FC<GeminiAssistantProps> = ({ onClose }) => {
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-              placeholder={isLive ? "Voice session is active..." : "Ask about your inventory or policy..."}
+              placeholder={isLive ? "Voice session is active..." : "Ask me to navigate or search..."}
               className="flex-grow p-2 border border-slate-300 rounded-md text-sm"
               disabled={isLive}
             />

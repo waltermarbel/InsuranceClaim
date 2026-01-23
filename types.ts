@@ -2,15 +2,12 @@
 // Fix: Removed invalid file marker that was causing a parsing error.
 export type ItemStatus = 'processing' | 'enriching' | 'clustering' | 'needs-review' | 'active' | 'claimed' | 'archived' | 'error' | 'rejected';
 export type ProofStatus = 'unprocessed' | 'categorizing' | 'categorized' | 'error';
-// New: Define the purpose of a piece of evidence.
 export type ProofPurpose = 'Proof of Purchase' | 'Proof of Possession' | 'Proof of Value' | 'Supporting Document' | 'Unknown';
 export type ProofType = 'image' | 'document' | 'video' | 'audio' | 'other';
 export type CostType = 'Loss of Use' | 'Property Damage & Debris Removal' | 'Identity Fraud Expenses' | 'Other';
 
-// New: Type to represent the stages of the autonomous AI pipeline.
 export type PipelineStage = 'idle' | 'processing';
 
-// New: Interface to track the progress within a pipeline stage.
 export interface PipelineProgress {
     current: number;
     total: number;
@@ -42,12 +39,10 @@ export interface Proof {
     estimatedValue?: number;
     predictedCategory?: string;
     predictedCategoryReasoning?: string;
-    sourceType?: 'local' | 'cloud'; // New: To distinguish local uploads from cloud links
-    sourceUrl?: string; // New: To store the URL for cloud-based proofs
+    sourceType?: 'local' | 'cloud';
+    sourceUrl?: string;
     status?: ProofStatus;
     summary?: string;
-    
-    // New: Rich analysis fields for each proof.
     purpose?: ProofPurpose;
     authenticityScore?: number;
     receiptData?: ReceiptData;
@@ -55,6 +50,7 @@ export interface Proof {
     owner?: string;
 }
 
+// LAYER A: MASTER INVENTORY ITEM
 export interface InventoryItem {
     id: string;
     status: ItemStatus;
@@ -84,6 +80,49 @@ export interface InventoryItem {
     recategorizationStrategy?: { newCategory: string; reasoning: string; };
 }
 
+// LAYER B: CLAIM INVENTORY ITEM
+export interface ClaimItem {
+    id: string;
+    masterItemId: string;
+    claimDescription: string;
+    category: string;
+    claimedValue: number;
+    valuationMethod: 'RCV' | 'ACV';
+    narrativeTag: 'Packed' | 'Stored' | 'In Transit' | 'In Use' | 'Unknown';
+    boxOrGroup?: string;
+    status: 'included' | 'excluded' | 'flagged';
+    exclusionReason?: string;
+    policyNotes?: string;
+}
+
+export interface ClaimDetails {
+    name: string; // e.g. "Burglary at 56th St"
+    dateOfLoss: string;
+    incidentType: string;
+    location: string;
+    policeReport: string;
+    propertyDamageDetails: string;
+    claimDateRange?: {
+        startDate?: string;
+        endDate?: string;
+    };
+    fairRentalValuePerDay?: number;
+    aleProofs?: Proof[];
+    claimDocuments?: Proof[];
+}
+
+// LAYER B: ACTIVE CLAIM CONTAINER
+export interface ActiveClaim {
+    id: string;
+    name: string; // User-friendly name
+    claimItems: ClaimItem[];
+    generatedAt: string;
+    totalClaimValue: number;
+    status: 'draft' | 'finalized';
+    linkedPolicyId?: string;
+    incidentDetails: ClaimDetails; // Snapshot of incident details for this claim
+}
+
 export interface AccountHolder {
     id: string;
     name: string;
@@ -110,40 +149,45 @@ export interface ParsedPolicy {
     coverageD_limit: number; // Loss of Use
     lossSettlementMethod: 'ACV' | 'RCV';
     exclusions: string[];
+    conditions: string[];
     confidenceScore: number;
     isVerified: boolean;
     policyType?: string;
 }
 
-// New: Represents the AI's full analysis of a new policy document, including comparisons.
 export interface PolicyAnalysisReport {
     analysisType: 'new' | 'update' | 'duplicate';
-    targetPolicyId?: string; // ID of the policy this is an update/duplicate of
+    targetPolicyId?: string;
     warnings: string[];
     parsedPolicy: Omit<ParsedPolicy, 'id' | 'isActive' | 'isVerified' | 'policyName'>;
 }
 
-
 export interface PolicyParseResponse extends Omit<ParsedPolicy, 'isVerified' | 'id' | 'isActive' | 'policyName'> {}
 
-export interface GeminiResponse {
-    itemName: string;
-    description: string;
-    category: string;
-    estimatedValue: number;
-    brand?: string;
-    model?: string;
-    summary: string;
+export interface PolicyVerificationResult {
+    suggestions: string[];
+    score: number;
 }
 
-export interface DraftClaim {
+export interface ClaimGapAnalysis {
+    overallRiskScore: number; // 0-100
+    flaggedItems: {
+        itemName: string;
+        issueType: 'Under-Insured' | 'Potential Exclusion' | 'Documentation Weak';
+        description: string;
+        financialImpact: number;
+    }[];
+    policyWarnings: string[];
+    recommendations: string[];
+}
+
+export interface ClaimScenario {
     id: string;
-    assetId: string;
-    policyNumber: string;
-    accountHolderId: string;
-    status: 'system_ready_to_file' | 'filed' | 'closed';
-    failureDescription: string;
-    createdAt: string;
+    title: string;
+    description: string;
+    likelihood: 'Low' | 'Medium' | 'High';
+    relevantCoverage: string;
+    riskLevel: number; // 0-100
 }
 
 export interface ValuationSource {
@@ -168,17 +212,6 @@ export interface WebIntelligenceResponse {
     facts: WebIntelligenceFact[];
 }
 
-export interface ApparelIdentificationResponse {
-    brand: string;
-    model: string;
-    msrp: number;
-}
-
-export interface HighestRcvResponse {
-    price: number;
-    source: string;
-}
-
 export interface SerialNumberResponse {
     serialNumber: string;
 }
@@ -188,38 +221,11 @@ export interface ProofStrengthResponse {
     feedback: string;
 }
 
-export interface ACVResponse {
-    acv: number;
-    reasoning: string[];
-}
-
 export interface ProofSuggestion {
     proofId: string;
     confidence: number;
     reason: string;
     sourceUrl?: string;
-}
-
-export interface OtherCosts {
-    lossOfUse: number;
-    propertyDamage: number;
-    identityFraud: number;
-}
-
-export interface ClaimDetails {
-    name: string;
-    dateOfLoss: string;
-    incidentType: string;
-    location: string;
-    policeReport: string;
-    propertyDamageDetails: string;
-    claimDateRange?: {
-        startDate?: string;
-        endDate?: string;
-    };
-    fairRentalValuePerDay?: number;
-    aleProofs?: Proof[];
-    claimDocuments?: Proof[];
 }
 
 export type AppView = 'upload' | 'dashboard' | 'item-detail' | 'room-scan' | 'processing-preview' | 'autonomous-processor' | 'autonomous-review' | 'strategic-dashboard';
@@ -230,8 +236,8 @@ export interface ActivityLogEntry {
   id: string;
   timestamp: string;
   app: 'VeritasVault' | 'Gemini';
-  action: string; // e.g., 'ITEM_CREATED', 'POLICY_PARSED'
-  details: string; // e.g., 'Created item: MacBook Pro 16"'
+  action: string;
+  details: string;
 }
 
 export type UndoableAction = 
@@ -243,14 +249,12 @@ export type UploadProgress = Record<string, {
     total: number;
 }>;
 
-// Represents an item currently in the background processing queue.
 export interface ProcessingQueueItem {
     file: File;
     dataUrl: string;
     placeholderId: string;
 }
 
-// New: Type for chat messages in the AI Assistant
 export interface ChatMessage {
   id: string;
   role: 'user' | 'model';
@@ -258,7 +262,6 @@ export interface ChatMessage {
   isLoading?: boolean;
 }
 
-// --- NEW: Types for Interactive Processing Queue ---
 export interface AleDetails {
     vendor: string;
     date: string;
@@ -283,7 +286,6 @@ export interface ProcessingInference {
     owner?: string;
 }
 
-// New: Type for the output of the Autonomous Inventory Processor AI
 export interface AutonomousInventoryItem {
     category: string;
     description: string;
@@ -300,7 +302,6 @@ export interface AutonomousInventoryItem {
     sublimit_tag: string | null;
 }
 
-// --- NEW: Types for Strategic Optimization ---
 export interface OptimalPolicyResult {
     bestPolicyId: string;
     reasoning: string;
@@ -319,14 +320,36 @@ export interface WebScrapeResult {
     sourceUrl: string;
 }
 
+export interface ScenarioAnalysis {
+    scenarioTitle: string;
+    grossLoss: number;
+    appliedDeductible: number;
+    netPayout: number;
+    deniedItems: { itemName: string, reason: string, value: number }[];
+    subLimitHits: { category: string, totalValue: number, limit: number }[];
+    warnings: string[];
+    actionPlan: string[];
+}
 
-// --- NEW: Types for State Management ---
+export interface RiskGap {
+    category: string;
+    totalValue: number;
+    policyLimit: number;
+    isAtRisk: boolean;
+    missingProofCount: number;
+}
+
+// --- APP STATE ---
 export interface AppState {
-    inventory: InventoryItem[];
+    inventory: InventoryItem[]; // LAYER A: Master Inventory
     policies: ParsedPolicy[];
     unlinkedProofs: Proof[];
     accountHolder: AccountHolder;
-    claimDetails: ClaimDetails;
+    
+    // Multiple Claims Support
+    claims: ActiveClaim[];
+    currentClaimId: string | null;
+
     activityLog: ActivityLogEntry[];
     undoAction: UndoableAction | null;
     currentView: AppView;
@@ -348,8 +371,6 @@ export type Action =
   | { type: 'UNDO_ACTION'; payload: UndoableAction }
   | { type: 'SAVE_POLICY_FROM_REPORT'; payload: PolicyAnalysisReport }
   | { type: 'SET_ACTIVE_POLICY'; payload: string }
-  | { type: 'UPDATE_CLAIM_DETAILS'; payload: Partial<ClaimDetails> }
-  | { type: 'ADD_CLAIM_DOCUMENT'; payload: Proof }
   | { type: 'ADD_PROOFS_TO_ITEM'; payload: { itemId: string; proofs: Proof[] } }
   | { type: 'SET_VIEW'; payload: AppView }
   | { type: 'SELECT_ITEM'; payload: string }
@@ -358,4 +379,11 @@ export type Action =
   | { type: 'SUGGEST_PROOF_FOR_ITEM', payload: { itemId: string; proof: Proof, suggestion: Omit<ProofSuggestion, 'sourceUrl'> & { sourceUrl?: string } } }
   | { type: 'ADD_SUGGESTIONS_TO_ITEM', payload: { itemId: string; suggestions: ProofSuggestion[] } }
   | { type: 'ACCEPT_SUGGESTION', payload: { itemId: string; proofId: string } }
-  | { type: 'REJECT_SUGGESTION_PERMANENT', payload: { itemId: string; proofId: string } };
+  | { type: 'REJECT_SUGGESTION_PERMANENT', payload: { itemId: string; proofId: string } }
+  | { type: 'REMOVE_UNLINKED_PROOF', payload: string }
+  // Claims Management Actions
+  | { type: 'CREATE_CLAIM', payload: ActiveClaim }
+  | { type: 'UPDATE_CLAIM_ITEM', payload: { claimId: string, item: ClaimItem } }
+  | { type: 'UPDATE_CLAIM_DETAILS', payload: { claimId: string, details: Partial<ClaimDetails> } }
+  | { type: 'SET_CURRENT_CLAIM', payload: string }
+  | { type: 'DELETE_CLAIM', payload: string };

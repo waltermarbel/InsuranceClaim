@@ -1,3 +1,4 @@
+
 import JSZip from 'jszip';
 import { InventoryItem, Proof } from './types.ts';
 // Fix: Removed self-import of `sanitizeFileName` which was causing a conflict.
@@ -18,6 +19,21 @@ export const fileToDataUrl = (
                 resolve(reader.result);
             } else {
                 reject(new Error("Failed to read file as a data URL."));
+            }
+        };
+        reader.onerror = error => reject(error);
+    });
+};
+
+export const blobToDataUrl = (blob: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(blob);
+        reader.onloadend = () => {
+            if (typeof reader.result === 'string') {
+                resolve(reader.result);
+            } else {
+                reject(new Error("Failed to read blob as Data URL."));
             }
         };
         reader.onerror = error => reject(error);
@@ -142,6 +158,71 @@ export const exportToCSV = (items: InventoryItem[], filename: string) => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+};
+
+export const parseCSV = async (file: File): Promise<any[]> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            try {
+                const text = event.target?.result as string;
+                const lines = text.split(/\r?\n/).filter(line => line.trim());
+                if (lines.length === 0) {
+                    resolve([]);
+                    return;
+                }
+
+                // Simple CSV parser handling comma delimiters and basic quotes
+                // Note: For production use with complex CSVs (nested quotes, newlines in fields), a library like Papaparse is recommended.
+                // This implementation assumes standard CSV formatting.
+                
+                const parseLine = (line: string) => {
+                    const result = [];
+                    let current = '';
+                    let inQuote = false;
+                    for (let i = 0; i < line.length; i++) {
+                        const char = line[i];
+                        if (char === '"') {
+                            if (inQuote && line[i + 1] === '"') {
+                                current += '"';
+                                i++;
+                            } else {
+                                inQuote = !inQuote;
+                            }
+                        } else if (char === ',' && !inQuote) {
+                            result.push(current.trim());
+                            current = '';
+                        } else {
+                            current += char;
+                        }
+                    }
+                    result.push(current.trim());
+                    return result;
+                };
+
+                const headers = parseLine(lines[0]).map(h => h.replace(/^"|"$/g, '').trim());
+                
+                const data = lines.slice(1).map(line => {
+                    const values = parseLine(line);
+                    const obj: any = {};
+                    headers.forEach((header, index) => {
+                        let value = values[index];
+                        if (value) {
+                            value = value.replace(/^"|"$/g, ''); // Remove surrounding quotes
+                        }
+                        obj[header] = value;
+                    });
+                    return obj;
+                });
+
+                resolve(data);
+            } catch (error) {
+                reject(error);
+            }
+        };
+        reader.onerror = (error) => reject(error);
+        reader.readAsText(file);
+    });
 };
 
 export const exportToZip = async (inventory: InventoryItem[], unlinkedProofs: Proof[]) => {
