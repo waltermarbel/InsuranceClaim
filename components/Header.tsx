@@ -9,13 +9,15 @@ interface HeaderProps {
     onNavigate: (tab: 'evidence' | 'inventory' | 'claim') => void;
     onAskGemini: () => void;
     onSave: () => void;
+    onImport: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({ 
     activeTab,
     onNavigate,
     onAskGemini,
-    onSave
+    onSave,
+    onImport
 }) => {
   const syncStatus = useSyncStatus();
   
@@ -70,6 +72,15 @@ export const Header: React.FC<HeaderProps> = ({
              </div>
 
              <div className="h-6 w-px bg-slate-200 hidden sm:block"></div>
+
+             <button
+                onClick={onImport}
+                className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-slate-600 hover:text-primary hover:bg-slate-100 rounded-lg transition-colors"
+                title="Import Backup"
+             >
+                <ArrowDownTrayIcon className="h-5 w-5 rotate-180"/>
+                <span className="hidden sm:inline">Import</span>
+             </button>
 
              <button
                 onClick={onSave}

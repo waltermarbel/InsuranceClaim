@@ -212,6 +212,39 @@ startxref
     }, [state.inventory, state.unlinkedProofs, logActivity]);
 
 
+    // --- IMPORT HANDLER ---
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleImportClick = useCallback(() => {
+        fileInputRef.current?.click();
+    }, []);
+
+    const handleFileChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        try {
+            const text = await file.text();
+            const importedState = JSON.parse(text);
+            
+            // Basic validation to check if it looks like our state
+            if (importedState && typeof importedState === 'object' && 'inventory' in importedState) {
+                dispatch({ type: 'LOAD_FROM_FILE', payload: importedState });
+                logActivity('BACKUP_IMPORTED', 'User imported a JSON backup.');
+                alert('Backup imported successfully!');
+            } else {
+                alert('Invalid backup file format.');
+            }
+        } catch (error) {
+            console.error("Import failed:", error);
+            alert("Failed to import backup file.");
+        } finally {
+            // Reset input so same file can be selected again if needed
+            if (event.target) event.target.value = '';
+        }
+    }, [dispatch, logActivity]);
+
+
     // --- AUTOMATED ENRICHMENT PIPELINE ---
     const runForensicEnrichment = useCallback(async (items: InventoryItem[]) => {
         const itemIds = items.map(i => i.id);
@@ -759,6 +792,14 @@ startxref
                 onNavigate={handleNavigate}
                 onAskGemini={() => setShowAssistant(true)}
                 onSave={() => setShowSaveModal(true)}
+                onImport={handleImportClick}
+            />
+            <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleFileChange} 
+                className="hidden" 
+                accept=".json" 
             />
             
             <main className="container mx-auto px-4 md:px-8 py-8 transition-all duration-300">

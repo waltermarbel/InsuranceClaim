@@ -137,7 +137,7 @@ const appReducer = (state: AppState, action: Action): AppState => {
     switch (action.type) {
         case 'INITIALIZE_STATE': return { ...action.payload, isInitialized: true };
         case 'RESET_STATE': return { ...INITIAL_STATE, activityLog: state.activityLog, isInitialized: true };
-        case 'LOAD_FROM_FILE': return { ...state, ...action.payload, currentView: 'dashboard', selectedItemId: null };
+        case 'LOAD_FROM_FILE': return { ...state, ...action.payload, currentView: 'dashboard', selectedItemId: null, isInitialized: true };
         
         case 'UPDATE_ITEM': return { ...state, inventory: state.inventory.map(item => item.id === action.payload.id ? action.payload : item) };
         case 'ADD_INVENTORY_ITEMS': return { ...state, inventory: [...state.inventory, ...action.payload] };
