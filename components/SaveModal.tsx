@@ -1,5 +1,6 @@
+
 import React, { useState } from 'react';
-import { XIcon, CubeIcon, DocumentTextIcon, SpinnerIcon } from './icons';
+import { XIcon, CubeIcon, DocumentTextIcon, SpinnerIcon } from './icons.tsx';
 
 interface SaveModalProps {
   onClose: () => void;

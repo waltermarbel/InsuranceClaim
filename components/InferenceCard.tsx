@@ -8,7 +8,7 @@ interface InferenceCardProps {
     existingItem?: InventoryItem; // Pass the full item if it's a match
     onToggleSelection: (proofId: string) => void;
     onImageZoom: (imageUrl: string) => void;
-    claimDetails: ClaimDetails;
+    claimDetails?: ClaimDetails | null; // Made optional to support no-claim state
 }
 
 const InferenceCard: React.FC<InferenceCardProps> = ({ inference, existingItem, onToggleSelection, onImageZoom, claimDetails }) => {
@@ -16,6 +16,8 @@ const InferenceCard: React.FC<InferenceCardProps> = ({ inference, existingItem, 
     const isApproved = userSelection === 'approved';
 
     const isDateInvalid = useMemo(() => {
+        if (!claimDetails) return false;
+
         if (inference.analysisType === 'NEW_ITEM') {
             const purchaseDate = inference.synthesizedItem?.purchaseDate;
             const lossDate = claimDetails.dateOfLoss;

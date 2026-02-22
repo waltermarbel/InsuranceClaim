@@ -1,0 +1,79 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Evidence Ledger Schema",
+  "type": "object",
+  "properties": {
+    "evidence": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "evidence_id": {"type": "string"},
+          "file_name": {"type": "string"},
+          "file_path": {"type": "string"},
+          "file_hash": {"type": "string"},
+          "mime": {"type": "string"},
+          "size": {"type": "integer"},
+          "ingest_timestamp": {"type": "integer"},
+          "evidence_class": {
+            "type": "string",
+            "enum": [
+              "documents_original",
+              "document_photos",
+              "documents_ai_derived",
+              "scene",
+              "items",
+              "metadata"
+            ]
+          },
+          "provenance_type": {
+            "type": "string",
+            "enum": ["native", "scanned_photo", "ai_generated", "extracted"]
+          },
+          "primary_weight": {"type": "integer"},
+          "confidence": {"type": "number"},
+          "extracted_fields": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "oneOf": [
+                    { "type": "string" },
+                    { "type": "number" },
+                    { "type": "boolean" },
+                    { 
+                      "type": "array", 
+                      "items": { "type": "string" } 
+                    }
+                  ]
+                },
+                "confidence": {"type": "number"}
+              },
+              "required": ["value", "confidence"]
+            }
+          },
+          "is_primary_record": {"type": "boolean"},
+          "superseded_by": {"type": ["string", "null"]}
+        },
+        "required": [
+          "evidence_id",
+          "file_name",
+          "file_path",
+          "file_hash",
+          "mime",
+          "size",
+          "ingest_timestamp",
+          "evidence_class",
+          "provenance_type",
+          "primary_weight",
+          "confidence",
+          "extracted_fields",
+          "is_primary_record"
+        ]
+      }
+    },
+    "updated_at": {"type": "integer"}
+  },
+  "required": ["evidence", "updated_at"]
+}

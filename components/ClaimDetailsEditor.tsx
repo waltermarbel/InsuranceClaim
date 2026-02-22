@@ -23,7 +23,7 @@ const RichTextToolbarButton: React.FC<{ command: string; icon: React.ReactNode; 
     );
 };
 
-const RichTextEditor: React.FC<{ value: string; onChange: (val: string) => void }> = ({ value, onChange }) => {
+const RichTextEditor: React.FC<{ value: string; onBlur: (val: string) => void }> = ({ value, onBlur }) => {
     const editorRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -32,9 +32,9 @@ const RichTextEditor: React.FC<{ value: string; onChange: (val: string) => void 
         }
     }, [value]);
 
-    const handleInput = () => {
+    const handleBlur = () => {
         if (editorRef.current) {
-            onChange(editorRef.current.innerHTML);
+            onBlur(editorRef.current.innerHTML);
         }
     };
 
@@ -51,7 +51,7 @@ const RichTextEditor: React.FC<{ value: string; onChange: (val: string) => void 
                 ref={editorRef}
                 contentEditable
                 className="p-3 min-h-[150px] outline-none text-sm text-slate-800 prose prose-sm max-w-none"
-                onInput={handleInput}
+                onBlur={handleBlur}
                 suppressContentEditableWarning={true}
             />
         </div>
@@ -59,110 +59,61 @@ const RichTextEditor: React.FC<{ value: string; onChange: (val: string) => void 
 };
 
 const ClaimDetailsEditor: React.FC<ClaimDetailsEditorProps> = ({ details, onUpdate }) => {
-    const [isEditing, setIsEditing] = useState(false);
+    // Local state to handle input values before blur
     const [formData, setFormData] = useState(details);
 
     useEffect(() => {
         setFormData(details);
     }, [details]);
 
-    const handleSave = () => {
-        onUpdate(formData);
-        setIsEditing(false);
-    };
-
-    const handleCancel = () => {
-        setFormData(details);
-        setIsEditing(false);
-    };
-
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleDateRangeChange = (type: 'startDate' | 'endDate', value: string) => {
-        setFormData(prev => ({
-            ...prev,
-            claimDateRange: {
-                ...prev.claimDateRange,
-                [type]: value
-            }
-        }));
+    // Auto-save on blur for text fields
+    const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+        const { name, value } = e.target;
+        if (value !== (details as any)[name]) {
+            onUpdate({ [name]: value });
+        }
     };
 
-    if (!isEditing) {
-        return (
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 mb-8">
-                <div className="flex justify-between items-start mb-4">
-                    <h2 className="text-xl font-bold text-slate-800 font-heading flex items-center gap-2">
-                        <ExclamationTriangleIcon className="h-6 w-6 text-red-500" />
-                        Incident Details
-                    </h2>
-                    <button onClick={() => setIsEditing(true)} className="flex items-center gap-1 text-sm font-semibold text-primary hover:text-primary-dark transition">
-                        <PencilIcon className="h-4 w-4" /> Edit
-                    </button>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-4">
-                        <div>
-                            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Incident Type</p>
-                            <p className="text-slate-800 font-semibold">{details.incidentType || 'Not specified'}</p>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                                    <CalendarIcon className="h-3 w-3"/> Loss Date
-                                </p>
-                                <p className="text-slate-800">{details.dateOfLoss || 'Not specified'}</p>
-                            </div>
-                            <div>
-                                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                                    <CalendarIcon className="h-3 w-3"/> Period
-                                </p>
-                                <p className="text-slate-800 text-xs mt-0.5">
-                                    {details.claimDateRange?.startDate ? new Date(details.claimDateRange.startDate).toLocaleDateString() : 'N/A'} - {details.claimDateRange?.endDate ? new Date(details.claimDateRange.endDate).toLocaleDateString() : 'N/A'}
-                                </p>
-                            </div>
-                        </div>
-                         <div>
-                            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Police Report #</p>
-                            <p className="text-slate-800 font-mono bg-slate-50 px-2 py-1 rounded inline-block text-sm border border-slate-200">
-                                {details.policeReport || 'N/A'}
-                            </p>
-                        </div>
-                    </div>
-                    <div>
-                        <div className="mb-4">
-                            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                                <MapPinIcon className="h-3 w-3"/> Location of Incident
-                            </p>
-                            <p className="text-slate-800">{details.location || 'Not specified'}</p>
-                        </div>
-                        <div>
-                            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1 mb-1">
-                                <DocumentTextIcon className="h-3 w-3"/> Narrative Description
-                            </p>
-                            <div 
-                                className="bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm text-slate-600 prose prose-sm max-w-none"
-                                dangerouslySetInnerHTML={{ __html: details.propertyDamageDetails || "No description provided." }}
-                            />
-                        </div>
-                    </div>
-                </div>
-            </div>
-        );
-    }
+    // Auto-save immediately for Select fields
+    const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+        onUpdate({ [name]: value });
+    };
+
+    const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value } = e.target; // name will be 'startDate' or 'endDate' via data-field logic below if needed, or specific inputs
+        // This function handles the root 'dateOfLoss'
+        setFormData(prev => ({ ...prev, [name]: value }));
+        onUpdate({ [name]: value });
+    };
+
+    const handleRangeDateChange = (type: 'startDate' | 'endDate', value: string) => {
+        const newRange = {
+            ...formData.claimDateRange,
+            [type]: value,
+            // ensure other field is preserved if existing, or empty string
+            ...(type === 'startDate' ? { endDate: formData.claimDateRange?.endDate || '' } : { startDate: formData.claimDateRange?.startDate || '' })
+        };
+        
+        setFormData(prev => ({
+            ...prev,
+            claimDateRange: newRange
+        }));
+        onUpdate({ claimDateRange: newRange });
+    };
 
     return (
         <div className="bg-white rounded-xl border border-primary/20 shadow-md p-6 mb-8 ring-1 ring-primary/5">
             <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-bold text-slate-800 font-heading">Edit Incident Details</h2>
-                <div className="flex gap-2">
-                    <button onClick={handleCancel} className="px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition">Cancel</button>
-                    <button onClick={handleSave} className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-bold bg-primary text-white rounded-lg hover:bg-primary-dark transition shadow-sm">
-                        <CheckIcon className="h-4 w-4" /> Save Changes
-                    </button>
+                <h2 className="text-xl font-bold text-slate-800 font-heading">Incident Details</h2>
+                <div className="text-xs text-slate-400 italic">
+                    Changes saved automatically
                 </div>
             </div>
             
@@ -173,7 +124,7 @@ const ClaimDetailsEditor: React.FC<ClaimDetailsEditorProps> = ({ details, onUpda
                         <select 
                             name="incidentType" 
                             value={formData.incidentType} 
-                            onChange={handleChange}
+                            onChange={handleSelectChange}
                             className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
                         >
                             <option value="">Select Type...</option>
@@ -193,7 +144,7 @@ const ClaimDetailsEditor: React.FC<ClaimDetailsEditorProps> = ({ details, onUpda
                             <input 
                                 type="date" 
                                 value={formData.claimDateRange?.startDate || ''} 
-                                onChange={(e) => handleDateRangeChange('startDate', e.target.value)}
+                                onChange={(e) => handleRangeDateChange('startDate', e.target.value)}
                                 className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
                             />
                         </div>
@@ -202,7 +153,7 @@ const ClaimDetailsEditor: React.FC<ClaimDetailsEditorProps> = ({ details, onUpda
                             <input 
                                 type="date" 
                                 value={formData.claimDateRange?.endDate || ''} 
-                                onChange={(e) => handleDateRangeChange('endDate', e.target.value)}
+                                onChange={(e) => handleRangeDateChange('endDate', e.target.value)}
                                 className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
                             />
                         </div>
@@ -214,7 +165,8 @@ const ClaimDetailsEditor: React.FC<ClaimDetailsEditorProps> = ({ details, onUpda
                             type="date" 
                             name="dateOfLoss"
                             value={formData.dateOfLoss} 
-                            onChange={handleChange}
+                            onChange={handleChange} // Update local state
+                            onBlur={handleBlur} // Save on blur
                             className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
                         />
                     </div>
@@ -226,6 +178,7 @@ const ClaimDetailsEditor: React.FC<ClaimDetailsEditorProps> = ({ details, onUpda
                             name="policeReport"
                             value={formData.policeReport} 
                             onChange={handleChange}
+                            onBlur={handleBlur}
                             placeholder="e.g. NYPD-2024-..."
                             className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none font-mono"
                         />
@@ -240,6 +193,7 @@ const ClaimDetailsEditor: React.FC<ClaimDetailsEditorProps> = ({ details, onUpda
                             name="location"
                             value={formData.location} 
                             onChange={handleChange}
+                            onBlur={handleBlur}
                             placeholder="Street Address, City, State"
                             className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
                         />
@@ -249,7 +203,7 @@ const ClaimDetailsEditor: React.FC<ClaimDetailsEditorProps> = ({ details, onUpda
                         <label className="block text-xs font-bold uppercase text-slate-500 mb-1.5">Property Damage Details</label>
                         <RichTextEditor 
                             value={formData.propertyDamageDetails}
-                            onChange={(val) => setFormData(prev => ({ ...prev, propertyDamageDetails: val }))}
+                            onBlur={(val) => onUpdate({ propertyDamageDetails: val })}
                         />
                     </div>
                 </div>

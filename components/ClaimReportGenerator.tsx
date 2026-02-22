@@ -11,8 +11,10 @@ interface ClaimReportGeneratorProps {
 }
 
 const ClaimReportGenerator: React.FC<ClaimReportGeneratorProps> = ({ onClose }) => {
-    const { inventory, policies, claimDetails, accountHolder } = useAppState();
+    const { inventory, policies, claims, currentClaimId, accountHolder } = useAppState();
     const policy = useMemo(() => policies.find(p => p.isActive), [policies]);
+    const activeClaim = useMemo(() => claims.find(c => c.id === currentClaimId), [claims, currentClaimId]);
+    const claimDetails = activeClaim?.incidentDetails;
     
     const [narrative, setNarrative] = useState('');
     const [isNarrativeLoading, setIsNarrativeLoading] = useState(true);
@@ -24,8 +26,8 @@ const ClaimReportGenerator: React.FC<ClaimReportGeneratorProps> = ({ onClose }) 
     const generateNarrative = useCallback(async () => {
         setIsNarrativeLoading(true);
         const itemsToInclude = claimedItems.filter(item => selectedItemIds.includes(item.id));
-        if (!policy) {
-            setNarrative("Error: No active insurance policy found.");
+        if (!policy || !claimDetails) {
+            setNarrative("Error: No active insurance policy or claim found.");
             setIsNarrativeLoading(false);
             return;
         }
@@ -54,8 +56,8 @@ const ClaimReportGenerator: React.FC<ClaimReportGeneratorProps> = ({ onClose }) 
     };
 
     const handleGenerateZip = async () => {
-        if (!policy) {
-            alert("Cannot generate report: No active policy found.");
+        if (!policy || !claimDetails) {
+            alert("Cannot generate report: No active policy or claim found.");
             return;
         }
 
@@ -64,30 +66,50 @@ const ClaimReportGenerator: React.FC<ClaimReportGeneratorProps> = ({ onClose }) 
         
         try {
             const zip = new JSZip();
+            const dateStr = new Date().toISOString().split('T')[0];
             
-            let reportContent = `# Claim Report: ${claimDetails.name}\n\n`;
-            reportContent += `**Policyholder:** ${accountHolder.name}\n`;
-            reportContent += `**Policy Number:** ${policy.policyNumber}\n`;
-            reportContent += `**Date of Loss:** ${claimDetails.dateOfLoss}\n\n`;
-            reportContent += `## Claim Narrative\n\n${narrative}\n\n`;
-            reportContent += `## Claimed Items Summary\n\n`;
-            reportContent += `| Item Name | Category | RCV |\n`;
-            reportContent += `| :--- | :--- | :--- |\n`;
-            let totalRcv = 0;
-            for (const item of selectedItems) {
-                const rcv = item.replacementCostValueRCV || item.originalCost || 0;
-                totalRcv += rcv;
-                reportContent += `| ${item.itemName} | ${item.itemCategory} | $${rcv.toFixed(2)} |\n`;
-            }
-            reportContent += `| **Total** | | **$${totalRcv.toFixed(2)}** |\n`;
+            // 1. Executive Summary
+            let execSummary = `# Executive Summary: Claim ${claimDetails.name}\n\n`;
+            execSummary += `**Date:** ${dateStr}\n`;
+            execSummary += `**Policyholder:** ${accountHolder.name}\n`;
+            execSummary += `**Policy Number:** ${policy.policyNumber}\n\n`;
+            execSummary += `## Incident Overview\n${narrative}\n\n`;
+            
+            const totalRcv = selectedItems.reduce((acc, i) => acc + (i.replacementCostValueRCV || 0), 0);
+            execSummary += `## Financial Summary\n`;
+            execSummary += `- **Total Replacement Cost Value (RCV):** $${totalRcv.toLocaleString()}\n`;
+            execSummary += `- **Applicable Deductible:** $${policy.deductible.toLocaleString()}\n`;
+            execSummary += `- **Net Claim Demand:** $${Math.max(0, totalRcv - policy.deductible).toLocaleString()}\n`;
+            
+            zip.file("00_Executive_Summary.md", execSummary);
 
-            zip.file("Claim_Report.md", reportContent);
+            // 2. Sworn Proof of Loss (Template)
+            const proofOfLoss = `SWORN STATEMENT IN PROOF OF LOSS\n\nTo: ${policy.provider}\nPolicy: ${policy.policyNumber}\nInsured: ${accountHolder.name}\n\nAt the time of loss, the interest of the insured in the property described was sole and unconditional ownership.\n\nThe actual cash value of said property at the time of the loss was $${totalRcv.toLocaleString()}.\n\nThe total amount claimed under this policy is $${Math.max(0, totalRcv - policy.deductible).toLocaleString()}.\n\nThe said loss did not originate by any act, design or procurement on the part of your insured.\n\n_________________________\nSignature of Insured\nDate: ${dateStr}`;
+            zip.file("01_Sworn_Proof_of_Loss.txt", proofOfLoss);
 
-            const proofsFolder = zip.folder("proofs");
+            // 3. Forensic Inventory
+            let inventoryCsv = "Item ID,Description,Category,Brand,Model,Serial Number,Purchase Date,Original Cost,RCV,Proof Type\n";
+            selectedItems.forEach(item => {
+                inventoryCsv += `"${item.id}","${item.itemName} - ${item.itemDescription}","${item.itemCategory}","${item.brand}","${item.model}","${item.serialNumber}","${item.purchaseDate}",${item.originalCost},${item.replacementCostValueRCV},"${item.linkedProofs.map(p=>p.type).join(';')}"\n`;
+            });
+            zip.file("02_Forensic_Inventory.csv", inventoryCsv);
+
+            // 4. Legal Memorandum (Placeholder logic for prototype)
+            const legalMemo = `LEGAL MEMORANDUM RE: CLAIM SUBMISSION\n\n` +
+                              `Pursuant to state insurance regulations regarding Fair Claims Settlement Practices, attached is the complete proof of loss.\n\n` +
+                              `NOTICE OF RIGHTS:\n` + 
+                              `1. We request acknowledgement of this claim within 15 days.\n` +
+                              `2. We request a coverage decision within 30 days of this submission.\n` +
+                              `3. Any ambiguity in the policy must be construed in favor of the insured (Contra Proferentem).\n\n` +
+                              `Govern yourselves accordingly.`;
+            zip.file("03_Legal_Memorandum.txt", legalMemo);
+
+            // Proofs Folder
+            const proofsFolder = zip.folder("04_Supporting_Evidence");
             if (!proofsFolder) throw new Error("Could not create proofs folder.");
 
             for (const item of selectedItems) {
-                const itemFolderName = sanitizeFileName(item.itemName);
+                const itemFolderName = sanitizeFileName(`${item.itemCategory}_${item.itemName}`);
                 const itemFolder = proofsFolder.folder(itemFolderName);
                 if (!itemFolder) continue;
 
@@ -102,7 +124,7 @@ const ClaimReportGenerator: React.FC<ClaimReportGeneratorProps> = ({ onClose }) 
             const content = await zip.generateAsync({ type: "blob" });
             const link = document.createElement("a");
             link.href = URL.createObjectURL(content);
-            link.download = `Claim_Report_${sanitizeFileName(claimDetails.name)}_${new Date().toISOString().split('T')[0]}.zip`;
+            link.download = `ClaimShield_Dossier_${sanitizeFileName(claimDetails.name)}_${dateStr}.zip`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
@@ -122,7 +144,7 @@ const ClaimReportGenerator: React.FC<ClaimReportGeneratorProps> = ({ onClose }) 
             .reduce((acc, item) => acc + (item.replacementCostValueRCV || item.originalCost || 0), 0);
     }, [claimedItems, selectedItemIds]);
     
-    if (!policy) {
+    if (!policy || !claimDetails) {
         return (
              <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-center items-center p-4" onClick={onClose}>
                 <div className="bg-white rounded-lg shadow-2xl w-full max-w-lg my-8 flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
@@ -131,7 +153,7 @@ const ClaimReportGenerator: React.FC<ClaimReportGeneratorProps> = ({ onClose }) 
                         <button onClick={onClose} className="text-medium rounded-full p-1 hover:text-dark hover:bg-slate-200 transition"><XIcon className="h-6 w-6" /></button>
                     </div>
                     <div className="p-8 text-center text-medium">
-                        <p>An active insurance policy is required to generate a claim report. Please set an active policy and try again.</p>
+                        <p>An active insurance policy and a selected claim are required to generate a claim report. Please check your settings.</p>
                     </div>
                 </div>
             </div>
@@ -142,17 +164,17 @@ const ClaimReportGenerator: React.FC<ClaimReportGeneratorProps> = ({ onClose }) 
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-center items-start p-4 overflow-y-auto" onClick={onClose}>
             <div className="bg-white rounded-lg shadow-2xl w-full max-w-4xl my-8 flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
                 <div className="flex justify-between items-center p-4 md:p-5 border-b bg-slate-50">
-                    <h2 className="text-xl font-bold text-dark font-heading flex items-center gap-2"><DocumentTextIcon className="h-6 w-6 text-primary"/> Claim Report Generator</h2>
+                    <h2 className="text-xl font-bold text-dark font-heading flex items-center gap-2"><DocumentTextIcon className="h-6 w-6 text-primary"/> ClaimShield Package Generator</h2>
                     <button onClick={onClose} className="text-medium rounded-full p-1 hover:text-dark hover:bg-slate-200 transition"><XIcon className="h-6 w-6" /></button>
                 </div>
                 <div className="p-6 md:p-8 grid grid-cols-1 md:grid-cols-2 gap-8 overflow-y-auto">
                     {/* Left: Narrative */}
                     <div className="space-y-4">
                          <div className="flex justify-between items-center">
-                            <h3 className="font-bold text-dark font-heading">Claim Narrative</h3>
+                            <h3 className="font-bold text-dark font-heading">Executive Summary Draft</h3>
                             <button onClick={generateNarrative} disabled={isNarrativeLoading} className="text-xs font-semibold text-primary hover:underline disabled:opacity-50">Refresh</button>
                         </div>
-                        <p className="text-sm text-medium">The AI has drafted a cover letter for your claim. You can edit it here before exporting.</p>
+                        <p className="text-sm text-medium">AI-generated summary of the loss event. Edit for accuracy before locking the dossier.</p>
                         {isNarrativeLoading ? (
                             <div className="h-64 flex items-center justify-center bg-slate-100 rounded-md"><SpinnerIcon className="h-8 w-8 text-primary"/></div>
                         ) : (
@@ -161,15 +183,15 @@ const ClaimReportGenerator: React.FC<ClaimReportGeneratorProps> = ({ onClose }) 
                     </div>
                     {/* Right: Items */}
                     <div className="space-y-4">
-                        <h3 className="font-bold text-dark font-heading">Included Items ({selectedItemIds.length} / {claimedItems.length})</h3>
-                        <p className="text-sm text-medium">Select which claimed items to include in this report package.</p>
+                        <h3 className="font-bold text-dark font-heading">Forensic Inventory ({selectedItemIds.length} items)</h3>
+                        <p className="text-sm text-medium">Select items to include in the sworn proof of loss.</p>
                         {selectedItemIds.length > 5 && (
                              <div className="p-3 bg-amber-100 border-l-4 border-amber-500 text-amber-900">
                                 <div className="flex">
                                     <div className="flex-shrink-0"><ExclamationTriangleIcon className="h-5 w-5 text-amber-500" /></div>
                                     <div className="ml-3">
                                         <p className="text-sm font-bold">Strategic Warning</p>
-                                        <p className="mt-1 text-xs">Submitting a large number of items in a single claim may attract additional scrutiny. For best results, consider generating separate reports for smaller batches of high-value items.</p>
+                                        <p className="mt-1 text-xs">Submitting a large number of items in a single claim may attract additional scrutiny. Ensure all selected items have "Green" proof status.</p>
                                     </div>
                                 </div>
                             </div>
@@ -193,14 +215,14 @@ const ClaimReportGenerator: React.FC<ClaimReportGeneratorProps> = ({ onClose }) 
                 </div>
                 <div className="flex justify-between items-center p-4 bg-slate-50 border-t space-x-3">
                      <div>
-                        <p className="text-sm text-medium">Total Report Value:</p>
+                        <p className="text-sm text-medium">Total Claim Value:</p>
                         <p className="text-lg font-bold text-dark">${totalSelectedValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                     </div>
                     <div className="flex items-center gap-3">
                         <button onClick={onClose} className="px-4 py-2 text-sm font-semibold bg-white text-medium border border-slate-300 rounded-md shadow-sm hover:bg-slate-50 transition">Cancel</button>
                         <button onClick={handleGenerateZip} disabled={isGenerating || selectedItemIds.length === 0} className="flex items-center justify-center space-x-2 px-6 py-3 text-base font-semibold bg-primary text-white rounded-md shadow-sm hover:bg-primary-dark transition disabled:opacity-50">
                             {isGenerating ? <SpinnerIcon className="h-6 w-6"/> : <DocumentTextIcon className="h-6 w-6"/>}
-                            <span>{isGenerating ? 'Generating...' : `Generate Package (${selectedItemIds.length})`}</span>
+                            <span>{isGenerating ? 'Compiling Dossier...' : `Download ClaimShield Package`}</span>
                         </button>
                     </div>
                 </div>

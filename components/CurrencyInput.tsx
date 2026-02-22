@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 
 interface CurrencyInputProps {
@@ -40,9 +41,9 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({ value, onChange, .
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const inputValue = e.target.value;
     
+    // Allow empty or currency symbol
     if (inputValue === '' || inputValue === '$') {
         setDisplayValue('');
-        onChange(0);
         return;
     }
     
@@ -53,15 +54,21 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({ value, onChange, .
     }
 
     setDisplayValue(sanitizedValue);
-    
-    const numericValue = parseCurrency(sanitizedValue);
-    onChange(numericValue);
   };
 
   const handleBlur = () => {
     const numericValue = parseCurrency(displayValue);
+    // Auto-save happens here
+    onChange(numericValue);
     setDisplayValue(formatCurrency(numericValue));
   };
+  
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter') {
+          handleBlur();
+          (e.target as HTMLInputElement).blur();
+      }
+  }
   
   const handleFocus = () => {
     // On focus, show the raw number for easier editing
@@ -78,6 +85,7 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({ value, onChange, .
             onChange={handleChange}
             onBlur={handleBlur}
             onFocus={handleFocus}
+            onKeyDown={handleKeyDown}
             {...rest}
             className={`${rest.className} pl-7 text-right`}
         />

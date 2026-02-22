@@ -1,51 +1,43 @@
+
 import React from 'react';
-// Fix: Added .ts extension to file path
 import { SyncStatus } from '../types.ts';
-import { SpinnerIcon, CloudArrowUpIcon, CheckCircleIcon, ExclamationCircleIcon } from './icons';
+import { SpinnerIcon, CloudArrowUpIcon, CheckCircleIcon, ExclamationCircleIcon } from './icons.tsx';
 
 interface SyncStatusIndicatorProps {
   status: SyncStatus;
-  onSync: () => void;
 }
 
-export const SyncStatusIndicator: React.FC<SyncStatusIndicatorProps> = ({ status, onSync }) => {
+export const SyncStatusIndicator: React.FC<SyncStatusIndicatorProps> = ({ status }) => {
   const statusConfig = {
     idle: {
       Icon: CloudArrowUpIcon,
-      text: 'Sync Now',
-      color: 'text-medium hover:text-primary',
-      action: onSync,
+      text: 'Saved',
+      color: 'text-slate-400',
     },
     syncing: {
       Icon: SpinnerIcon,
-      text: 'Syncing...',
+      text: 'Saving...',
       color: 'text-primary',
-      action: () => {},
     },
     synced: {
       Icon: CheckCircleIcon,
-      text: 'All changes saved',
-      color: 'text-success',
-      action: () => {},
+      text: 'Synced',
+      color: 'text-emerald-500',
     },
     error: {
       Icon: ExclamationCircleIcon,
-      text: 'Sync Failed',
-      color: 'text-danger',
-      action: onSync,
+      text: 'Sync Error',
+      color: 'text-rose-500',
     },
   };
 
-  const { Icon, text, color, action } = statusConfig[status];
+  // Default to idle if status is undefined
+  const { Icon, text, color } = statusConfig[status || 'idle'];
 
   return (
-    <button
-      onClick={action}
-      disabled={status === 'syncing' || status === 'synced'}
-      className={`flex items-center space-x-2 text-sm font-medium transition-colors disabled:cursor-default ${color}`}
-    >
-      <Icon className="h-5 w-5" />
-      <span>{text}</span>
-    </button>
+    <div className={`flex items-center gap-1.5 text-xs font-semibold transition-colors duration-300 ${color}`} title="Data Persistence Status">
+      <Icon className={`h-3.5 w-3.5 ${status === 'syncing' ? 'animate-spin' : ''}`} />
+      <span className="hidden sm:inline">{text}</span>
+    </div>
   );
 };

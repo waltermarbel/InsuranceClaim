@@ -21,13 +21,16 @@ import {
     PhotoIcon,
     DocumentTextIcon,
     SpinnerIcon,
-    CalculatorIcon
+    CalculatorIcon,
+    CloudArrowUpIcon,
+    XIcon
 } from './icons.tsx';
 import { CATEGORY_ICONS, CATEGORIES, CATEGORY_COLORS } from '../constants.ts';
 import BulkEditModal from './BulkEditModal.tsx';
 import ImportCSVModal from './ImportCSVModal.tsx';
 import RiskHeatmap from './RiskHeatmap.tsx';
 import ScenarioSimulatorModal from './ScenarioSimulatorModal.tsx';
+import DigitalDiscoveryModal from './DigitalDiscoveryModal.tsx'; // Import new modal
 import { exportToCSV } from '../utils/fileUtils.ts';
 import { useProofDataUrl } from '../hooks/useProofDataUrl.ts';
 import * as geminiService from '../services/geminiService.ts';
@@ -95,7 +98,7 @@ const DashboardThumbnail: React.FC<{ proof: Proof; categoryIcon: React.ElementTy
 };
 
 const StatCard = ({ title, value, subtext, icon: Icon, colorClass, progress, target }: any) => (
-    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] flex items-start space-x-4 transition-transform hover:-translate-y-1 duration-300">
+    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-start space-x-4 transition-transform hover:-translate-y-1 duration-300">
         <div className={`p-3 rounded-lg ${colorClass} bg-opacity-10`}>
             <Icon className={`h-6 w-6 ${colorClass.replace('bg-', 'text-')}`} />
         </div>
@@ -122,8 +125,9 @@ const StatCard = ({ title, value, subtext, icon: Icon, colorClass, progress, tar
 );
 
 const StatusBadge: React.FC<{ item: InventoryItem }> = ({ item }) => {
-    const hasReceipt = item.linkedProofs.some(p => p.type === 'document' || p.purpose === 'Proof of Purchase');
-    const hasPhoto = item.linkedProofs.some(p => p.type === 'image');
+    const proofs = item.linkedProofs || [];
+    const hasReceipt = proofs.some(p => p.type === 'document' || p.purpose === 'Proof of Purchase');
+    const hasPhoto = proofs.some(p => p.type === 'image');
     const hasSerial = !!item.serialNumber;
     
     if(item.status === 'enriching') {
@@ -165,13 +169,14 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [showBulkEdit, setShowBulkEdit] = useState(false);
     const [showImportModal, setShowImportModal] = useState(false);
+    const [showDiscoveryModal, setShowDiscoveryModal] = useState(false); // New state
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' } | null>(null);
     const [riskGaps, setRiskGaps] = useState<RiskGap[]>([]);
     const [isRiskLoading, setIsRiskLoading] = useState(false);
     const [showSimulator, setShowSimulator] = useState(false);
 
     const activePolicy = policies.find(p => p.isActive);
-    const personalPropertyLimit = activePolicy?.coverage.find(c => c.type === 'main' && c.category === 'Personal Property')?.limit || 95000;
+    const personalPropertyLimit = activePolicy?.coverage ? (activePolicy.coverage.find(c => c.type === 'main' && c.category === 'Personal Property')?.limit || 95000) : 95000;
 
     useEffect(() => {
         const fetchRiskData = async () => {
@@ -202,17 +207,17 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
 
     const getSortValue = (item: InventoryItem, key: SortKey) => {
         if (key === 'replacementCostValueRCV') return item.replacementCostValueRCV || item.originalCost || 0;
-        if (key === 'itemName') return item.itemName.toLowerCase();
-        if (key === 'itemCategory') return item.itemCategory.toLowerCase();
-        if (key === 'status') return item.status.toLowerCase();
+        if (key === 'itemName') return item.itemName ? item.itemName.toLowerCase() : '';
+        if (key === 'itemCategory') return item.itemCategory ? item.itemCategory.toLowerCase() : '';
+        if (key === 'status') return item.status ? item.status.toLowerCase() : '';
         // default to direct access (originalCost)
         return (item as any)[key];
     };
 
     const tableData = useMemo(() => {
         let data = inventory.filter(item => 
-            item.itemName.toLowerCase().includes(searchTerm?.toLowerCase() || '') ||
-            item.itemCategory.toLowerCase().includes(searchTerm?.toLowerCase() || '')
+            (item.itemName && item.itemName.toLowerCase().includes(searchTerm?.toLowerCase() || '')) ||
+            (item.itemCategory && item.itemCategory.toLowerCase().includes(searchTerm?.toLowerCase() || ''))
         );
 
         if (sortConfig) {
@@ -239,8 +244,8 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
     const stats = useMemo(() => {
         const totalVal = tableData.reduce((acc, item) => acc + (item.replacementCostValueRCV || item.originalCost || 0), 0);
         const readyCount = tableData.filter(i => 
-            i.linkedProofs.some(p => p.type === 'image') && 
-            i.linkedProofs.some(p => p.type === 'document' || p.purpose === 'Proof of Purchase')
+            (i.linkedProofs || []).some(p => p.type === 'image') && 
+            (i.linkedProofs || []).some(p => p.type === 'document' || p.purpose === 'Proof of Purchase')
         ).length;
         return {
             totalRCV: totalVal,
@@ -328,7 +333,7 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
             <RiskHeatmap gaps={riskGaps} isLoading={isRiskLoading} />
 
             {/* Toolbar */}
-            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm sticky top-20 z-20">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm sticky top-20 z-20 transition-all duration-300 ease-in-out">
                 <div className="flex items-center gap-2 w-full sm:w-auto">
                     <div className="relative flex-grow sm:flex-grow-0 group">
                         <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-primary transition-colors" />
@@ -349,6 +354,14 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                         className="hidden sm:flex items-center gap-2 px-4 py-2 text-primary font-bold bg-primary/10 rounded-lg hover:bg-primary/20 transition text-sm"
                     >
                         <CalculatorIcon className="h-4 w-4"/> What If?
+                    </button>
+
+                     {/* Cloud Discovery Button (New) */}
+                     <button 
+                        onClick={() => setShowDiscoveryModal(true)}
+                        className="hidden sm:flex items-center gap-2 px-4 py-2 text-purple-600 font-bold bg-purple-50 hover:bg-purple-100 rounded-lg border border-purple-100 transition text-sm"
+                    >
+                        <CloudArrowUpIcon className="h-4 w-4"/> Digital Discovery
                     </button>
 
                      <button 
@@ -383,10 +396,10 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
             {/* High-Density Data Table */}
             <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-slate-100">
-                        <thead className="bg-slate-50/80">
+                    <table className="min-w-full border-separate border-spacing-y-2 px-4" style={{ borderCollapse: 'separate' }}>
+                        <thead>
                             <tr>
-                                <th scope="col" className="px-4 py-4 w-12">
+                                <th scope="col" className="px-4 py-3 w-12 text-left">
                                      <input 
                                         type="checkbox" 
                                         className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
@@ -396,7 +409,7 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                                 </th>
                                 <th 
                                     scope="col" 
-                                    className="px-6 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 hover:text-slate-700 transition-colors group"
+                                    className="px-6 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:text-primary transition-colors group"
                                     onClick={() => handleSort('itemName')}
                                 >
                                     <div className="flex items-center gap-1">
@@ -406,7 +419,7 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                                 </th>
                                 <th 
                                     scope="col" 
-                                    className="px-6 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 hover:text-slate-700 transition-colors group"
+                                    className="px-6 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:text-primary transition-colors group"
                                     onClick={() => handleSort('itemCategory')}
                                 >
                                     <div className="flex items-center gap-1">
@@ -416,7 +429,7 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                                 </th>
                                 <th 
                                     scope="col" 
-                                    className="px-6 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 hover:text-slate-700 transition-colors group"
+                                    className="px-6 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:text-primary transition-colors group"
                                     onClick={() => handleSort('originalCost')}
                                 >
                                     <div className="flex items-center justify-end gap-1">
@@ -426,7 +439,7 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                                 </th>
                                 <th 
                                     scope="col" 
-                                    className="px-6 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 hover:text-slate-700 transition-colors group"
+                                    className="px-6 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:text-primary transition-colors group"
                                     onClick={() => handleSort('replacementCostValueRCV')}
                                 >
                                     <div className="flex items-center justify-end gap-1">
@@ -436,7 +449,7 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                                 </th>
                                 <th 
                                     scope="col" 
-                                    className="px-6 py-3 text-center text-[11px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 hover:text-slate-700 transition-colors group"
+                                    className="px-6 py-3 text-center text-[11px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:text-primary transition-colors group"
                                     onClick={() => handleSort('status')}
                                 >
                                     <div className="flex items-center justify-center gap-1">
@@ -447,22 +460,22 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                                 <th scope="col" className="relative px-6 py-3"><span className="sr-only">Edit</span></th>
                             </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-slate-50">
+                        <tbody>
                             {tableData.map((item) => {
                                 const CategoryIcon = CATEGORY_ICONS[item.itemCategory] || CATEGORY_ICONS['Other'];
                                 const categoryColor = CATEGORY_COLORS[item.itemCategory] || '#94a3b8';
                                 const isSelected = selectedIds.has(item.id);
                                 
                                 // Prioritize showing an image proof if available
-                                const displayProof = item.linkedProofs.find(p => p.type === 'image' || p.mimeType.startsWith('image/')) || item.linkedProofs[0];
+                                const displayProof = (item.linkedProofs || []).find(p => p.type === 'image' || p.mimeType.startsWith('image/')) || (item.linkedProofs || [])[0];
 
                                 return (
                                     <tr 
                                         key={item.id} 
-                                        className={`group transition-all duration-200 cursor-pointer ${isSelected ? 'bg-blue-50/50 hover:bg-blue-50' : 'hover:bg-slate-50'}`}
+                                        className={`group transition-all duration-300 cursor-pointer rounded-lg shadow-sm border border-transparent hover:shadow-md hover:border-slate-200 ${isSelected ? 'bg-blue-50/50 hover:bg-blue-50' : 'bg-white hover:bg-white'}`}
                                         onClick={() => dispatch({ type: 'SELECT_ITEM', payload: item.id })}
                                     >
-                                        <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                                        <td className="px-4 py-4 rounded-l-lg" onClick={(e) => e.stopPropagation()}>
                                              <input 
                                                 type="checkbox" 
                                                 className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
@@ -491,7 +504,7 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-700">
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-slate-50 text-slate-700 border border-slate-100">
                                                 <CategoryIcon className="h-3.5 w-3.5 mr-1.5" style={{ color: categoryColor }}/>
                                                 {item.itemCategory}
                                             </span>
@@ -506,8 +519,8 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                                         <td className="px-6 py-4 whitespace-nowrap text-center">
                                             <StatusBadge item={item} />
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <span className="text-primary opacity-0 group-hover:opacity-100 transition-opacity font-semibold text-xs uppercase tracking-wide">View</span>
+                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium rounded-r-lg">
+                                            <span className="text-primary opacity-0 group-hover:opacity-100 transition-opacity font-semibold text-xs uppercase tracking-wide bg-primary/5 px-3 py-1 rounded-full">Edit</span>
                                         </td>
                                     </tr>
                                 );
@@ -532,29 +545,41 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
 
             {/* Floating Bulk Actions Bar */}
             {selectedIds.size > 0 && (
-                <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white rounded-full shadow-2xl px-6 py-3 flex items-center gap-6 z-50 animate-fade-in-up border border-slate-700/50 backdrop-blur-md bg-opacity-95">
-                    <span className="font-bold text-sm whitespace-nowrap pl-2">{selectedIds.size} Selected</span>
-                    <div className="h-5 w-px bg-slate-700"></div>
-                    <div className="flex items-center gap-2">
+                <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 bg-slate-900/95 text-white rounded-full shadow-2xl px-6 py-3 flex items-center gap-6 z-50 animate-fade-in-up border border-slate-700/50 backdrop-blur-md">
+                    <div className="flex items-center gap-3">
+                        <div className="bg-primary text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                            {selectedIds.size}
+                        </div>
+                        <span className="font-semibold text-sm whitespace-nowrap">Selected</span>
+                    </div>
+                    
+                    <div className="h-6 w-px bg-slate-700/50"></div>
+                    
+                    <div className="flex items-center gap-1">
                         <button 
                             onClick={() => setShowBulkEdit(true)}
-                            className="flex items-center gap-2 px-4 py-2 rounded-full hover:bg-white/10 transition text-sm font-semibold"
+                            className="flex items-center gap-2 px-4 py-2 rounded-full hover:bg-white/10 transition text-sm font-semibold group"
                         >
-                            <PencilSquareIcon className="h-4 w-4"/> Edit
+                            <PencilSquareIcon className="h-4 w-4 text-slate-400 group-hover:text-white transition-colors"/> 
+                            Edit
                         </button>
                         <button 
                              onClick={handleBulkDelete}
-                             className="flex items-center gap-2 px-4 py-2 rounded-full hover:bg-rose-500/20 text-rose-300 hover:text-rose-200 transition text-sm font-semibold"
+                             className="flex items-center gap-2 px-4 py-2 rounded-full hover:bg-rose-500/20 text-rose-300 hover:text-rose-200 transition text-sm font-semibold group"
                         >
-                            <TrashIcon className="h-4 w-4"/> Delete
+                            <TrashIcon className="h-4 w-4 group-hover:text-rose-200"/> 
+                            Delete
                         </button>
                     </div>
-                    <div className="h-5 w-px bg-slate-700"></div>
+
+                    <div className="h-6 w-px bg-slate-700/50"></div>
+                    
                     <button 
                         onClick={() => setSelectedIds(new Set())} 
-                        className="text-slate-400 hover:text-white text-xs font-semibold uppercase tracking-wider pr-2"
+                        className="flex items-center gap-2 text-slate-400 hover:text-white text-xs font-bold uppercase tracking-wider pl-1 pr-2 transition-colors"
                     >
-                        Clear
+                        <XIcon className="h-4 w-4"/>
+                        Clear Selection
                     </button>
                 </div>
             )}
@@ -581,6 +606,13 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                 <ImportCSVModal 
                     onClose={() => setShowImportModal(false)} 
                     onImport={onImportInventory}
+                />
+            )}
+
+            {showDiscoveryModal && (
+                <DigitalDiscoveryModal 
+                    onClose={() => setShowDiscoveryModal(false)}
+                    onImport={onImportInventory!} // Assuming onImportInventory is provided in props
                 />
             )}
             

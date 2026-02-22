@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useLayoutEffect } from 'react';
 import { useAppState, useAppDispatch } from './context/AppContext.tsx';
 import { Header } from './components/Header.tsx';
 import InventoryDashboard from './components/InventoryDashboard.tsx';
@@ -19,13 +19,13 @@ import PolicyReviewModal from './components/PolicyReviewModal.tsx';
 import { SpinnerIcon } from './components/icons.tsx';
 import * as geminiService from './services/geminiService.ts';
 import * as storageService from './services/storageService.ts';
-import { InventoryItem, Proof, AutonomousInventoryItem, ProcessingInference, PolicyAnalysisReport } from './types.ts';
+import { InventoryItem, Proof, AutonomousInventoryItem, ProcessingInference, PolicyAnalysisReport, PipelineItem } from './types.ts';
 import { urlToDataUrl, dataUrlToBlob, sanitizeFileName, exportToZip, fileToDataUrl, blobToDataUrl } from './utils/fileUtils.ts';
 
 const App: React.FC = () => {
     const state = useAppState();
     const dispatch = useAppDispatch();
-    const { inventory, isInitialized, currentView, selectedItemId } = state;
+    const { inventory, isInitialized, currentView, selectedItemId, lastScrollPosition, processingQueue } = state;
     
     // Workflow State
     const [activeTab, setActiveTab] = useState<'evidence' | 'inventory' | 'claim'>('inventory');
@@ -34,7 +34,7 @@ const App: React.FC = () => {
 
     // Modal/Overlay State
     const [showAssistant, setShowAssistant] = useState(false);
-    const [showSaveModal, setShowSaveModal] = useState(false);
+    const [showSaveModal, setShowSaveModal] = useState(true);
     const [showWebItemModal, setShowWebItemModal] = useState(false);
     const [uploadProgress, setUploadProgress] = useState<Record<string, { loaded: number, total: number }> | null>(null);
     
@@ -48,10 +48,7 @@ const App: React.FC = () => {
     const [generatingImageItem, setGeneratingImageItem] = useState<InventoryItem | null>(null);
     const [recordingAudioItem, setRecordingAudioItem] = useState<InventoryItem | null>(null);
 
-    // Processing State
-    const [pipelineStage, setPipelineStage] = useState<'idle' | 'processing'>('idle');
-    const [pipelineProgress, setPipelineProgress] = useState({ current: 0, total: 0, fileName: '' });
-    const [processingQueue, setProcessingQueue] = useState<File[]>([]);
+    // Processing State (Durable Ledger Logic)
     const [accumulatedReviewItems, setAccumulatedReviewItems] = useState<InventoryItem[]>([]);
 
     const logActivity = useCallback((action: string, details: string, app: 'VeritasVault' | 'Gemini' = 'VeritasVault') => {
@@ -152,6 +149,34 @@ startxref
         initStaticData();
     }, [isInitialized]);
 
+    // --- SCROLL PERSISTENCE ---
+    // Restore scroll position when view is mounted/initialized
+    useLayoutEffect(() => {
+        if (isInitialized && lastScrollPosition !== undefined && lastScrollPosition > 0) {
+            window.scrollTo(0, lastScrollPosition);
+        }
+    }, [isInitialized]); // Run once when app initializes
+
+    // Track scroll position
+    useEffect(() => {
+        if (!isInitialized) return;
+
+        let scrollTimeout: number;
+        const handleScroll = () => {
+            if (scrollTimeout) clearTimeout(scrollTimeout);
+            scrollTimeout = window.setTimeout(() => {
+                dispatch({ type: 'UPDATE_SCROLL', payload: window.scrollY });
+            }, 200); // Debounce scroll updates
+        };
+
+        window.addEventListener('scroll', handleScroll);
+        return () => {
+            window.removeEventListener('scroll', handleScroll);
+            if (scrollTimeout) clearTimeout(scrollTimeout);
+        };
+    }, [isInitialized, dispatch]);
+
+
     // --- NAVIGATION HANDLER ---
     const handleNavigate = (tab: 'evidence' | 'inventory' | 'claim') => {
         setActiveTab(tab);
@@ -182,7 +207,7 @@ startxref
             logActivity('EXPORT_CREATED', 'User created a forensic ZIP export.');
         } catch (error) {
             console.error("Export failed:", error);
-            alert("Export failed. Please try again.");
+            alert("Export failed. Please check console for details.");
         }
     }, [state.inventory, state.unlinkedProofs, logActivity]);
 
@@ -199,71 +224,81 @@ startxref
             try {
                 // 1. Web Intelligence
                 if (!item.webIntelligence || item.webIntelligence.length === 0) {
-                    const webData = await geminiService.enrichAssetFromWeb(item);
-                    if (webData && webData.facts.length > 0) {
-                        updatedItem.webIntelligence = [webData];
-                        if (updatedItem.itemDescription.length < 20 && webData.facts[0].fact) {
-                            updatedItem.itemDescription = `${updatedItem.itemDescription}\n\nSpecs: ${webData.facts[0].fact}`;
+                    try {
+                        const webData = await geminiService.enrichAssetFromWeb(item);
+                        if (webData && webData.facts.length > 0) {
+                            updatedItem.webIntelligence = [webData];
+                            if (updatedItem.itemDescription.length < 20 && webData.facts[0].fact) {
+                                updatedItem.itemDescription = `${updatedItem.itemDescription}\n\nSpecs: ${webData.facts[0].fact}`;
+                            }
                         }
-                    }
+                    } catch (e) { console.warn("Web enrich failed", e); }
                 }
 
                 // 2. Market Valuation
                 if (!item.replacementCostValueRCV || item.replacementCostValueRCV === 0) {
-                    const pricing = await geminiService.findMarketPrice(updatedItem);
-                    if (pricing) {
-                        updatedItem.replacementCostValueRCV = pricing.rcv;
-                        updatedItem.actualCashValueACV = pricing.acv;
-                        updatedItem.valuationHistory = [pricing];
-                    }
+                    try {
+                        const pricing = await geminiService.findMarketPrice(updatedItem);
+                        if (pricing) {
+                            updatedItem.replacementCostValueRCV = pricing.rcv;
+                            updatedItem.actualCashValueACV = pricing.acv;
+                            updatedItem.valuationHistory = [pricing];
+                        }
+                    } catch (e) { console.warn("Pricing failed", e); }
                 }
 
                 // 3. Auto-Link Evidence (Fuzzy Match)
+                // Filter locally first to avoid re-linking proofs already taken in this batch
                 const availableProofs = state.unlinkedProofs.filter(p => !batchClaimedProofIds.has(p.id));
+                
                 if (availableProofs.length > 0) {
-                    const matchResult = await geminiService.fuzzyMatchProofs(updatedItem, availableProofs);
-                    const bestMatch = matchResult.suggestions.sort((a, b) => b.confidence - a.confidence)[0];
-                    
-                    if (bestMatch && bestMatch.confidence >= 80) {
-                        const proof = availableProofs.find(p => p.id === bestMatch.proofId);
-                        if (proof) {
-                            updatedItem.linkedProofs = [...updatedItem.linkedProofs, proof];
-                            updatedItem.status = 'active'; 
-                            updatedItem.proofStrengthScore = (updatedItem.proofStrengthScore || 0) + 20; 
-                            
-                            batchClaimedProofIds.add(proof.id);
-                            dispatch({ type: 'REMOVE_UNLINKED_PROOF', payload: proof.id });
-                            
-                            logActivity('AUTO_LINKED_PROOF', `Linked ${proof.fileName} to ${updatedItem.itemName} (${bestMatch.confidence}% match)`, 'Gemini');
+                    try {
+                        const matchResult = await geminiService.fuzzyMatchProofs(updatedItem, availableProofs);
+                        const bestMatch = matchResult.suggestions.sort((a, b) => b.confidence - a.confidence)[0];
+                        
+                        if (bestMatch && bestMatch.confidence >= 80) {
+                            const proof = availableProofs.find(p => p.id === bestMatch.proofId);
+                            if (proof) {
+                                updatedItem.linkedProofs = [...updatedItem.linkedProofs, proof];
+                                updatedItem.status = 'active'; 
+                                updatedItem.proofStrengthScore = (updatedItem.proofStrengthScore || 0) + 20; 
+                                
+                                batchClaimedProofIds.add(proof.id);
+                                dispatch({ type: 'REMOVE_UNLINKED_PROOF', payload: proof.id });
+                                
+                                logActivity('AUTO_LINKED_PROOF', `Linked ${proof.fileName} to ${updatedItem.itemName} (${bestMatch.confidence}% match)`, 'Gemini');
+                            }
+                        } else if (matchResult.suggestions.length > 0) {
+                            updatedItem.suggestedProofs = matchResult.suggestions;
                         }
-                    } else if (matchResult.suggestions.length > 0) {
-                        updatedItem.suggestedProofs = matchResult.suggestions;
-                    }
+                    } catch (e) { console.warn("Fuzzy match failed", e); }
                 }
 
                 // 4. Missing Image Recovery (Web)
                 if (updatedItem.linkedProofs.length === 0) {
-                     const imageResult = await geminiService.findProductImageFromWeb(updatedItem);
-                     if (imageResult && imageResult.imageUrl) {
-                        const dataUrl = await urlToDataUrl(imageResult.imageUrl);
-                        const blob = dataUrlToBlob(dataUrl);
-                        const cleanItemName = sanitizeFileName(`${updatedItem.brand || ''}_${updatedItem.itemName}`);
-                        const newProof: Proof = {
-                            id: `proof-auto-${Date.now()}`,
-                            type: 'image',
-                            fileName: `web_ref_${cleanItemName}.jpg`,
-                            // dataUrl: dataUrl, // Removed to save state size
-                            mimeType: blob.type || 'image/jpeg',
-                            createdBy: 'AI',
-                            purpose: 'Proof of Possession', 
-                            notes: `Sourced from: ${imageResult.source}`
-                        };
-                        
-                        await storageService.saveProof(newProof, blob);
-                        
-                        updatedItem.linkedProofs = [newProof];
-                        updatedItem.status = 'active'; 
-                     }
+                     try {
+                         const imageResult = await geminiService.findProductImageFromWeb(updatedItem);
+                         if (imageResult && imageResult.imageUrl) {
+                            const dataUrl = await urlToDataUrl(imageResult.imageUrl);
+                            const blob = dataUrlToBlob(dataUrl);
+                            const cleanItemName = sanitizeFileName(`${updatedItem.brand || ''}_${updatedItem.itemName}`);
+                            const newProof: Proof = {
+                                id: `proof-auto-${Date.now()}`,
+                                type: 'image',
+                                fileName: `web_ref_${cleanItemName}.jpg`,
+                                // dataUrl: dataUrl, // Removed to save state size
+                                mimeType: blob.type || 'image/jpeg',
+                                createdBy: 'AI',
+                                purpose: 'Proof of Possession', 
+                                notes: `Sourced from: ${imageResult.source}`
+                            };
+                            
+                            await storageService.saveProof(newProof, blob);
+                            
+                            updatedItem.linkedProofs = [newProof];
+                            updatedItem.status = 'active'; 
+                         }
+                     } catch (e) { console.warn("Web image find failed", e); }
                 }
 
                 // 5. Visual Extraction (Vision API)
@@ -297,13 +332,16 @@ startxref
                             }
                          } catch (e) {
                              console.error("Visual extraction failed", e);
+                             logActivity('VISUAL_EXTRACTION_ERROR', `Failed to extract details for ${updatedItem.itemName}`, 'Gemini');
                          }
                     }
                 }
 
                 // Recalculate proof strength
-                const strength = await geminiService.calculateProofStrength(updatedItem);
-                updatedItem.proofStrengthScore = strength.score;
+                try {
+                    const strength = await geminiService.calculateProofStrength(updatedItem);
+                    updatedItem.proofStrengthScore = strength.score;
+                } catch (e) { console.warn("Strength calc failed", e); }
 
                 updatedItem.status = updatedItem.status === 'needs-review' ? 'needs-review' : 'active';
                 dispatch({ type: 'UPDATE_ITEM', payload: updatedItem });
@@ -460,7 +498,7 @@ startxref
     }, [dispatch, runForensicEnrichment, logActivity]);
 
 
-    // --- AUTONOMOUS PROCESSING PIPELINE ---
+    // --- AUTONOMOUS PROCESSING PIPELINE (DURABLE LEDGER) ---
     const handleFileUploads = useCallback(async (files: FileList) => {
         const filesArray = Array.from(files);
         if (filesArray.length === 0) return;
@@ -468,107 +506,169 @@ startxref
         setActiveTab('inventory');
         dispatch({ type: 'SET_VIEW', payload: 'autonomous-processor' });
         
-        setProcessingQueue(filesArray);
-        setPipelineStage('processing');
-        setPipelineProgress({ current: 0, total: filesArray.length, fileName: 'Initializing AI Pipeline...' });
+        const newPipelineItems: PipelineItem[] = [];
+
+        // 1. Persist blobs immediately and create ledger entries
+        for (const file of filesArray) {
+            const proofId = `proof-auto-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+            // Save raw blob
+            const dummyProof: Proof = { 
+                id: proofId, 
+                fileName: file.name, 
+                mimeType: file.type, 
+                type: 'document', // placeholder
+                createdBy: 'AI'
+            };
+            await storageService.saveProof(dummyProof, file);
+
+            newPipelineItems.push({
+                id: `pipe-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                proofId: proofId,
+                fileName: file.name,
+                mimeType: file.type,
+                status: 'pending',
+                retries: 0
+            });
+        }
+
+        dispatch({ type: 'ENQUEUE_PIPELINE_ITEMS', payload: newPipelineItems });
+        // The useEffect below will react to the queue change
     }, [dispatch]);
 
+    // Pipeline Processor Effect
     useEffect(() => {
-        if (pipelineStage !== 'processing') return;
+        if (!processingQueue || processingQueue.length === 0) return;
 
-        if (processingQueue.length === 0) {
-            setPipelineStage('idle');
-            if (accumulatedReviewItems.length > 0) {
-                dispatch({ type: 'SET_VIEW', payload: 'autonomous-review' });
-            } else {
-                dispatch({ type: 'SET_VIEW', payload: 'dashboard' });
+        // Find the next pending item
+        const nextItem = processingQueue.find(item => item.status === 'pending');
+        
+        // If everything is processed, check if we should switch views
+        if (!nextItem) {
+            const hasProcessing = processingQueue.some(item => item.status === 'processing');
+            if (!hasProcessing) {
+                // All done
+                const processedItems = accumulatedReviewItems; // From state
+                if (processedItems.length > 0 && currentView === 'autonomous-processor') {
+                    // Slight delay to show 100% progress
+                    setTimeout(() => {
+                        dispatch({ type: 'SET_VIEW', payload: 'autonomous-review' });
+                        // Clear the queue or mark as archived? 
+                        // For now, we keep it in state until review is finalized, then clear.
+                    }, 500);
+                } else if (currentView === 'autonomous-processor') {
+                     dispatch({ type: 'SET_VIEW', payload: 'dashboard' });
+                }
             }
             return;
         }
 
-        const BATCH_SIZE = 5;
-        let isCancelled = false;
-
-        const processNextBatch = async () => {
-            const batch = processingQueue.slice(0, BATCH_SIZE);
-            const remainingInQueue = processingQueue.slice(BATCH_SIZE);
-            const processedCount = pipelineProgress.total - processingQueue.length;
-            
-            setPipelineProgress(prev => ({ 
-                ...prev, 
-                current: processedCount + 1, 
-                fileName: `Analyzing batch of ${batch.length} files...` 
-            }));
+        // Process 'nextItem'
+        const processItem = async () => {
+            dispatch({ type: 'UPDATE_PIPELINE_ITEM_STATUS', payload: { id: nextItem.id, status: 'processing' } });
             
             try {
-                // Modified: Now returns { file, result } pairs
-                const results = await geminiService.runAutonomousProcessor(batch);
+                // Retrieve Blob
+                const fileBlob = await storageService.getProofBlob(nextItem.proofId);
+                if (!fileBlob) throw new Error("File blob not found in storage");
+
+                const file = new File([fileBlob], nextItem.fileName, { type: nextItem.mimeType });
                 
-                const newItems: InventoryItem[] = [];
+                // Run AI (Single item batch)
+                const results = await geminiService.runAutonomousProcessor([file]);
+                const result = results[0];
 
-                for (const { file, result: item } of results) {
-                    if (!item) continue;
-
-                    // 1. Create a Proof record for the file
-                    const proofId = `proof-auto-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
-                    const proof: Proof = {
-                        id: proofId,
-                        type: file.type.startsWith('image/') ? 'image' : 'document',
-                        fileName: file.name,
-                        mimeType: file.type,
-                        createdBy: 'AI', // Changed from 'AI Autonomous' to 'AI' to match Proof interface
-                        purpose: 'Proof of Possession',
-                        sourceType: 'local'
-                    };
-                    
-                    // 2. Persist the file content
-                    await storageService.saveProof(proof, file);
-
-                    // 3. Create the Inventory Item, linked to the proof
-                    newItems.push({ 
+                if (result && result.result) {
+                    const itemData = result.result;
+                    // Create Inventory Item
+                    const newItem: InventoryItem = { 
                         id: `item-auto-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`, 
-                        status: 'processing', 
-                        itemName: item.description, 
-                        itemDescription: `${item.ainotes}\n\nSource: ${item.imagesource.join(', ')}`, 
-                        itemCategory: item.category, 
-                        originalCost: item.estimatedvaluercv, 
-                        replacementCostValueRCV: item.estimatedvaluercv, 
-                        purchaseDate: item.lastseendate, 
-                        brand: item.brandmodel.split(' ')[0] || 'Unknown', 
-                        model: item.brandmodel.split(' ').slice(1).join(' ') || '', 
-                        serialNumber: item.serialnumber || undefined, 
-                        linkedProofs: [proof], // Link the proof immediately
+                        status: 'processing', // Will change to active after review
+                        itemName: itemData.description, 
+                        itemDescription: `${itemData.ainotes}\n\nSource: ${itemData.imagesource.join(', ')}`, 
+                        itemCategory: itemData.category, 
+                        originalCost: itemData.estimatedvaluercv, 
+                        replacementCostValueRCV: itemData.estimatedvaluercv, 
+                        purchaseDate: itemData.lastseendate, 
+                        brand: itemData.brandmodel.split(' ')[0] || 'Unknown', 
+                        model: itemData.brandmodel.split(' ').slice(1).join(' ') || '', 
+                        serialNumber: itemData.serialnumber || undefined, 
+                        linkedProofs: [{
+                            id: nextItem.proofId,
+                            type: file.type.startsWith('image/') ? 'image' : 'document',
+                            fileName: file.name,
+                            mimeType: file.type,
+                            createdBy: 'AI',
+                            purpose: 'Proof of Possession',
+                            sourceType: 'local',
+                            notes: itemData.ainotes,
+                            summary: itemData.description
+                        }], 
                         createdAt: new Date().toISOString(), 
                         createdBy: 'AI Autonomous' 
-                    });
-                }
+                    };
 
-                if (!isCancelled) {
-                    setAccumulatedReviewItems(prev => [...prev, ...newItems]);
-                    setProcessingQueue(remainingInQueue);
+                    setAccumulatedReviewItems(prev => [...prev, newItem]);
+                    dispatch({ 
+                        type: 'UPDATE_PIPELINE_ITEM_STATUS', 
+                        payload: { id: nextItem.id, status: 'complete', resultItemId: newItem.id } 
+                    });
+                } else {
+                    throw new Error("AI returned no data");
                 }
 
             } catch (error) {
-                console.error("Batch failed:", error);
-                if (!isCancelled) setProcessingQueue(remainingInQueue);
+                console.error(`Failed to process item ${nextItem.id}:`, error);
+                dispatch({ 
+                    type: 'UPDATE_PIPELINE_ITEM_STATUS', 
+                    payload: { id: nextItem.id, status: 'error', error: String(error) } 
+                });
             }
         };
 
-        processNextBatch();
-        return () => { isCancelled = true; };
-    }, [pipelineStage, processingQueue, accumulatedReviewItems, pipelineProgress.total, dispatch]);
+        processItem();
+
+    }, [processingQueue, accumulatedReviewItems, dispatch, currentView]);
 
 
     const handleFinalizeAutonomousReview = useCallback((approvedItems: InventoryItem[], rejectedItems: InventoryItem[]) => {
         const itemsToAdd = approvedItems.map(i => ({...i, status: 'active' as const}));
         dispatch({ type: 'ADD_INVENTORY_ITEMS', payload: itemsToAdd });
         
+        // Extract proofs from rejected items to add to unlinked locker
+        const rejectedProofs = rejectedItems.flatMap(i => i.linkedProofs);
+        if (rejectedProofs.length > 0) {
+            dispatch({ type: 'ADD_UNLINKED_PROOFS', payload: rejectedProofs });
+            logActivity('AUTO_PIPELINE', `Archived ${rejectedProofs.length} proofs from rejected items to evidence locker`, 'VeritasVault');
+        }
+
         setAccumulatedReviewItems([]);
+        // Clear processed items from the queue to "reset" the pipeline state
+        dispatch({ type: 'CLEAR_PROCESSED_PIPELINE_ITEMS' });
+        
         dispatch({ type: 'SET_VIEW', payload: 'dashboard' });
         
         runForensicEnrichment(itemsToAdd);
 
-    }, [dispatch, runForensicEnrichment]);
+    }, [dispatch, runForensicEnrichment, logActivity]);
+
+    // Calculate progress for UI
+    const queueProgress = useMemo(() => {
+        if (!processingQueue.length) return { current: 0, total: 0, fileName: '' };
+        const completed = processingQueue.filter(i => i.status === 'complete' || i.status === 'error').length;
+        const processingItem = processingQueue.find(i => i.status === 'processing');
+        return {
+            current: completed + (processingItem ? 1 : 0),
+            total: processingQueue.length,
+            fileName: processingItem?.fileName || 'Processing...'
+        };
+    }, [processingQueue]);
+
+    const pipelineStageLabel = useMemo(() => {
+        if (processingQueue.length === 0) return 'idle';
+        if (processingQueue.some(i => i.status === 'processing')) return 'processing';
+        return 'idle';
+    }, [processingQueue]);
+
 
     // --- POLICY INGESTION HANDLERS ---
     const handlePolicyUpload = useCallback(async (file: File) => {
@@ -604,7 +704,14 @@ startxref
 
     const renderContent = () => {
         if (currentView === 'autonomous-processor') {
-            return <ProcessingPage progress={{ stage: pipelineStage, ...pipelineProgress }} onCancel={() => { setPipelineStage('idle'); setProcessingQueue([]); dispatch({ type: 'SET_VIEW', payload: 'dashboard' }); }} />;
+            return <ProcessingPage 
+                progress={{ stage: pipelineStageLabel, ...queueProgress }} 
+                onCancel={() => { 
+                    setAccumulatedReviewItems([]); 
+                    dispatch({ type: 'CLEAR_PROCESSED_PIPELINE_ITEMS' }); 
+                    dispatch({ type: 'SET_VIEW', payload: 'dashboard' }); 
+                }} 
+            />;
         }
         if (currentView === 'autonomous-review') {
             return <BulkReviewPage items={accumulatedReviewItems} onFinalize={handleFinalizeAutonomousReview} />;
@@ -646,7 +753,7 @@ startxref
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 font-sans text-slate-800 antialiased selection:bg-primary/20">
+        <div className="min-h-screen bg-slate-50 font-sans text-slate-800 antialiased selection:bg-primary/20 transition-colors duration-500">
             <Header 
                 activeTab={activeTab}
                 onNavigate={handleNavigate}
@@ -665,7 +772,6 @@ startxref
                     onNavigate={handleNavigate}
                     onSearch={(query) => {
                         setSearchTerm(query);
-                        // Ensure we are on the dashboard/inventory view to see results
                         if(activeTab !== 'inventory' || currentView !== 'dashboard') {
                             handleNavigate('inventory');
                         }

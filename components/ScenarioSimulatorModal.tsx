@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { InventoryItem, ParsedPolicy, ScenarioAnalysis } from '../types.ts';
-import { XIcon, SparklesIcon, SpinnerIcon, ExclamationTriangleIcon, CalculatorIcon, DocumentTextIcon, CheckCircleIcon } from './icons.tsx';
+import { XIcon, SparklesIcon, SpinnerIcon, ExclamationTriangleIcon, CalculatorIcon, DocumentTextIcon, CheckCircleIcon, BoltIcon } from './icons.tsx';
 import * as geminiService from '../services/geminiService.ts';
 
 interface ScenarioSimulatorModalProps {
@@ -33,6 +33,11 @@ const ScenarioSimulatorModal: React.FC<ScenarioSimulatorModalProps> = ({ invento
         }
     };
 
+    const loadDemoScenario = () => {
+        setEventType("Theft / Burglary");
+        setDescription("My MacBook Pro was stolen during a move.");
+    };
+
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex justify-center items-center p-4" onClick={onClose}>
             <div className="bg-white rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
@@ -54,6 +59,14 @@ const ScenarioSimulatorModal: React.FC<ScenarioSimulatorModalProps> = ({ invento
                             </div>
 
                             <div className="space-y-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                                <div className="flex justify-end">
+                                    <button 
+                                        onClick={loadDemoScenario} 
+                                        className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full flex items-center gap-1 hover:bg-indigo-100 transition"
+                                    >
+                                        <BoltIcon className="h-3 w-3"/> Load Demo: Theft during Move
+                                    </button>
+                                </div>
                                 <div>
                                     <label className="block text-xs font-bold uppercase text-slate-400 mb-2">Event Type</label>
                                     <select 

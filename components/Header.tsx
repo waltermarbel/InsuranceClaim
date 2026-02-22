@@ -1,6 +1,8 @@
 
 import React, { useRef } from 'react';
 import { CubeIcon, SparklesIcon, ClipboardDocumentListIcon, FolderIcon, ShieldCheckIcon, ArrowDownTrayIcon } from './icons.tsx';
+import { useAppState, useSyncStatus } from '../context/AppContext.tsx';
+import { SyncStatusIndicator } from './SyncStatusIndicator.tsx';
 
 interface HeaderProps {
     activeTab: 'evidence' | 'inventory' | 'claim';
@@ -15,6 +17,7 @@ export const Header: React.FC<HeaderProps> = ({
     onAskGemini,
     onSave
 }) => {
+  const syncStatus = useSyncStatus();
   
   const getTabClass = (tabName: string) => {
       const baseClass = "flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200";
@@ -60,7 +63,14 @@ export const Header: React.FC<HeaderProps> = ({
           </nav>
 
           {/* Actions */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-4">
+             {/* Sync Indicator */}
+             <div className="hidden sm:block">
+                <SyncStatusIndicator status={syncStatus || 'idle'} />
+             </div>
+
+             <div className="h-6 w-px bg-slate-200 hidden sm:block"></div>
+
              <button
                 onClick={onSave}
                 className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-slate-600 hover:text-primary hover:bg-slate-100 rounded-lg transition-colors"
@@ -69,7 +79,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <ArrowDownTrayIcon className="h-5 w-5"/>
                 <span className="hidden sm:inline">Export</span>
              </button>
-             <div className="h-6 w-px bg-slate-200 mx-1"></div>
+             
              <button
                 onClick={onAskGemini}
                 className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-primary bg-white border border-primary/20 rounded-full shadow-sm hover:shadow-md hover:bg-primary/5 transition-all duration-200 group"

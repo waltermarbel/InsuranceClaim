@@ -14,8 +14,13 @@ interface ProcessingPreviewProps {
 }
 
 const ProcessingPreview: React.FC<ProcessingPreviewProps> = ({ proofs, onFinalize, onCancel, onImageZoom }) => {
-    const { inventory, policies, claimDetails } = useAppState();
+    const { inventory, policies, claims, currentClaimId } = useAppState();
     const policy = useMemo(() => policies.find(p => p.isActive), [policies]);
+    
+    // Derived active claim details
+    const activeClaim = useMemo(() => claims.find(c => c.id === currentClaimId), [claims, currentClaimId]);
+    const claimDetails = activeClaim?.incidentDetails;
+
     const policyHolders = useMemo(() => policy?.policyHolder.split(/ & | and /i).map(s => s.trim()).filter(Boolean) || [], [policy]);
     
     const [inferences, setInferences] = useState<ProcessingInference[]>([]);

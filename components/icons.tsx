@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 
 const iconProps = {
@@ -197,6 +198,12 @@ export const VideoCameraIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) 
   </svg>
 );
 
+export const MicrophoneIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+  <svg {...iconProps} {...props}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
+  </svg>
+);
+
 export const LinkIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   <svg {...iconProps} {...props}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
@@ -265,7 +272,7 @@ export const QueueListIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) =>
 
 export const WrenchScrewdriverIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
     <svg {...iconProps} {...props}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.83-5.83M11.42 15.17L15.17 11.42M5.25 12a.75.75 0 01.75-.75h.01a.75.75 0 01.75.75v.01a.75.75 0 01-.75.75H6a.75.75 0 01-.75-.75V12zm3.007-3.75a.75.75 0 10-1.5 0v.01a.75.75 0 001.5 0V8.25zm5.25 5.25a.75.75 0 10-1.5 0v.01a.75.75 0 001.5 0v-.01zM12 9a.75.75 0 100-1.5.75.75 0 000 1.5zm.75 4.5a.75.75 0 10-1.5 0v.01a.75.75 0 001.5 0v-.01zm-3-3a.75.75 0 10-1.5 0v.01a.75.75 0 001.5 0v-.01zm-3-3a.75.75 0 10-1.5 0v.01a.75.75 0 001.5 0V6zm6 0a.75.75 0 10-1.5 0v.01a.75.75 0 001.5 0V6z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.83-5.83M11.42 15.17L15.17 11.42M5.25 12a.75.75 0 01.75-.75h.01a.75.75 0 01.75.75v.01a.75.75 0 01-.75.75H6a.75.75 0 01-.75-.75V12zm3.007-3.75a.75.75 0 10-1.5 0v.01a.75.75 0 001.5 0V8.25zm5.25 5.25a.75.75 0 10-1.5 0v.01a.75.75 0 001.5 0v-.01zM12 9a.75.75 0 100-1.5.75.75 0 000 1.5zm.75 4.5a.75.75 0 10-1.5 0v.01a.75.75 0 001.5 0v-.01zm-3-3a.75.75 0 10-1.5 0v.01a.75.75 0 001.5 0V6zm6 0a.75.75 0 10-1.5 0v.01a.75.75 0 001.5 0V6z" />
     </svg>
 );
 
@@ -323,6 +330,12 @@ export const MapPinIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
 export const BoltIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   <svg {...iconProps} {...props}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+  </svg>
+);
+
+export const CurrencyDollarIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+  <svg {...iconProps} {...props}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
   </svg>
 );
 

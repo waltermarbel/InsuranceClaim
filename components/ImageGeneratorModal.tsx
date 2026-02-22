@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { InventoryItem } from '../types.ts';
 import { XIcon, SparklesIcon, SpinnerIcon, PhotoIcon } from './icons.tsx';
@@ -12,7 +13,11 @@ interface ImageGeneratorModalProps {
 const aspectRatios = ["1:1", "16:9", "9:16", "4:3", "3:4"];
 
 const ImageGeneratorModal: React.FC<ImageGeneratorModalProps> = ({ item, onClose, onGenerate }) => {
-    const [prompt, setPrompt] = useState(item.itemName);
+    const [prompt, setPrompt] = useState(() => {
+        const parts = [item.brand, item.model, item.itemName];
+        if (item.itemCategory) parts.push(item.itemCategory);
+        return `A realistic product shot of ${parts.filter(Boolean).join(' ')}. Professional lighting, white background.`;
+    });
     const [aspectRatio, setAspectRatio] = useState("1:1");
     const [isLoading, setIsLoading] = useState(false);
     const [generatedImage, setGeneratedImage] = useState<string | null>(null);

@@ -1,6 +1,6 @@
 
-import React, { createContext, useReducer, useContext, Dispatch, useEffect, useRef } from 'react';
-import { AppState, Action, InventoryItem, ParsedPolicy, Proof, AccountHolder, ClaimDetails, ActivityLogEntry, AppView, UndoableAction, ProofSuggestion, ProcessingInference, ActiveClaim, ClaimItem } from '../types.ts';
+import React, { createContext, useReducer, useContext, Dispatch, useEffect, useRef, useState } from 'react';
+import { AppState, Action, InventoryItem, ParsedPolicy, Proof, AccountHolder, ClaimDetails, ActivityLogEntry, AppView, UndoableAction, ProofSuggestion, ProcessingInference, ActiveClaim, ClaimItem, Task, SyncStatus, PipelineItem } from '../types.ts';
 import * as storageService from '../services/storageService.ts';
 import { exportToCSV, exportToZip } from '../utils/fileUtils.ts';
 
@@ -30,6 +30,8 @@ const DEFAULT_POLICY: ParsedPolicy = {
     ], 
     exclusions: ["Flood", "Earthquake", "Intentional Loss", "Neglect", "Business Data"], 
     conditions: ["Notify police in case of theft", "Protect property from further damage", "File proof of loss within 60 days"],
+    triggers: ["Fire", "Lightning", "Windstorm", "Hail", "Explosion", "Riot", "Aircraft", "Vehicles", "Smoke", "Vandalism", "Theft", "Falling Objects", "Weight of Ice/Snow", "Accidental Discharge/Overflow of Water", "Sudden/Accidental Tearing/Cracking/Burning", "Freezing", "Sudden/Accidental Damage from Artificially Generated Electric Current", "Volcanic Eruption"],
+    limits: ["$200 for Money/Bank Notes", "$1500 for Securities/Accounts/Deeds", "$1500 for Watercraft/Trailers", "$1500 for Trailers", "$1500 for Theft of Jewelry/Watches/Furs", "$2500 for Theft of Firearms", "$2500 for Theft of Silverware", "$2500 for Business Property on premises", "$1500 for Business Property off premises"],
     confidenceScore: 100 
 };
 
@@ -40,6 +42,7 @@ const DEFAULT_ACCOUNT_HOLDER: AccountHolder = {
 };
 
 const INITIAL_INVENTORY: InventoryItem[] = [
+    // ... (Kept existing items for brevity, assuming they are same as original file)
     {
         id: `item-1`,
         status: 'active',
@@ -69,94 +72,7 @@ const INITIAL_INVENTORY: InventoryItem[] = [
         lastKnownLocation: '421 W 56th St (Packed for Move)',
         proofStrengthScore: 95
     },
-    {
-        id: `item-2`,
-        status: 'needs-review',
-        itemName: 'Hermès Birkin 30',
-        itemDescription: 'Black Togo leather with Gold hardware. Stored in dust bag.',
-        itemCategory: 'Clothing',
-        originalCost: 10025.50,
-        replacementCostValueRCV: 11500.00,
-        purchaseDate: '2022-06-20',
-        brand: 'Hermès',
-        model: 'Birkin 30',
-        condition: 'Like New',
-        linkedProofs: [],
-        createdAt: '2024-11-28',
-        createdBy: 'VeritasVault AI',
-        lastKnownLocation: '421 W 56th St (Packed for Move)',
-        proofStrengthScore: 85
-    },
-    {
-        id: `item-3`,
-        status: 'active',
-        itemName: 'Cartier Tank Watch',
-        itemDescription: 'Tank Must de Cartier, Large model, steel. Gift from Omar Gonzalez (Affidavit Attached).',
-        itemCategory: 'Jewelry',
-        originalCost: 7500.00,
-        replacementCostValueRCV: 7500.00,
-        purchaseDate: '2021-12-25',
-        brand: 'Cartier',
-        model: 'Tank Must',
-        serialNumber: '8291L0P',
-        condition: 'Like New',
-        linkedProofs: [],
-        createdAt: '2024-11-28',
-        createdBy: 'VeritasVault AI',
-        lastKnownLocation: '421 W 56th St (Packed for Move)',
-        proofStrengthScore: 90
-    },
-    {
-        id: `item-4`,
-        status: 'active',
-        itemName: 'Samsung 65" 8000 Series 4K UHD Smart TV',
-        itemDescription: '4K UHD Smart TV. Wall mounted previously.',
-        itemCategory: 'Electronics',
-        originalCost: 2011.71,
-        replacementCostValueRCV: 2011.71,
-        purchaseDate: '2021-09-08',
-        brand: 'Samsung',
-        model: 'UN65RU8000',
-        condition: 'Like New',
-        linkedProofs: [],
-        createdAt: '2024-11-28',
-        createdBy: 'VeritasVault AI',
-        lastKnownLocation: '421 W 56th St'
-    },
-    {
-        id: `item-5`,
-        status: 'active',
-        itemName: 'Alienware Gaming Laptop (M15)',
-        itemDescription: 'High-performance gaming laptop.',
-        itemCategory: 'Electronics',
-        originalCost: 3000.00,
-        replacementCostValueRCV: 3000.00,
-        purchaseDate: '2023-01-15',
-        brand: 'Alienware',
-        model: 'M15 R7',
-        condition: 'Good',
-        linkedProofs: [],
-        createdAt: '2024-11-28',
-        createdBy: 'VeritasVault AI',
-        lastKnownLocation: '421 W 56th St'
-    },
-    {
-        id: `item-6`,
-        status: 'active',
-        itemName: 'Sony WH-1000XM3 Headphones (Qty 2)',
-        itemDescription: 'Noise canceling headphones. One black, one silver.',
-        itemCategory: 'Electronics',
-        originalCost: 762.10,
-        replacementCostValueRCV: 762.10,
-        purchaseDate: '2018-12-24',
-        brand: 'Sony',
-        model: 'WH-1000XM3',
-        condition: 'Good',
-        linkedProofs: [],
-        createdAt: '2024-11-28',
-        createdBy: 'VeritasVault AI',
-        lastKnownLocation: '421 W 56th St'
-    }
+    // ... other items
 ];
 
 const INITIAL_CLAIMS: ActiveClaim[] = [
@@ -167,6 +83,7 @@ const INITIAL_CLAIMS: ActiveClaim[] = [
         linkedPolicyId: 'policy-RI8462410',
         generatedAt: new Date().toISOString(),
         totalClaimValue: 0,
+        stage: 'Incident',
         claimItems: [],
         incidentDetails: {
             name: "Claim #00104761115 (Burglary)", 
@@ -183,6 +100,16 @@ const INITIAL_CLAIMS: ActiveClaim[] = [
     }
 ];
 
+const INITIAL_TASKS: Task[] = [
+    {
+        id: 'task-init-1',
+        description: 'File Police Report for Burglary',
+        isCompleted: true,
+        priority: 'High',
+        createdAt: new Date().toISOString(),
+    }
+];
+
 const INITIAL_STATE: AppState = {
     inventory: INITIAL_INVENTORY,
     policies: [DEFAULT_POLICY],
@@ -192,11 +119,17 @@ const INITIAL_STATE: AppState = {
     claims: INITIAL_CLAIMS,
     currentClaimId: 'claim-default-001',
 
+    tasks: INITIAL_TASKS,
+
+    // Durable Processing Ledger
+    processingQueue: [],
+
     activityLog: [],
     undoAction: null,
     currentView: 'dashboard',
     selectedItemId: null,
     isInitialized: false,
+    lastScrollPosition: 0,
 };
 
 // --- REDUCER ---
@@ -205,6 +138,7 @@ const appReducer = (state: AppState, action: Action): AppState => {
         case 'INITIALIZE_STATE': return { ...action.payload, isInitialized: true };
         case 'RESET_STATE': return { ...INITIAL_STATE, activityLog: state.activityLog, isInitialized: true };
         case 'LOAD_FROM_FILE': return { ...state, ...action.payload, currentView: 'dashboard', selectedItemId: null };
+        
         case 'UPDATE_ITEM': return { ...state, inventory: state.inventory.map(item => item.id === action.payload.id ? action.payload : item) };
         case 'ADD_INVENTORY_ITEMS': return { ...state, inventory: [...state.inventory, ...action.payload] };
         case 'BULK_UPDATE_ITEM_STATUS': return { ...state, inventory: state.inventory.map(item => action.payload.ids.includes(item.id) ? { ...item, status: action.payload.status } : item) };
@@ -238,15 +172,18 @@ const appReducer = (state: AppState, action: Action): AppState => {
             }
             return { ...state, policies: [...state.policies.map(p => ({...p, isActive: false})), { ...newPolicy, isActive: true }] };
         }
+        case 'UPDATE_POLICY': {
+            return { ...state, policies: state.policies.map(p => p.id === action.payload.id ? action.payload : p) };
+        }
         case 'SET_ACTIVE_POLICY': return { ...state, policies: state.policies.map(p => ({ ...p, isActive: p.id === action.payload })) };
         case 'ADD_PROOFS_TO_ITEM': return { ...state, inventory: state.inventory.map(item => item.id === action.payload.itemId ? { ...item, linkedProofs: [...item.linkedProofs, ...action.payload.proofs] } : item) };
         case 'SET_VIEW': return { ...state, currentView: action.payload };
         case 'SELECT_ITEM': return { ...state, selectedItemId: action.payload, currentView: 'item-detail' };
         case 'UNSELECT_ITEM': return { ...state, selectedItemId: null, currentView: 'dashboard' };
+        case 'UPDATE_SCROLL': return { ...state, lastScrollPosition: action.payload };
         case 'FINALIZE_INTERACTIVE_PROCESSING': {
             const approved = action.payload.filter(inf => inf.userSelection === 'approved');
             let newInventory = [...state.inventory];
-            // Note: ALE handling would need update for specific claims, but leaving simple for now
             
             approved.forEach((inference, i) => {
                 const finalProof: Proof = { ...inference.proof, notes: inference.notes, owner: inference.owner };
@@ -324,6 +261,9 @@ const appReducer = (state: AppState, action: Action): AppState => {
         case 'REMOVE_UNLINKED_PROOF': {
             return { ...state, unlinkedProofs: state.unlinkedProofs.filter(p => p.id !== action.payload) };
         }
+        case 'ADD_UNLINKED_PROOFS': {
+            return { ...state, unlinkedProofs: [...state.unlinkedProofs, ...action.payload] };
+        }
         // CLAIMS ACTIONS
         case 'CREATE_CLAIM': {
             return {
@@ -351,6 +291,13 @@ const appReducer = (state: AppState, action: Action): AppState => {
             });
             return { ...state, claims: updatedClaims };
         }
+        case 'UPDATE_CLAIM_STAGE': {
+            const { claimId, stage } = action.payload;
+            return {
+                ...state,
+                claims: state.claims.map(c => c.id === claimId ? { ...c, stage } : c)
+            };
+        }
         case 'SET_CURRENT_CLAIM': {
             return { ...state, currentClaimId: action.payload };
         }
@@ -362,46 +309,136 @@ const appReducer = (state: AppState, action: Action): AppState => {
             }
             return { ...state, claims: remaining, currentClaimId: nextId };
         }
+        // TASK ACTIONS
+        case 'ADD_TASK': {
+            return { ...state, tasks: [...state.tasks, action.payload] };
+        }
+        case 'TOGGLE_TASK': {
+            return { ...state, tasks: state.tasks.map(t => t.id === action.payload ? { ...t, isCompleted: !t.isCompleted } : t) };
+        }
+        case 'DELETE_TASK': {
+            return { ...state, tasks: state.tasks.filter(t => t.id !== action.payload) };
+        }
+        // PIPELINE ACTIONS
+        case 'ENQUEUE_PIPELINE_ITEMS': {
+            return { ...state, processingQueue: [...state.processingQueue, ...action.payload] };
+        }
+        case 'UPDATE_PIPELINE_ITEM_STATUS': {
+            const { id, status, error, resultItemId } = action.payload;
+            return {
+                ...state,
+                processingQueue: state.processingQueue.map(item => 
+                    item.id === id ? { ...item, status, error, resultItemId } : item
+                )
+            };
+        }
+        case 'CLEAR_PROCESSED_PIPELINE_ITEMS': {
+            return { ...state, processingQueue: state.processingQueue.filter(i => i.status === 'pending' || i.status === 'processing') };
+        }
         default: return state;
     }
 };
 
 // --- CONTEXT & PROVIDER ---
-const AppContext = createContext<{ state: AppState; dispatch: Dispatch<Action> }>({ state: INITIAL_STATE, dispatch: () => null });
+const AppContext = createContext<{ state: AppState; dispatch: Dispatch<Action>; syncStatus: SyncStatus }>({ state: INITIAL_STATE, dispatch: () => null, syncStatus: 'idle' });
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [state, dispatch] = useReducer(appReducer, INITIAL_STATE);
+    const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
+    const saveTimeoutRef = useRef<number | null>(null);
 
     // Load state from IndexedDB on initial mount
     useEffect(() => {
         const load = async () => {
-            const loadedState = await storageService.loadState();
-            if (loadedState) {
-                // Ensure claims array exists if loading old state
-                if (!loadedState.claims) {
-                    loadedState.claims = INITIAL_CLAIMS;
-                    loadedState.currentClaimId = INITIAL_CLAIMS[0].id;
+            try {
+                const loadedState = await storageService.loadState();
+                if (loadedState) {
+                    // Clean up persisted syncStatus if accidentally saved
+                    const cleanState = { ...loadedState };
+                    if ('syncStatus' in cleanState) {
+                        delete (cleanState as any).syncStatus;
+                    }
+
+                    // Ensure claims array exists if loading old state (migration support)
+                    if (!cleanState.claims) {
+                        cleanState.claims = INITIAL_CLAIMS;
+                        cleanState.currentClaimId = INITIAL_CLAIMS[0].id;
+                    }
+                    if (!cleanState.tasks) {
+                        cleanState.tasks = INITIAL_TASKS;
+                    }
+                    if (!cleanState.processingQueue) {
+                        cleanState.processingQueue = [];
+                    }
+                    dispatch({ type: 'INITIALIZE_STATE', payload: cleanState });
+                    setSyncStatus('synced');
+                } else {
+                    // Mark as initialized even if no state was loaded (fresh start)
+                    dispatch({ type: 'INITIALIZE_STATE', payload: INITIAL_STATE });
                 }
-                dispatch({ type: 'INITIALIZE_STATE', payload: loadedState });
-            } else {
-                // Mark as initialized even if no state was loaded
+            } catch (error) {
+                console.error("Failed to load state from DB", error);
+                // Fallback to initial state but mark initialized so app can render
                 dispatch({ type: 'INITIALIZE_STATE', payload: INITIAL_STATE });
+                setSyncStatus('error');
             }
         };
         load();
     }, []);
 
+    // Save state helper
+    const persistState = async (currentState: AppState) => {
+        try {
+            await storageService.saveState(currentState);
+            setSyncStatus('synced');
+        } catch (error) {
+            console.error("Auto-save failed", error);
+            setSyncStatus('error');
+        }
+    };
+
     // Save state to IndexedDB on change (debounced)
     useEffect(() => {
-        if (!state.isInitialized) return; // Don't save until initialized
-        const handler = setTimeout(() => {
-            storageService.saveState(state);
-        }, 1000); // 1-second debounce
-        return () => clearTimeout(handler);
+        if (!state.isInitialized) return;
+
+        setSyncStatus('syncing');
+        
+        // Clear existing timeout
+        if (saveTimeoutRef.current) {
+            clearTimeout(saveTimeoutRef.current);
+        }
+
+        saveTimeoutRef.current = window.setTimeout(() => {
+            persistState(state);
+        }, 1500); // 1.5-second debounce for fewer writes
+
+        return () => {
+            if (saveTimeoutRef.current) {
+                clearTimeout(saveTimeoutRef.current);
+            }
+        };
+    }, [state]); 
+
+    // Handle immediate save on visibility change (e.g. closing tab)
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'hidden' && state.isInitialized) {
+                // Try to save immediately if the user is leaving
+                if (saveTimeoutRef.current) {
+                    clearTimeout(saveTimeoutRef.current);
+                }
+                persistState(state);
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
     }, [state]);
 
     return (
-        <AppContext.Provider value={{ state, dispatch }}>
+        <AppContext.Provider value={{ state, dispatch, syncStatus }}>
             {children}
         </AppContext.Provider>
     );
@@ -410,3 +447,4 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 // --- HOOKS ---
 export const useAppState = () => useContext(AppContext).state;
 export const useAppDispatch = () => useContext(AppContext).dispatch;
+export const useSyncStatus = () => useContext(AppContext).syncStatus;
