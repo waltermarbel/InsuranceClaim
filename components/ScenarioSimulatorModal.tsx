@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { InventoryItem, ParsedPolicy, ScenarioAnalysis } from '../types.ts';
+import React, { useState, useEffect } from 'react';
+import { InventoryItem, ParsedPolicy, ScenarioAnalysis, ClaimScenario } from '../types.ts';
 import { XIcon, SparklesIcon, SpinnerIcon, ExclamationTriangleIcon, CalculatorIcon, DocumentTextIcon, CheckCircleIcon, BoltIcon } from './icons.tsx';
 import * as geminiService from '../services/geminiService.ts';
 
@@ -10,13 +10,30 @@ interface ScenarioSimulatorModalProps {
     onClose: () => void;
 }
 
-const SCENARIO_TYPES = ["Theft / Burglary", "Fire", "Water Damage", "Lost during Travel", "Power Surge"];
+const SCENARIO_TYPES = ["Theft / Burglary", "Fire", "Water Damage", "Lost during Travel", "Power Surge", "Other"];
 
 const ScenarioSimulatorModal: React.FC<ScenarioSimulatorModalProps> = ({ inventory, policy, onClose }) => {
     const [eventType, setEventType] = useState(SCENARIO_TYPES[0]);
     const [description, setDescription] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [result, setResult] = useState<ScenarioAnalysis | null>(null);
+    const [suggestedScenarios, setSuggestedScenarios] = useState<ClaimScenario[]>([]);
+    const [isSuggesting, setIsSuggesting] = useState(false);
+
+    useEffect(() => {
+        const loadSuggestions = async () => {
+            setIsSuggesting(true);
+            try {
+                const suggestions = await geminiService.suggestClaimScenarios(inventory, policy);
+                setSuggestedScenarios(suggestions);
+            } catch (error) {
+                console.error("Failed to load suggestions", error);
+            } finally {
+                setIsSuggesting(false);
+            }
+        };
+        loadSuggestions();
+    }, [inventory, policy]);
 
     const handleSimulate = async () => {
         if (!description.trim()) return;
@@ -36,6 +53,11 @@ const ScenarioSimulatorModal: React.FC<ScenarioSimulatorModalProps> = ({ invento
     const loadDemoScenario = () => {
         setEventType("Theft / Burglary");
         setDescription("My MacBook Pro was stolen during a move.");
+    };
+
+    const loadSuggestedScenario = (scenario: ClaimScenario) => {
+        setEventType(scenario.eventType || "Other");
+        setDescription(scenario.description);
     };
 
     return (
@@ -58,13 +80,54 @@ const ScenarioSimulatorModal: React.FC<ScenarioSimulatorModalProps> = ({ invento
                                 </p>
                             </div>
 
+                            {/* Suggested Scenarios */}
+                            <div className="space-y-3">
+                                <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                                    <SparklesIcon className="h-4 w-4 text-primary" /> 
+                                    AI Suggested Scenarios
+                                </h4>
+                                {isSuggesting ? (
+                                    <div className="flex items-center justify-center p-6 bg-white rounded-xl border border-slate-200 border-dashed">
+                                        <SpinnerIcon className="h-6 w-6 text-primary animate-spin" />
+                                        <span className="ml-3 text-sm text-slate-500">Analyzing inventory for risks...</span>
+                                    </div>
+                                ) : suggestedScenarios.length > 0 ? (
+                                    <div className="grid grid-cols-1 gap-3">
+                                        {suggestedScenarios.map((scenario, idx) => (
+                                            <div 
+                                                key={idx}
+                                                onClick={() => loadSuggestedScenario(scenario)}
+                                                className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm hover:border-primary/50 hover:shadow-md transition cursor-pointer group"
+                                            >
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <h5 className="font-bold text-slate-800 group-hover:text-primary transition">{scenario.title}</h5>
+                                                    <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                                                        scenario.likelihood === 'High' ? 'bg-red-100 text-red-700' :
+                                                        scenario.likelihood === 'Medium' ? 'bg-amber-100 text-amber-700' :
+                                                        'bg-emerald-100 text-emerald-700'
+                                                    }`}>
+                                                        {scenario.likelihood} Risk
+                                                    </span>
+                                                </div>
+                                                <p className="text-xs text-slate-600 mb-3">{scenario.description}</p>
+                                                <div className="flex items-center gap-2 text-[10px] text-slate-500 font-medium">
+                                                    <span className="bg-slate-100 px-2 py-1 rounded">{scenario.eventType}</span>
+                                                    <span className="bg-slate-100 px-2 py-1 rounded">{scenario.relevantCoverage}</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : null}
+                            </div>
+
                             <div className="space-y-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                                <div className="flex justify-end">
+                                <div className="flex justify-between items-center">
+                                    <h4 className="text-sm font-bold text-slate-700">Custom Scenario</h4>
                                     <button 
                                         onClick={loadDemoScenario} 
                                         className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full flex items-center gap-1 hover:bg-indigo-100 transition"
                                     >
-                                        <BoltIcon className="h-3 w-3"/> Load Demo: Theft during Move
+                                        <BoltIcon className="h-3 w-3"/> Load Demo
                                     </button>
                                 </div>
                                 <div>

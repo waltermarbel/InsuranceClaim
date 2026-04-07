@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { motion } from 'motion/react';
 import { SpinnerIcon, SparklesIcon } from './icons';
 
 interface ProcessingPageProps {
@@ -16,7 +17,12 @@ const ProcessingPage: React.FC<ProcessingPageProps> = ({ progress, onCancel }) =
   const percentage = progress.total > 0 ? Math.round((progress.current / progress.total) * 100) : 0;
 
   return (
-    <div className="flex flex-col items-center justify-center text-center h-full min-h-[50vh]">
+    <motion.div 
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className="flex flex-col items-center justify-center text-center h-full min-h-[50vh]"
+    >
       <div className="max-w-2xl mx-auto">
         <div className="relative inline-block">
             <SpinnerIcon className="h-20 w-20 text-primary mx-auto animate-spin" />
@@ -60,7 +66,7 @@ const ProcessingPage: React.FC<ProcessingPageProps> = ({ progress, onCancel }) =
           Cancel Process
         </button>
       </div>
-    </div>
+    </motion.div>
   );
 };
 

@@ -1,0 +1,130 @@
+{
+  "entities": {
+    "InventoryItem": {
+      "title": "Inventory Item",
+      "description": "Represents an item in the user's inventory.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "status": { "type": "string" },
+        "itemName": { "type": "string" },
+        "itemDescription": { "type": "string" },
+        "itemCategory": { "type": "string" },
+        "originalCost": { "type": "number" },
+        "replacementCostValueRCV": { "type": "number" },
+        "actualCashValueACV": { "type": "number" },
+        "purchaseDate": { "type": "string" },
+        "brand": { "type": "string" },
+        "model": { "type": "string" },
+        "serialNumber": { "type": "string" },
+        "condition": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "lastKnownLocation": { "type": "string" },
+        "proofStrengthScore": { "type": "number" },
+        "discoveredFromBackground": { "type": "boolean" },
+        "isGift": { "type": "boolean" },
+        "giftedBy": { "type": "string" },
+        "discoverySource": { "type": "string" },
+        "uid": { "type": "string", "description": "The user ID of the owner" }
+      },
+      "required": ["id", "itemName", "itemCategory", "originalCost", "createdAt", "createdBy", "uid"]
+    },
+    "ParsedPolicy": {
+      "title": "Parsed Policy",
+      "description": "Represents an insurance policy.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "policyName": { "type": "string" },
+        "isActive": { "type": "boolean" },
+        "isVerified": { "type": "boolean" },
+        "policyNumber": { "type": "string" },
+        "provider": { "type": "string" },
+        "policyHolder": { "type": "string" },
+        "effectiveDate": { "type": "string" },
+        "expirationDate": { "type": "string" },
+        "deductible": { "type": "number" },
+        "coverageD_limit": { "type": "number" },
+        "lossSettlementMethod": { "type": "string" },
+        "policyType": { "type": "string" },
+        "confidenceScore": { "type": "number" },
+        "uid": { "type": "string", "description": "The user ID of the owner" }
+      },
+      "required": ["id", "isActive", "policyNumber", "provider", "policyHolder", "effectiveDate", "expirationDate", "deductible", "lossSettlementMethod", "policyType", "uid"]
+    },
+    "ActiveClaim": {
+      "title": "Active Claim",
+      "description": "Represents an active insurance claim.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "status": { "type": "string" },
+        "linkedPolicyId": { "type": "string" },
+        "generatedAt": { "type": "string" },
+        "totalClaimValue": { "type": "number" },
+        "stage": { "type": "string" },
+        "uid": { "type": "string", "description": "The user ID of the owner" }
+      },
+      "required": ["id", "name", "status", "linkedPolicyId", "generatedAt", "totalClaimValue", "stage", "uid"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "Represents a user task.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "description": { "type": "string" },
+        "isCompleted": { "type": "boolean" },
+        "priority": { "type": "string" },
+        "linkedItemId": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "uid": { "type": "string", "description": "The user ID of the owner" }
+      },
+      "required": ["id", "description", "isCompleted", "priority", "createdAt", "uid"]
+    },
+    "Proof": {
+      "title": "Proof",
+      "description": "Represents an unlinked proof document or image.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string" },
+        "fileName": { "type": "string" },
+        "mimeType": { "type": "string" },
+        "dataUrl": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "purpose": { "type": "string" },
+        "notes": { "type": "string" },
+        "sourceType": { "type": "string" },
+        "summary": { "type": "string" },
+        "uid": { "type": "string", "description": "The user ID of the owner" }
+      },
+      "required": ["id", "type", "fileName", "mimeType", "createdBy", "uid"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/inventory/{itemId}": {
+      "schema": { "$ref": "#/entities/InventoryItem" },
+      "description": "Inventory items owned by the user"
+    },
+    "/users/{userId}/policies/{policyId}": {
+      "schema": { "$ref": "#/entities/ParsedPolicy" },
+      "description": "Insurance policies owned by the user"
+    },
+    "/users/{userId}/claims/{claimId}": {
+      "schema": { "$ref": "#/entities/ActiveClaim" },
+      "description": "Claims owned by the user"
+    },
+    "/users/{userId}/tasks/{taskId}": {
+      "schema": { "$ref": "#/entities/Task" },
+      "description": "Tasks owned by the user"
+    },
+    "/users/{userId}/proofs/{proofId}": {
+      "schema": { "$ref": "#/entities/Proof" },
+      "description": "Unlinked proofs owned by the user"
+    }
+  }
+}

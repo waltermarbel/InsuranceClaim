@@ -1,5 +1,6 @@
 
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { motion } from 'motion/react';
 import { useAppState, useAppDispatch } from '../context/AppContext.tsx';
 import { InventoryItem, ParsedPolicy, OptimalPolicyResult, ClaimItem, ClaimDetails, ActiveClaim, ClaimScenario, ClaimStage, Task } from '../types.ts';
 import { SpinnerIcon, WrenchScrewdriverIcon, CheckCircleIcon, SparklesIcon, InformationCircleIcon, BriefcaseIcon, ShieldCheckIcon, DocumentTextIcon, XCircleIcon, PlusIcon, ExclamationTriangleIcon, TrashIcon, BoltIcon, ChartPieIcon, CheckIcon, ArrowDownTrayIcon, ChevronRightIcon, ShieldExclamationIcon, ClockIcon, CalculatorIcon, LinkIcon, CubeIcon } from './icons.tsx';
@@ -187,7 +188,7 @@ const ClaimWizard: React.FC<{
                                 />
                             </div>
 
-                            <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 text-sm text-blue-800">
+                            <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-100 text-sm text-indigo-800">
                                 <p className="font-bold flex items-center gap-2"><InformationCircleIcon className="h-4 w-4"/> Next Steps</p>
                                 <p className="mt-1">We will generate a task list and document checklist specific to <strong>{selectedIncident}</strong> claims.</p>
                             </div>
@@ -385,7 +386,12 @@ const StrategicDashboard: React.FC<StrategicDashboardProps> = ({ onPolicyUpload,
     };
 
     return (
-        <div className="max-w-7xl mx-auto px-4 pb-20">
+        <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className="max-w-7xl mx-auto px-4 pb-20"
+        >
             <div className="flex justify-between items-end mb-8 pt-4">
                 <div>
                     <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight font-heading">Command Center</h1>
@@ -500,7 +506,7 @@ const StrategicDashboard: React.FC<StrategicDashboardProps> = ({ onPolicyUpload,
                             </div>
                             {suggestedScenarios.length > 0 ? (
                                 <div className="space-y-2">
-                                    {suggestedScenarios.slice(0, 2).map((scenario, i) => (
+                                    {suggestedScenarios.slice(0, 3).map((scenario, i) => (
                                         <div key={i} className="bg-white/80 p-2.5 rounded-lg border border-indigo-100 text-xs hover:shadow-md transition-all cursor-pointer" onClick={() => handleConvertScenario(scenario)}>
                                             <div className="flex justify-between items-start mb-1">
                                                 <span className="font-bold text-indigo-800">{scenario.title}</span>
@@ -632,7 +638,7 @@ const StrategicDashboard: React.FC<StrategicDashboardProps> = ({ onPolicyUpload,
                                             <h3 className="font-bold text-slate-800">Claim Schedule (Layer 2)</h3>
                                             <p className="text-xs text-slate-500">{currentClaim.name}</p>
                                         </div>
-                                        <div className="hidden md:flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full border border-blue-100 text-[10px] font-bold uppercase tracking-wide cursor-help group relative">
+                                        <div className="hidden md:flex items-center gap-1.5 bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-full border border-indigo-100 text-[10px] font-bold uppercase tracking-wide cursor-help group relative">
                                             <InformationCircleIcon className="h-3 w-3"/>
                                             Snapshot Mode
                                             <div className="absolute left-0 top-full mt-2 w-64 bg-slate-800 text-white text-xs font-medium p-3 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition z-50 normal-case leading-snug">
@@ -802,7 +808,7 @@ const StrategicDashboard: React.FC<StrategicDashboardProps> = ({ onPolicyUpload,
                     onClose={() => setShowSimulator(false)}
                 />
             )}
-        </div>
+        </motion.div>
     );
 };
 

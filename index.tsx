@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 // Fix: Added .tsx extension to ensure module is found.
 import App from './App.tsx';
 import { AppProvider } from './context/AppContext.tsx';
+import { AuthProvider } from './context/AuthContext.tsx';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -12,8 +13,10 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <AppProvider>
-      <App />
-    </AppProvider>
+    <AuthProvider>
+      <AppProvider>
+        <App />
+      </AppProvider>
+    </AuthProvider>
   </React.StrictMode>
 );

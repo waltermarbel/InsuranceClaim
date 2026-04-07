@@ -104,7 +104,7 @@ const DigitalDiscoveryModal: React.FC<DigitalDiscoveryModalProps> = ({ onClose, 
                                 </button>
                             </div>
 
-                            <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 text-xs text-blue-800 flex items-start gap-2">
+                            <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-100 text-xs text-indigo-800 flex items-start gap-2">
                                 <SparklesIcon className="h-4 w-4 flex-shrink-0 mt-0.5"/>
                                 <p><strong>Privacy First:</strong> The AI scans metadata locally where possible. Only extracted asset details are stored in your vault. No raw emails or photos are permanently saved without your permission.</p>
                             </div>

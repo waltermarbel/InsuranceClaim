@@ -1,5 +1,6 @@
 
 import React, { useMemo, useState, useRef, useEffect } from 'react';
+import { motion } from 'motion/react';
 import { useAppState, useAppDispatch } from '../context/AppContext.tsx';
 import { InventoryItem, Proof, RiskGap } from '../types.ts';
 import { 
@@ -31,9 +32,11 @@ import ImportCSVModal from './ImportCSVModal.tsx';
 import RiskHeatmap from './RiskHeatmap.tsx';
 import ScenarioSimulatorModal from './ScenarioSimulatorModal.tsx';
 import DigitalDiscoveryModal from './DigitalDiscoveryModal.tsx'; // Import new modal
+import GallerySyncModal from './GallerySyncModal.tsx';
 import { exportToCSV } from '../utils/fileUtils.ts';
 import { useProofDataUrl } from '../hooks/useProofDataUrl.ts';
 import * as geminiService from '../services/geminiService.ts';
+import { generateInventoryReport } from '../utils/pdfGenerator.ts';
 
 interface InventoryDashboardProps {
     filteredItems: InventoryItem[];
@@ -98,7 +101,10 @@ const DashboardThumbnail: React.FC<{ proof: Proof; categoryIcon: React.ElementTy
 };
 
 const StatCard = ({ title, value, subtext, icon: Icon, colorClass, progress, target }: any) => (
-    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-start space-x-4 transition-transform hover:-translate-y-1 duration-300">
+    <motion.div 
+        whileHover={{ y: -4 }}
+        className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-start space-x-4 transition-transform duration-300"
+    >
         <div className={`p-3 rounded-lg ${colorClass} bg-opacity-10`}>
             <Icon className={`h-6 w-6 ${colorClass.replace('bg-', 'text-')}`} />
         </div>
@@ -112,16 +118,18 @@ const StatCard = ({ title, value, subtext, icon: Icon, colorClass, progress, tar
                         <span>{Math.round((progress / target) * 100)}% of Limit</span>
                     </div>
                     <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                        <div 
+                        <motion.div 
+                            initial={{ width: 0 }}
+                            animate={{ width: `${Math.min((progress / target) * 100, 100)}%` }}
+                            transition={{ duration: 1, ease: "easeOut" }}
                             className={`h-full rounded-full ${colorClass.replace('bg-', 'bg-').replace('text-', '')}`} 
-                            style={{ width: `${Math.min((progress / target) * 100, 100)}%` }}
-                        ></div>
+                        ></motion.div>
                     </div>
                 </div>
             )}
             {subtext && <p className="text-xs text-slate-400 mt-1 font-medium">{subtext}</p>}
         </div>
-    </div>
+    </motion.div>
 );
 
 const StatusBadge: React.FC<{ item: InventoryItem }> = ({ item }) => {
@@ -131,7 +139,7 @@ const StatusBadge: React.FC<{ item: InventoryItem }> = ({ item }) => {
     const hasSerial = !!item.serialNumber;
     
     if(item.status === 'enriching') {
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-blue-50 text-blue-700 border border-blue-100 animate-pulse"><SpinnerIcon className="w-3 h-3 mr-1"/> Enriching</span>;
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-indigo-50 text-indigo-700 border border-indigo-100 animate-pulse"><SpinnerIcon className="w-3 h-3 mr-1"/> Enriching</span>;
     }
 
     if (hasReceipt && hasPhoto && hasSerial) {
@@ -162,18 +170,35 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
     onImageZoom,
     onImportInventory
 }) => {
-    const { inventory, policies } = useAppState();
+    const { inventory, policies, accountHolder } = useAppState();
     const dispatch = useAppDispatch();
     const fileInputRef = useRef<HTMLInputElement>(null);
     
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
+    const [showFilterDropdown, setShowFilterDropdown] = useState(false);
     const [showBulkEdit, setShowBulkEdit] = useState(false);
     const [showImportModal, setShowImportModal] = useState(false);
     const [showDiscoveryModal, setShowDiscoveryModal] = useState(false); // New state
+    const [showGallerySyncModal, setShowGallerySyncModal] = useState(false);
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' } | null>(null);
     const [riskGaps, setRiskGaps] = useState<RiskGap[]>([]);
     const [isRiskLoading, setIsRiskLoading] = useState(false);
     const [showSimulator, setShowSimulator] = useState(false);
+    const filterRef = useRef<HTMLDivElement>(null);
+
+    // Close filter dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
+                setShowFilterDropdown(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
 
     const activePolicy = policies.find(p => p.isActive);
     const personalPropertyLimit = activePolicy?.coverage ? (activePolicy.coverage.find(c => c.type === 'main' && c.category === 'Personal Property')?.limit || 95000) : 95000;
@@ -219,6 +244,10 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
             (item.itemName && item.itemName.toLowerCase().includes(searchTerm?.toLowerCase() || '')) ||
             (item.itemCategory && item.itemCategory.toLowerCase().includes(searchTerm?.toLowerCase() || ''))
         );
+
+        if (selectedCategories.size > 0) {
+            data = data.filter(item => selectedCategories.has(item.itemCategory));
+        }
 
         if (sortConfig) {
             data.sort((a, b) => {
@@ -288,17 +317,33 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
     };
 
     const handleBulkDelete = () => {
-        if (window.confirm(`Are you sure you want to delete ${selectedIds.size} items?`)) {
-             Array.from(selectedIds).forEach(id => {
-                 dispatch({ type: 'DELETE_ITEM', payload: { itemId: id } });
-             });
-             setSelectedIds(new Set());
-        }
+        dispatch({ type: 'BULK_DELETE_ITEMS', payload: { ids: Array.from(selectedIds) } });
+        setSelectedIds(new Set());
     };
 
     const handleExportCSV = () => {
         const filename = `VeritasVault_Inventory_${new Date().toISOString().split('T')[0]}.csv`;
         exportToCSV(tableData, filename);
+    };
+
+    const handleGenerateReport = () => {
+        generateInventoryReport(tableData, activePolicy, accountHolder.name);
+    };
+
+    const handleCategoryClick = (category: string) => {
+        const newCategories = new Set(selectedCategories);
+        if (newCategories.has(category)) {
+            newCategories.delete(category);
+        } else {
+            newCategories.add(category);
+        }
+        setSelectedCategories(newCategories);
+        
+        // Scroll to table
+        const tableElement = document.querySelector('table');
+        if (tableElement) {
+            tableElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
     };
 
     return (
@@ -318,7 +363,7 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                     value={stats.count} 
                     subtext="Individual assets in vault"
                     icon={CubeIcon} 
-                    colorClass="bg-blue-500 text-blue-600" 
+                    colorClass="bg-indigo-500 text-indigo-600" 
                 />
                 <StatCard 
                     title="Documentation Health" 
@@ -330,7 +375,11 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
             </div>
 
             {/* Risk Heatmap (New Feature) */}
-            <RiskHeatmap gaps={riskGaps} isLoading={isRiskLoading} />
+            <RiskHeatmap 
+                gaps={riskGaps} 
+                isLoading={isRiskLoading} 
+                onCategoryClick={handleCategoryClick}
+            />
 
             {/* Toolbar */}
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm sticky top-20 z-20 transition-all duration-300 ease-in-out">
@@ -344,6 +393,67 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                             value={searchTerm}
                             onChange={(e) => onSearchTermChange(e.target.value)}
                         />
+                    </div>
+
+                    {/* Filter Dropdown */}
+                    <div className="relative" ref={filterRef}>
+                        <button 
+                            onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                            className={`flex items-center gap-2 px-3 py-2.5 text-sm font-medium rounded-lg border transition-all ${
+                                selectedCategories.size > 0 || showFilterDropdown 
+                                ? 'bg-primary/10 text-primary border-primary/20' 
+                                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                            }`}
+                        >
+                            <FunnelIcon className="h-4 w-4" />
+                            <span className="hidden sm:inline">Filter</span>
+                            {selectedCategories.size > 0 && (
+                                <span className="flex items-center justify-center bg-primary text-white text-[10px] font-bold h-5 w-5 rounded-full ml-1">
+                                    {selectedCategories.size}
+                                </span>
+                            )}
+                        </button>
+
+                        {/* Dropdown Menu */}
+                        {showFilterDropdown && (
+                            <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-100 p-2 z-50 animate-in fade-in zoom-in-95 duration-200 origin-top-left">
+                                <div className="flex justify-between items-center px-2 py-2 mb-1 border-b border-slate-100">
+                                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Categories</span>
+                                    {selectedCategories.size > 0 && (
+                                        <button 
+                                            onClick={() => setSelectedCategories(new Set())}
+                                            className="text-xs text-primary hover:text-primary-dark font-medium"
+                                        >
+                                            Clear
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="max-h-60 overflow-y-auto space-y-1">
+                                    {CATEGORIES.map(category => (
+                                        <label 
+                                            key={category} 
+                                            className="flex items-center gap-3 px-2 py-2 hover:bg-slate-50 rounded-lg cursor-pointer transition-colors"
+                                        >
+                                            <input 
+                                                type="checkbox"
+                                                checked={selectedCategories.has(category)}
+                                                onChange={(e) => {
+                                                    const newSet = new Set(selectedCategories);
+                                                    if (e.target.checked) {
+                                                        newSet.add(category);
+                                                    } else {
+                                                        newSet.delete(category);
+                                                    }
+                                                    setSelectedCategories(newSet);
+                                                }}
+                                                className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                                            />
+                                            <span className="text-sm text-slate-700">{category}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
                 
@@ -364,6 +474,14 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                         <CloudArrowUpIcon className="h-4 w-4"/> Digital Discovery
                     </button>
 
+                    {/* Gallery Sync Button */}
+                    <button 
+                        onClick={() => setShowGallerySyncModal(true)}
+                        className="hidden sm:flex items-center gap-2 px-4 py-2 text-indigo-600 font-bold bg-indigo-50 hover:bg-indigo-100 rounded-lg border border-indigo-100 transition text-sm"
+                    >
+                        <PhotoIcon className="h-4 w-4"/> Gallery Sync
+                    </button>
+
                      <button 
                         onClick={() => setShowImportModal(true)}
                         className="hidden sm:flex items-center gap-2 px-3 py-2 text-slate-600 hover:text-dark hover:bg-slate-100 rounded-lg border border-transparent hover:border-slate-200 transition text-sm font-medium"
@@ -374,7 +492,13 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                         onClick={handleExportCSV}
                         className="hidden sm:flex items-center gap-2 px-3 py-2 text-slate-600 hover:text-dark hover:bg-slate-100 rounded-lg border border-transparent hover:border-slate-200 transition text-sm font-medium"
                     >
-                        <ArrowDownTrayIcon className="h-4 w-4"/> Export
+                        <ArrowDownTrayIcon className="h-4 w-4"/> Export CSV
+                    </button>
+                    <button 
+                        onClick={handleGenerateReport}
+                        className="hidden sm:flex items-center gap-2 px-3 py-2 text-slate-600 hover:text-dark hover:bg-slate-100 rounded-lg border border-transparent hover:border-slate-200 transition text-sm font-medium"
+                    >
+                        <DocumentTextIcon className="h-4 w-4"/> Report PDF
                     </button>
                     <div className="h-6 w-px bg-slate-200 hidden sm:block"></div>
                     <button 
@@ -470,9 +594,12 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                                 const displayProof = (item.linkedProofs || []).find(p => p.type === 'image' || p.mimeType.startsWith('image/')) || (item.linkedProofs || [])[0];
 
                                 return (
-                                    <tr 
+                                    <motion.tr 
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ duration: 0.2 }}
                                         key={item.id} 
-                                        className={`group transition-all duration-300 cursor-pointer rounded-lg shadow-sm border border-transparent hover:shadow-md hover:border-slate-200 ${isSelected ? 'bg-blue-50/50 hover:bg-blue-50' : 'bg-white hover:bg-white'}`}
+                                        className={`group transition-all duration-300 cursor-pointer rounded-lg shadow-sm border border-transparent hover:shadow-md hover:border-slate-200 ${isSelected ? 'bg-indigo-50/50 hover:bg-indigo-50' : 'bg-white hover:bg-white'}`}
                                         onClick={() => dispatch({ type: 'SELECT_ITEM', payload: item.id })}
                                     >
                                         <td className="px-4 py-4 rounded-l-lg" onClick={(e) => e.stopPropagation()}>
@@ -520,9 +647,21 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                                             <StatusBadge item={item} />
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium rounded-r-lg">
-                                            <span className="text-primary opacity-0 group-hover:opacity-100 transition-opacity font-semibold text-xs uppercase tracking-wide bg-primary/5 px-3 py-1 rounded-full">Edit</span>
+                                            <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <span className="text-primary font-semibold text-xs uppercase tracking-wide bg-primary/5 px-3 py-1 rounded-full hover:bg-primary/10 transition-colors">Edit</span>
+                                                <button 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        dispatch({ type: 'DELETE_ITEM', payload: { itemId: item.id } });
+                                                    }}
+                                                    className="text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 p-1.5 rounded-full transition-colors"
+                                                    title="Delete Item"
+                                                >
+                                                    <TrashIcon className="h-4 w-4" />
+                                                </button>
+                                            </div>
                                         </td>
-                                    </tr>
+                                    </motion.tr>
                                 );
                             })}
                             {tableData.length === 0 && (
@@ -613,6 +752,12 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                 <DigitalDiscoveryModal 
                     onClose={() => setShowDiscoveryModal(false)}
                     onImport={onImportInventory!} // Assuming onImportInventory is provided in props
+                />
+            )}
+
+            {showGallerySyncModal && (
+                <GallerySyncModal 
+                    onClose={() => setShowGallerySyncModal(false)}
                 />
             )}
             

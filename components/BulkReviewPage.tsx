@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion } from 'motion/react';
 // Fix: Added .ts extension to file path
 import { InventoryItem } from '../types.ts';
 import { CheckCircleIcon, DocumentTextIcon, TagIcon, TrashIcon, XCircleIcon } from './icons';
@@ -49,7 +50,11 @@ const BulkReviewPage: React.FC<BulkReviewPageProps> = ({ items, onFinalize }) =>
   const rejectedCount = items.length - approvedCount;
 
   return (
-    <div>
+    <motion.div 
+      initial={{ opacity: 0 }} 
+      animate={{ opacity: 1 }} 
+      transition={{ duration: 0.5 }}
+    >
       <div className="text-center mb-8">
         <h1 className="text-4xl font-extrabold text-dark tracking-tight font-heading">Review Your New Items</h1>
         <p className="mt-3 text-lg text-medium max-w-3xl mx-auto">
@@ -92,8 +97,14 @@ const BulkReviewPage: React.FC<BulkReviewPageProps> = ({ items, onFinalize }) =>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 bg-white">
-                        {items.map(item => (
-                            <tr key={item.id} className={selection[item.id] === 'rejected' ? 'bg-slate-50' : ''}>
+                        {items.map((item, index) => (
+                            <motion.tr 
+                                key={item.id} 
+                                className={selection[item.id] === 'rejected' ? 'bg-slate-50' : ''}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: index * 0.05 }}
+                            >
                                 <td className="py-4 pl-4 pr-3 text-sm sm:pl-6">
                                     <div className="flex items-center">
                                         <div className="h-10 w-10 flex-shrink-0">
@@ -133,7 +144,7 @@ const BulkReviewPage: React.FC<BulkReviewPageProps> = ({ items, onFinalize }) =>
                                         </button>
                                     )}
                                 </td>
-                            </tr>
+                            </motion.tr>
                         ))}
                     </tbody>
                 </table>
@@ -141,7 +152,7 @@ const BulkReviewPage: React.FC<BulkReviewPageProps> = ({ items, onFinalize }) =>
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 };
 

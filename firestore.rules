@@ -1,0 +1,283 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users/{userId}/inventory
+    // Document ID: {itemId}
+    // Fields:
+    //   - id: string (required)
+    //   - status: string (required)
+    //   - itemName: string (required)
+    //   - itemDescription: string (optional)
+    //   - itemCategory: string (required)
+    //   - originalCost: number (required)
+    //   - replacementCostValueRCV: number (optional)
+    //   - actualCashValueACV: number (optional)
+    //   - purchaseDate: string (optional)
+    //   - brand: string (optional)
+    //   - model: string (optional)
+    //   - serialNumber: string (optional)
+    //   - condition: string (optional)
+    //   - createdAt: string (required, immutable)
+    //   - createdBy: string (required)
+    //   - lastKnownLocation: string (optional)
+    //   - proofStrengthScore: number (optional)
+    //   - discoveredFromBackground: boolean (optional)
+    //   - isGift: boolean (optional)
+    //   - giftedBy: string (optional)
+    //   - discoverySource: string (optional)
+    //   - uid: string (required, immutable)
+    //   - linkedProofs: list (optional)
+    //   - suggestedProofs: list (optional)
+    //   - webIntelligence: list (optional)
+    //   - valuationHistory: list (optional)
+    //   - valuationReport: map (optional)
+    //
+    // Collection: users/{userId}/policies
+    // Document ID: {policyId}
+    // Fields:
+    //   - id: string (required)
+    //   - policyName: string (optional)
+    //   - isActive: boolean (required)
+    //   - isVerified: boolean (optional)
+    //   - policyNumber: string (required)
+    //   - provider: string (required)
+    //   - policyHolder: string (required)
+    //   - effectiveDate: string (required)
+    //   - expirationDate: string (required)
+    //   - deductible: number (required)
+    //   - coverageD_limit: number (optional)
+    //   - lossSettlementMethod: string (required)
+    //   - policyType: string (required)
+    //   - confidenceScore: number (optional)
+    //   - coverage: list (optional)
+    //   - exclusions: list (optional)
+    //   - conditions: list (optional)
+    //   - triggers: list (optional)
+    //   - limits: list (optional)
+    //   - endorsements: list (optional)
+    //   - uid: string (required, immutable)
+    //
+    // Collection: users/{userId}/claims
+    // Document ID: {claimId}
+    // Fields:
+    //   - id: string (required)
+    //   - name: string (required)
+    //   - status: string (required)
+    //   - linkedPolicyId: string (required)
+    //   - generatedAt: string (required, immutable)
+    //   - totalClaimValue: number (required)
+    //   - stage: string (required)
+    //   - claimItems: list (optional)
+    //   - incidentDetails: map (optional)
+    //   - uid: string (required, immutable)
+    //
+    // Collection: users/{userId}/tasks
+    // Document ID: {taskId}
+    // Fields:
+    //   - id: string (required)
+    //   - description: string (required)
+    //   - isCompleted: boolean (required)
+    //   - priority: string (required)
+    //   - linkedItemId: string (optional)
+    //   - createdAt: string (required, immutable)
+    //   - uid: string (required, immutable)
+    //
+    // Collection: users/{userId}/proofs
+    // Document ID: {proofId}
+    // Fields:
+    //   - id: string (required)
+    //   - type: string (required)
+    //   - fileName: string (required)
+    //   - mimeType: string (required)
+    //   - dataUrl: string (optional)
+    //   - createdBy: string (required)
+    //   - createdAt: string (optional, immutable)
+    //   - purpose: string (optional)
+    //   - notes: string (optional)
+    //   - sourceType: string (optional)
+    //   - summary: string (optional)
+    //   - owner: string (optional)
+    //   - uid: string (required, immutable)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function uidUnchanged() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == request.auth.uid;
+    }
+    
+    function uidNotModified() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == resource.data.uid;
+    }
+    
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+    
+    function areImmutableFieldsUnchanged(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidInventoryItem(data) {
+      return hasRequiredFields(['id', 'itemName', 'itemCategory', 'originalCost', 'createdAt', 'createdBy', 'uid']) &&
+             data.id is string && data.id.size() > 0 && data.id.size() < 100 &&
+             data.itemName is string && data.itemName.size() > 0 && data.itemName.size() < 200 &&
+             data.itemCategory is string && data.itemCategory.size() > 0 && data.itemCategory.size() < 100 &&
+             data.originalCost is number && data.originalCost >= 0 &&
+             data.createdAt is string && data.createdAt.size() > 0 && data.createdAt.size() < 50 &&
+             data.createdBy is string && data.createdBy.size() > 0 && data.createdBy.size() < 100 &&
+             data.uid is string && data.uid.size() > 0 && data.uid.size() < 100 &&
+             (!('status' in data) || (data.status is string && data.status.size() < 50)) &&
+             (!('itemDescription' in data) || (data.itemDescription is string && data.itemDescription.size() < 10000)) &&
+             (!('replacementCostValueRCV' in data) || (data.replacementCostValueRCV is number && data.replacementCostValueRCV >= 0)) &&
+             (!('actualCashValueACV' in data) || (data.actualCashValueACV is number && data.actualCashValueACV >= 0)) &&
+             (!('purchaseDate' in data) || (data.purchaseDate is string && data.purchaseDate.size() < 50)) &&
+             (!('brand' in data) || (data.brand is string && data.brand.size() < 100)) &&
+             (!('model' in data) || (data.model is string && data.model.size() < 100)) &&
+             (!('serialNumber' in data) || (data.serialNumber is string && data.serialNumber.size() < 100)) &&
+             (!('condition' in data) || (data.condition is string && data.condition.size() < 50)) &&
+             (!('lastKnownLocation' in data) || (data.lastKnownLocation is string && data.lastKnownLocation.size() < 200)) &&
+             (!('proofStrengthScore' in data) || (data.proofStrengthScore is number && data.proofStrengthScore >= 0)) &&
+             (!('discoveredFromBackground' in data) || data.discoveredFromBackground is bool) &&
+             (!('isGift' in data) || data.isGift is bool) &&
+             (!('giftedBy' in data) || (data.giftedBy is string && data.giftedBy.size() < 100)) &&
+             (!('discoverySource' in data) || (data.discoverySource is string && data.discoverySource.size() < 50)) &&
+             (!('linkedProofs' in data) || data.linkedProofs is list) &&
+             (!('suggestedProofs' in data) || data.suggestedProofs is list) &&
+             (!('webIntelligence' in data) || data.webIntelligence is list) &&
+             (!('valuationHistory' in data) || data.valuationHistory is list) &&
+             (!('valuationReport' in data) || data.valuationReport is map);
+    }
+
+    function isValidPolicy(data) {
+      return hasRequiredFields(['id', 'isActive', 'policyNumber', 'provider', 'policyHolder', 'effectiveDate', 'expirationDate', 'deductible', 'lossSettlementMethod', 'policyType', 'uid']) &&
+             data.id is string && data.id.size() > 0 && data.id.size() < 100 &&
+             data.isActive is bool &&
+             data.policyNumber is string && data.policyNumber.size() > 0 && data.policyNumber.size() < 100 &&
+             data.provider is string && data.provider.size() > 0 && data.provider.size() < 100 &&
+             data.policyHolder is string && data.policyHolder.size() > 0 && data.policyHolder.size() < 100 &&
+             data.effectiveDate is string && data.effectiveDate.size() > 0 && data.effectiveDate.size() < 50 &&
+             data.expirationDate is string && data.expirationDate.size() > 0 && data.expirationDate.size() < 50 &&
+             data.deductible is number && data.deductible >= 0 &&
+             data.lossSettlementMethod is string && data.lossSettlementMethod.size() > 0 && data.lossSettlementMethod.size() < 50 &&
+             data.policyType is string && data.policyType.size() > 0 && data.policyType.size() < 100 &&
+             data.uid is string && data.uid.size() > 0 && data.uid.size() < 100 &&
+             (!('policyName' in data) || (data.policyName is string && data.policyName.size() < 200)) &&
+             (!('isVerified' in data) || data.isVerified is bool) &&
+             (!('coverageD_limit' in data) || (data.coverageD_limit is number && data.coverageD_limit >= 0)) &&
+             (!('confidenceScore' in data) || (data.confidenceScore is number && data.confidenceScore >= 0)) &&
+             (!('coverage' in data) || data.coverage is list) &&
+             (!('exclusions' in data) || data.exclusions is list) &&
+             (!('conditions' in data) || data.conditions is list) &&
+             (!('triggers' in data) || data.triggers is list) &&
+             (!('limits' in data) || data.limits is list) &&
+             (!('endorsements' in data) || data.endorsements is list);
+    }
+
+    function isValidClaim(data) {
+      return hasRequiredFields(['id', 'name', 'status', 'linkedPolicyId', 'generatedAt', 'totalClaimValue', 'stage', 'uid']) &&
+             data.id is string && data.id.size() > 0 && data.id.size() < 100 &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
+             data.status is string && data.status.size() > 0 && data.status.size() < 50 &&
+             data.linkedPolicyId is string && data.linkedPolicyId.size() > 0 && data.linkedPolicyId.size() < 100 &&
+             data.generatedAt is string && data.generatedAt.size() > 0 && data.generatedAt.size() < 50 &&
+             data.totalClaimValue is number && data.totalClaimValue >= 0 &&
+             data.stage is string && data.stage.size() > 0 && data.stage.size() < 50 &&
+             data.uid is string && data.uid.size() > 0 && data.uid.size() < 100 &&
+             (!('claimItems' in data) || data.claimItems is list) &&
+             (!('incidentDetails' in data) || data.incidentDetails is map);
+    }
+
+    function isValidTask(data) {
+      return hasRequiredFields(['id', 'description', 'isCompleted', 'priority', 'createdAt', 'uid']) &&
+             data.id is string && data.id.size() > 0 && data.id.size() < 100 &&
+             data.description is string && data.description.size() > 0 && data.description.size() < 2000 &&
+             data.isCompleted is bool &&
+             data.priority is string && data.priority.size() > 0 && data.priority.size() < 50 &&
+             data.createdAt is string && data.createdAt.size() > 0 && data.createdAt.size() < 50 &&
+             data.uid is string && data.uid.size() > 0 && data.uid.size() < 100 &&
+             (!('linkedItemId' in data) || (data.linkedItemId is string && data.linkedItemId.size() < 100));
+    }
+
+    function isValidProof(data) {
+      return hasRequiredFields(['id', 'type', 'fileName', 'mimeType', 'createdBy', 'uid']) &&
+             data.id is string && data.id.size() > 0 && data.id.size() < 100 &&
+             data.type is string && data.type.size() > 0 && data.type.size() < 50 &&
+             data.fileName is string && data.fileName.size() > 0 && data.fileName.size() < 500 &&
+             data.mimeType is string && data.mimeType.size() > 0 && data.mimeType.size() < 100 &&
+             data.createdBy is string && data.createdBy.size() > 0 && data.createdBy.size() < 100 &&
+             data.uid is string && data.uid.size() > 0 && data.uid.size() < 100 &&
+             (!('dataUrl' in data) || (data.dataUrl is string && data.dataUrl.size() < 2000000)) && // Allows up to ~2MB dataUrl
+             (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() < 50)) &&
+             (!('purpose' in data) || (data.purpose is string && data.purpose.size() < 100)) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() < 5000)) &&
+             (!('sourceType' in data) || (data.sourceType is string && data.sourceType.size() < 50)) &&
+             (!('summary' in data) || (data.summary is string && data.summary.size() < 5000)) &&
+             (!('owner' in data) || (data.owner is string && data.owner.size() < 100));
+    }
+
+    // ===============================================================
+    // Security Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read, write: if false; // Users cannot read/write the root user document directly unless defined
+
+      match /inventory/{itemId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidInventoryItem(request.resource.data) && uidUnchanged();
+        allow update: if isOwner(userId) && isValidInventoryItem(request.resource.data) && uidNotModified() && areImmutableFieldsUnchanged(['createdAt', 'uid']);
+        allow delete: if isOwner(userId);
+      }
+
+      match /policies/{policyId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidPolicy(request.resource.data) && uidUnchanged();
+        allow update: if isOwner(userId) && isValidPolicy(request.resource.data) && uidNotModified() && areImmutableFieldsUnchanged(['uid']);
+        allow delete: if isOwner(userId);
+      }
+
+      match /claims/{claimId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidClaim(request.resource.data) && uidUnchanged();
+        allow update: if isOwner(userId) && isValidClaim(request.resource.data) && uidNotModified() && areImmutableFieldsUnchanged(['generatedAt', 'uid']);
+        allow delete: if isOwner(userId);
+      }
+
+      match /tasks/{taskId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidTask(request.resource.data) && uidUnchanged();
+        allow update: if isOwner(userId) && isValidTask(request.resource.data) && uidNotModified() && areImmutableFieldsUnchanged(['createdAt', 'uid']);
+        allow delete: if isOwner(userId);
+      }
+
+      match /proofs/{proofId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidProof(request.resource.data) && uidUnchanged();
+        allow update: if isOwner(userId) && isValidProof(request.resource.data) && uidNotModified() && areImmutableFieldsUnchanged(['createdAt', 'uid']);
+        allow delete: if isOwner(userId);
+      }
+    }
+  }
+}

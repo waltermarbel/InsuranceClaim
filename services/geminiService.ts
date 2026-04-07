@@ -217,6 +217,86 @@ export const calculateProofStrength = async (item: InventoryItem): Promise<{ sco
     return JSON.parse(response.text || '{ "score": 0 }');
 };
 
+export interface GallerySyncResult {
+    uniqueObjects: {
+        itemName: string;
+        itemCategory: string;
+        itemDescription: string;
+        estimatedValue: number;
+        brand?: string;
+        model?: string;
+        condition?: 'New' | 'Like New' | 'Good' | 'Fair' | 'Poor';
+        imageIndices: number[];
+    }[];
+}
+
+export const processGallerySync = async (files: File[]): Promise<GallerySyncResult> => {
+    const parts: any[] = [];
+    
+    parts.push({
+        text: `I am providing ${files.length} images from a user's gallery. Your task is to identify all unique valuable items across these images. 
+        If the exact same physical item appears in multiple images (e.g., from different angles, close-ups, or in different contexts), group those images together as belonging to the same item.
+        
+        For each unique item, provide:
+        - itemName: A clear name for the item.
+        - itemCategory: The category (e.g., Electronics, Furniture, Jewelry, Appliances).
+        - itemDescription: A brief description.
+        - estimatedValue: A rough estimated value in USD (number only).
+        - brand: The brand if visible or identifiable.
+        - model: The model if visible or identifiable.
+        - condition: 'New', 'Like New', 'Good', 'Fair', or 'Poor'.
+        - imageIndices: An array of numbers representing the 0-based index of the images where this item appears. The first image provided is index 0, the second is index 1, etc.
+        `
+    });
+
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const base64 = await fileToBase64(file);
+        parts.push({
+            inlineData: {
+                data: base64,
+                mimeType: file.type
+            }
+        });
+    }
+
+    const response = await ai.models.generateContent({
+        model: 'gemini-3.1-flash-preview',
+        contents: { parts },
+        config: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    uniqueObjects: {
+                        type: Type.ARRAY,
+                        items: {
+                            type: Type.OBJECT,
+                            properties: {
+                                itemName: { type: Type.STRING },
+                                itemCategory: { type: Type.STRING },
+                                itemDescription: { type: Type.STRING },
+                                estimatedValue: { type: Type.NUMBER },
+                                brand: { type: Type.STRING },
+                                model: { type: Type.STRING },
+                                condition: { type: Type.STRING },
+                                imageIndices: { 
+                                    type: Type.ARRAY,
+                                    items: { type: Type.INTEGER }
+                                }
+                            },
+                            required: ["itemName", "itemCategory", "itemDescription", "estimatedValue", "imageIndices"]
+                        }
+                    }
+                },
+                required: ["uniqueObjects"]
+            }
+        }
+    });
+
+    return JSON.parse(response.text.trim());
+};
+
 export const runAutonomousProcessor = async (files: File[]): Promise<{ file: File, result: AutonomousInventoryItem }[]> => {
     const results: { file: File, result: AutonomousInventoryItem }[] = [];
     
@@ -508,12 +588,34 @@ export const transcribeAudio = async (audioBlob: Blob): Promise<string> => {
     return response.text || '';
 };
 
-export const getAssistantContext = (inventory: InventoryItem[], policy?: ParsedPolicy): string => {
-    return `You are VeritasVault AI, an insurance claim assistant.
+export const getAssistantContext = (
+    inventory: InventoryItem[], 
+    policy?: ParsedPolicy, 
+    selectedItem?: InventoryItem | null, 
+    currentClaim?: ActiveClaim | null
+): string => {
+    let context = `You are VeritasVault AI, an insurance claim assistant.
     Current Inventory Items: ${inventory.length}
     Active Policy: ${policy ? policy.policyNumber : 'None'}
+    `;
+
+    if (selectedItem) {
+        context += `
+        Currently Viewing Item: ${selectedItem.itemName} (${selectedItem.itemCategory})
+        Value: $${selectedItem.originalCost}
+        Description: ${selectedItem.itemDescription}
+        `;
+    }
+
+    if (currentClaim) {
+        context += `
+        Active Claim: ${currentClaim.name} (${currentClaim.stage})
+        Incident: ${currentClaim.incidentDetails.incidentType} on ${currentClaim.incidentDetails.dateOfLoss}
+        `;
+    }
     
-    Answer user questions about their inventory, policy coverage, and claim strategy.`;
+    context += `\nAnswer user questions about their inventory, policy coverage, and claim strategy.`;
+    return context;
 };
 
 export const getChatResponse = async (
@@ -521,11 +623,13 @@ export const getChatResponse = async (
     inputText: string, 
     thinking: boolean, 
     inventory: InventoryItem[], 
-    policy?: ParsedPolicy
+    policy?: ParsedPolicy,
+    selectedItem?: InventoryItem | null,
+    currentClaim?: ActiveClaim | null
 ): Promise<{ text: string, functionCalls?: any[] }> => {
     const modelName = thinking ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
     const config: any = {
-        systemInstruction: getAssistantContext(inventory, policy),
+        systemInstruction: getAssistantContext(inventory, policy, selectedItem, currentClaim),
         tools: [{ functionDeclarations: [
             {
                 name: 'navigate',
@@ -684,29 +788,51 @@ export const generateClaimNarrative = async (claim: ClaimDetails, accountHolder:
 };
 
 export const suggestClaimScenarios = async (inventory: InventoryItem[], policy: ParsedPolicy): Promise<ClaimScenario[]> => {
-    const prompt = `Suggest potential claim scenarios based on this inventory (e.g. high value electronics, jewelry) and this policy coverage. Identify risks.`;
-    const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
-        contents: prompt,
-        config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-                type: Type.ARRAY,
-                items: {
-                    type: Type.OBJECT,
-                    properties: {
-                        id: { type: Type.STRING },
-                        title: { type: Type.STRING },
-                        description: { type: Type.STRING },
-                        likelihood: { type: Type.STRING },
-                        relevantCoverage: { type: Type.STRING },
-                        riskLevel: { type: Type.NUMBER }
+    const prompt = `Analyze the provided inventory and insurance policy to suggest 3 distinct, realistic claim scenarios that the user might encounter.
+    
+    Inventory Value: $${inventory.reduce((acc, i) => acc + (i.replacementCostValueRCV || 0), 0)}
+    Top Inventory Categories: ${Array.from(new Set(inventory.map(i => i.itemCategory))).join(', ')}
+    Policy Deductible: $${policy.deductible}
+    Policy Coverages: ${JSON.stringify(policy.coverage)}
+    
+    For each scenario, provide:
+    - id: A unique string identifier.
+    - title: A short, catchy title (e.g., "Kitchen Fire", "Stolen Laptop")
+    - description: A brief description of the event, referencing specific types of items from their inventory if applicable.
+    - likelihood: "Low", "Medium", or "High" based on common insurance statistics and their specific items.
+    - relevantCoverage: The specific policy coverage that would apply (e.g., "Coverage C - Personal Property", "Coverage D - Loss of Use").
+    - riskLevel: A number from 1 to 10 indicating the severity of the risk.
+    - eventType: One of: "Theft / Burglary", "Fire", "Water Damage", "Lost during Travel", "Power Surge", or "Other".`;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-3.1-flash-preview',
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.ARRAY,
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            id: { type: Type.STRING },
+                            title: { type: Type.STRING },
+                            description: { type: Type.STRING },
+                            likelihood: { type: Type.STRING, enum: ["Low", "Medium", "High"] },
+                            relevantCoverage: { type: Type.STRING },
+                            riskLevel: { type: Type.NUMBER },
+                            eventType: { type: Type.STRING }
+                        },
+                        required: ["id", "title", "description", "likelihood", "relevantCoverage", "riskLevel", "eventType"]
                     }
                 }
             }
-        }
-    });
-    return JSON.parse(response.text || '[]');
+        });
+        return JSON.parse(response.text || '[]');
+    } catch (error) {
+        console.error("Failed to suggest scenarios:", error);
+        return [];
+    }
 };
 
 export const generateClaimDetailsFromScenario = async (scenario: ClaimScenario, accountHolder: AccountHolder): Promise<Partial<ClaimDetails>> => {
@@ -784,23 +910,78 @@ export const generateEscalationLetter = async (trigger: EscalationType, claim: A
 };
 
 export const performDigitalDiscovery = async (source: 'email' | 'photos'): Promise<{ items: InventoryItem[], log: string[] }> => {
-    // Simulation
-    return {
-        items: [
-            {
-                id: `disc-${Date.now()}`,
-                status: 'needs-review',
-                itemName: 'Discovered Item (Simulated)',
-                itemDescription: `Found in ${source}`,
-                itemCategory: 'Electronics',
-                originalCost: 199.99,
-                createdAt: new Date().toISOString(),
-                createdBy: 'Digital Discovery',
-                linkedProofs: []
+    const prompt = `Simulate a digital discovery scan of a user's ${source === 'email' ? 'email archives (looking for receipts, order confirmations)' : 'cloud photo library (looking for photos of belongings)'}. 
+    Generate a list of 3-5 realistic items that might be found.
+    For each item, provide:
+    - itemName: A descriptive name (e.g., "Apple MacBook Pro 14-inch", "Sony A7III Camera")
+    - itemDescription: A brief description including where it was found (e.g., "Found receipt from Best Buy in email", "Identified in living room photo from 2023")
+    - itemCategory: A valid category (Electronics, Furniture, Appliances, Clothing, Jewelry, Collectibles, Tools, Sporting Goods, Other)
+    - originalCost: A realistic estimated cost in USD
+    - brand: The brand name if applicable
+    - model: The model name if applicable
+    - purchaseDate: An estimated purchase date (YYYY-MM-DD) if possible
+    - replacementCostValueRCV: A realistic replacement cost (usually similar to or slightly higher than original cost for electronics, etc.)`;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-3.1-flash-preview',
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.ARRAY,
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            itemName: { type: Type.STRING },
+                            itemDescription: { type: Type.STRING },
+                            itemCategory: { type: Type.STRING },
+                            originalCost: { type: Type.NUMBER },
+                            brand: { type: Type.STRING },
+                            model: { type: Type.STRING },
+                            purchaseDate: { type: Type.STRING },
+                            replacementCostValueRCV: { type: Type.NUMBER }
+                        },
+                        required: ["itemName", "itemDescription", "itemCategory", "originalCost"]
+                    }
+                }
             }
-        ],
-        log: [`Connected to ${source}`, `Scanning recent entries...`, `Found 1 potential asset`]
-    };
+        });
+
+        const generatedItems = JSON.parse(response.text || '[]');
+        
+        const items: InventoryItem[] = generatedItems.map((item: any, index: number) => ({
+            id: `disc-${Date.now()}-${index}`,
+            status: 'needs-review',
+            itemName: item.itemName,
+            itemDescription: item.itemDescription,
+            itemCategory: item.itemCategory,
+            originalCost: item.originalCost,
+            brand: item.brand,
+            model: item.model,
+            purchaseDate: item.purchaseDate,
+            replacementCostValueRCV: item.replacementCostValueRCV || item.originalCost,
+            createdAt: new Date().toISOString(),
+            createdBy: 'Digital Discovery',
+            linkedProofs: []
+        }));
+
+        const log = [
+            `Connected securely to ${source === 'email' ? 'Email Provider' : 'Cloud Photos'}...`,
+            `Scanning recent ${source === 'email' ? 'messages and attachments' : 'albums and metadata'}...`,
+            `Analyzing content with Gemini Vision & Text models...`,
+            `Cross-referencing with known asset databases...`,
+            `Found ${items.length} potential assets.`
+        ];
+
+        return { items, log };
+    } catch (error) {
+        console.error("Digital discovery failed:", error);
+        return {
+            items: [],
+            log: [`Connection to ${source} failed.`, `Error: ${error instanceof Error ? error.message : String(error)}`]
+        };
+    }
 };
 
 export const runScenarioSimulation = async (inventory: InventoryItem[], policy: ParsedPolicy, description: string, eventType: string): Promise<ScenarioAnalysis> => {

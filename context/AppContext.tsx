@@ -1,123 +1,53 @@
 
 import React, { createContext, useReducer, useContext, Dispatch, useEffect, useRef, useState } from 'react';
-import { AppState, Action, InventoryItem, ParsedPolicy, Proof, AccountHolder, ClaimDetails, ActivityLogEntry, AppView, UndoableAction, ProofSuggestion, ProcessingInference, ActiveClaim, ClaimItem, Task, SyncStatus, PipelineItem } from '../types.ts';
+import { AppState, Action, InventoryItem, ParsedPolicy, Proof, AccountHolder, ClaimDetails, ActivityLogEntry, AppView, ProofSuggestion, ProcessingInference, ActiveClaim, ClaimItem, Task, SyncStatus, PipelineItem } from '../types.ts';
 import * as storageService from '../services/storageService.ts';
 import { exportToCSV, exportToZip } from '../utils/fileUtils.ts';
+import { useAuth } from './AuthContext.tsx';
 
 // --- INITIAL STATE ---
 const DEFAULT_POLICY: ParsedPolicy = { 
-    id: 'policy-RI8462410', 
-    policyName: "Assurant Renters (Premier)", 
-    isActive: true, 
-    isVerified: true, 
-    provider: "Assurant", 
-    policyNumber: "RI8462410", 
-    policyHolder: "Roydel Marquez Bello & Maleidy Bello Landin", 
-    effectiveDate: "2024-08-26", 
-    expirationDate: "2025-08-26", 
-    deductible: 500, 
-    lossSettlementMethod: 'RCV', 
-    policyType: 'HO-4 Renters Insurance', 
-    coverageD_limit: 19000, // Loss of Use
-    coverage: [
-        { category: "Personal Property", limit: 95000, type: "main" }, 
-        { category: "Personal Liability", limit: 100000, type: "main" },
-        { category: "Medical Payments", limit: 1000, type: "main" },
-        { category: "Jewelry/Watches/Furs", limit: 1000, type: "sub-limit" }, 
-        { category: "Electronics", limit: 5000, type: "sub-limit" }, 
-        { category: "Business Property", limit: 2500, type: "sub-limit" },
-        { category: "Firearms", limit: 2500, type: "sub-limit" }
-    ], 
-    exclusions: ["Flood", "Earthquake", "Intentional Loss", "Neglect", "Business Data"], 
-    conditions: ["Notify police in case of theft", "Protect property from further damage", "File proof of loss within 60 days"],
-    triggers: ["Fire", "Lightning", "Windstorm", "Hail", "Explosion", "Riot", "Aircraft", "Vehicles", "Smoke", "Vandalism", "Theft", "Falling Objects", "Weight of Ice/Snow", "Accidental Discharge/Overflow of Water", "Sudden/Accidental Tearing/Cracking/Burning", "Freezing", "Sudden/Accidental Damage from Artificially Generated Electric Current", "Volcanic Eruption"],
-    limits: ["$200 for Money/Bank Notes", "$1500 for Securities/Accounts/Deeds", "$1500 for Watercraft/Trailers", "$1500 for Trailers", "$1500 for Theft of Jewelry/Watches/Furs", "$2500 for Theft of Firearms", "$2500 for Theft of Silverware", "$2500 for Business Property on premises", "$1500 for Business Property off premises"],
-    confidenceScore: 100 
+    id: 'policy-default', 
+    policyName: "No Policy Loaded", 
+    isActive: false, 
+    isVerified: false, 
+    provider: "", 
+    policyNumber: "", 
+    policyHolder: "", 
+    effectiveDate: "", 
+    expirationDate: "", 
+    deductible: 0, 
+    lossSettlementMethod: 'ACV', 
+    policyType: '', 
+    coverageD_limit: 0, // Loss of Use
+    coverage: [], 
+    exclusions: [], 
+    conditions: [],
+    triggers: [],
+    limits: [],
+    confidenceScore: 0 
 };
 
 const DEFAULT_ACCOUNT_HOLDER: AccountHolder = { 
-    id: 'ah-001', 
-    name: 'Roydel Marquez Bello', 
-    address: '312 W 43rd St, Apt 14J, New York, NY 10036' 
+    id: 'ah-default', 
+    name: 'Unknown User', 
+    address: '' 
 };
 
-const INITIAL_INVENTORY: InventoryItem[] = [
-    // ... (Kept existing items for brevity, assuming they are same as original file)
-    {
-        id: `item-1`,
-        status: 'active',
-        itemName: 'MacBook Pro 16-inch (Core i7/16GB/256GB)',
-        itemDescription: 'Space Gray. Purchased specifically for personal media editing. Verified via Apple ID logs.',
-        itemCategory: 'Electronics',
-        originalCost: 2499.00,
-        replacementCostValueRCV: 2499.00,
-        purchaseDate: '2019-02-21',
-        brand: 'Apple',
-        model: 'MacBook Pro 16"',
-        serialNumber: 'C02Y...',
-        condition: 'Like New',
-        linkedProofs: [
-            {
-                id: 'proof-macbook-receipt',
-                type: 'document',
-                fileName: 'macbook_receipt.pdf',
-                mimeType: 'application/pdf',
-                createdBy: 'User',
-                purpose: 'Proof of Purchase',
-                notes: 'Uploaded from ./uploads/macbook_receipt.pdf'
-            }
-        ],
-        createdAt: '2024-11-28',
-        createdBy: 'VeritasVault AI',
-        lastKnownLocation: '421 W 56th St (Packed for Move)',
-        proofStrengthScore: 95
-    },
-    // ... other items
-];
+const INITIAL_INVENTORY: InventoryItem[] = [];
 
-const INITIAL_CLAIMS: ActiveClaim[] = [
-    {
-        id: 'claim-default-001',
-        name: "Claim #00104761115",
-        status: 'draft',
-        linkedPolicyId: 'policy-RI8462410',
-        generatedAt: new Date().toISOString(),
-        totalClaimValue: 0,
-        stage: 'Incident',
-        claimItems: [],
-        incidentDetails: {
-            name: "Claim #00104761115 (Burglary)", 
-            dateOfLoss: "2024-11-27", 
-            incidentType: "Burglary (Forced Entry)", 
-            location: "421 West 56th Street, Apt 4A, New York, NY 10019", 
-            policeReport: "NYPD: 2024-018-12043", 
-            propertyDamageDetails: "Burglary occurred on Nov 27, 2024 during relocation. Premises entered via forced entry (window/door). Apartment ransacked. Items were packed in boxes for move to 312 W 43rd St.", 
-            claimDateRange: { startDate: "2024-11-27", endDate: "2024-11-28" }, 
-            fairRentalValuePerDay: 350,
-            aleProofs: [], 
-            claimDocuments: [], 
-        }
-    }
-];
+const INITIAL_CLAIMS: ActiveClaim[] = [];
 
-const INITIAL_TASKS: Task[] = [
-    {
-        id: 'task-init-1',
-        description: 'File Police Report for Burglary',
-        isCompleted: true,
-        priority: 'High',
-        createdAt: new Date().toISOString(),
-    }
-];
+const INITIAL_TASKS: Task[] = [];
 
 const INITIAL_STATE: AppState = {
     inventory: INITIAL_INVENTORY,
-    policies: [DEFAULT_POLICY],
+    policies: [],
     unlinkedProofs: [],
     accountHolder: DEFAULT_ACCOUNT_HOLDER,
     
     claims: INITIAL_CLAIMS,
-    currentClaimId: 'claim-default-001',
+    currentClaimId: null,
 
     tasks: INITIAL_TASKS,
 
@@ -125,7 +55,6 @@ const INITIAL_STATE: AppState = {
     processingQueue: [],
 
     activityLog: [],
-    undoAction: null,
     currentView: 'dashboard',
     selectedItemId: null,
     isInitialized: false,
@@ -143,26 +72,15 @@ const appReducer = (state: AppState, action: Action): AppState => {
         case 'ADD_INVENTORY_ITEMS': return { ...state, inventory: [...state.inventory, ...action.payload] };
         case 'BULK_UPDATE_ITEM_STATUS': return { ...state, inventory: state.inventory.map(item => action.payload.ids.includes(item.id) ? { ...item, status: action.payload.status } : item) };
         case 'BULK_EDIT_ITEMS': return { ...state, inventory: state.inventory.map(item => action.payload.ids.includes(item.id) ? { ...item, ...action.payload.updates } : item) };
+        case 'BULK_DELETE_ITEMS': return { ...state, inventory: state.inventory.filter(item => !action.payload.ids.includes(item.id)) };
         case 'DELETE_ITEM': {
             const itemToDelete = state.inventory.find(i => i.id === action.payload.itemId);
             if (!itemToDelete) return state;
-            return { ...state, inventory: state.inventory.filter(i => i.id !== action.payload.itemId), undoAction: { type: 'DELETE_ITEM', payload: { item: itemToDelete } } };
+            return { ...state, inventory: state.inventory.filter(i => i.id !== action.payload.itemId) };
         }
         case 'LOG_ACTIVITY': {
             const newEntry: ActivityLogEntry = { id: `log-${Date.now()}`, timestamp: new Date().toISOString(), app: action.payload.app || 'VeritasVault', action: action.payload.action, details: action.payload.details };
             return { ...state, activityLog: [...state.activityLog, newEntry] };
-        }
-        case 'CLEAR_UNDO_ACTION': return { ...state, undoAction: null };
-        case 'UNDO_ACTION': {
-            if (!action.payload) return state;
-            if (action.payload.type === 'DELETE_ITEM') {
-                return { ...state, inventory: [...state.inventory, action.payload.payload.item], undoAction: null };
-            }
-            if (action.payload.type === 'REJECT_SUGGESTION') {
-                const { itemId, suggestion } = action.payload.payload;
-                return { ...state, inventory: state.inventory.map(item => item.id === itemId ? { ...item, suggestedProofs: [...(item.suggestedProofs || []), suggestion] } : item), undoAction: null };
-            }
-            return state;
         }
         case 'SAVE_POLICY_FROM_REPORT': {
             const report = action.payload;
@@ -254,8 +172,7 @@ const appReducer = (state: AppState, action: Action): AppState => {
                         ...i,
                         suggestedProofs: (i.suggestedProofs || []).filter(s => s.proofId !== proofId)
                     };
-                }),
-                undoAction: { type: 'REJECT_SUGGESTION', payload: { suggestion, itemId } }
+                })
             };
         }
         case 'REMOVE_UNLINKED_PROOF': {
@@ -339,16 +256,112 @@ const appReducer = (state: AppState, action: Action): AppState => {
     }
 };
 
+type HistoryState = {
+    past: AppState[];
+    present: AppState;
+    future: AppState[];
+};
+
+const UNDOABLE_ACTIONS = new Set([
+    'UPDATE_ITEM', 'ADD_INVENTORY_ITEMS', 'BULK_UPDATE_ITEM_STATUS', 
+    'BULK_EDIT_ITEMS', 'BULK_DELETE_ITEMS', 'DELETE_ITEM', 'FINALIZE_INTERACTIVE_PROCESSING', 
+    'ADD_PROOFS_TO_ITEM', 'ACCEPT_SUGGESTION', 'REJECT_SUGGESTION_PERMANENT', 
+    'REMOVE_UNLINKED_PROOF', 'ADD_UNLINKED_PROOFS', 'CREATE_CLAIM', 
+    'UPDATE_CLAIM_ITEM', 'UPDATE_CLAIM_DETAILS', 'UPDATE_CLAIM_STAGE', 
+    'DELETE_CLAIM', 'ADD_TASK', 'TOGGLE_TASK', 'DELETE_TASK'
+]);
+
+const undoableReducer = (state: HistoryState, action: Action): HistoryState => {
+    if (action.type === 'GLOBAL_UNDO') {
+        if (state.past.length === 0) return state;
+        const previous = state.past[state.past.length - 1];
+        const newPast = state.past.slice(0, state.past.length - 1);
+        const restoredState = {
+            ...previous,
+            currentView: state.present.currentView,
+            selectedItemId: state.present.selectedItemId,
+            lastScrollPosition: state.present.lastScrollPosition,
+        };
+        return {
+            past: newPast,
+            present: restoredState,
+            future: [state.present, ...state.future]
+        };
+    }
+
+    if (action.type === 'GLOBAL_REDO') {
+        if (state.future.length === 0) return state;
+        const next = state.future[0];
+        const newFuture = state.future.slice(1);
+        const restoredState = {
+            ...next,
+            currentView: state.present.currentView,
+            selectedItemId: state.present.selectedItemId,
+            lastScrollPosition: state.present.lastScrollPosition,
+        };
+        return {
+            past: [...state.past, state.present],
+            present: restoredState,
+            future: newFuture
+        };
+    }
+
+    const newPresent = appReducer(state.present, action);
+    
+    if (newPresent === state.present) {
+        return state;
+    }
+
+    if (UNDOABLE_ACTIONS.has(action.type)) {
+        return {
+            past: [...state.past, state.present].slice(-50), // Keep last 50 states
+            present: newPresent,
+            future: []
+        };
+    }
+
+    return {
+        ...state,
+        present: newPresent
+    };
+};
+
+const INITIAL_HISTORY_STATE: HistoryState = {
+    past: [],
+    present: INITIAL_STATE,
+    future: []
+};
+
 // --- CONTEXT & PROVIDER ---
-const AppContext = createContext<{ state: AppState; dispatch: Dispatch<Action>; syncStatus: SyncStatus }>({ state: INITIAL_STATE, dispatch: () => null, syncStatus: 'idle' });
+const AppContext = createContext<{ 
+    state: AppState; 
+    dispatch: Dispatch<Action>; 
+    syncStatus: SyncStatus;
+    canUndo: boolean;
+    canRedo: boolean;
+    undo: () => void;
+    redo: () => void;
+}>({ 
+    state: INITIAL_STATE, 
+    dispatch: () => null, 
+    syncStatus: 'idle',
+    canUndo: false,
+    canRedo: false,
+    undo: () => null,
+    redo: () => null
+});
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [state, dispatch] = useReducer(appReducer, INITIAL_STATE);
+    const [historyState, dispatch] = useReducer(undoableReducer, INITIAL_HISTORY_STATE);
+    const state = historyState.present;
     const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
     const saveTimeoutRef = useRef<number | null>(null);
+    const { user, isAuthReady } = useAuth();
 
-    // Load state from IndexedDB on initial mount
+    // Load state from IndexedDB/Firestore on initial mount or user change
     useEffect(() => {
+        if (!isAuthReady) return;
+
         const load = async () => {
             try {
                 const loadedState = await storageService.loadState();
@@ -362,7 +375,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                     // Ensure claims array exists if loading old state (migration support)
                     if (!cleanState.claims) {
                         cleanState.claims = INITIAL_CLAIMS;
-                        cleanState.currentClaimId = INITIAL_CLAIMS[0].id;
+                        cleanState.currentClaimId = INITIAL_CLAIMS.length > 0 ? INITIAL_CLAIMS[0].id : null;
                     }
                     if (!cleanState.tasks) {
                         cleanState.tasks = INITIAL_TASKS;
@@ -384,10 +397,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             }
         };
         load();
-    }, []);
+    }, [user, isAuthReady]);
 
     // Save state helper
     const persistState = async (currentState: AppState) => {
+        if (!user) return; // Don't persist if not logged in
         try {
             await storageService.saveState(currentState);
             setSyncStatus('synced');
@@ -399,7 +413,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Save state to IndexedDB on change (debounced)
     useEffect(() => {
-        if (!state.isInitialized) return;
+        if (!state.isInitialized || !user) return;
 
         setSyncStatus('syncing');
         
@@ -417,12 +431,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 clearTimeout(saveTimeoutRef.current);
             }
         };
-    }, [state]); 
+    }, [state, user]); 
 
     // Handle immediate save on visibility change (e.g. closing tab)
     useEffect(() => {
         const handleVisibilityChange = () => {
-            if (document.visibilityState === 'hidden' && state.isInitialized) {
+            if (document.visibilityState === 'hidden' && state.isInitialized && user) {
                 // Try to save immediately if the user is leaving
                 if (saveTimeoutRef.current) {
                     clearTimeout(saveTimeoutRef.current);
@@ -435,10 +449,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return () => {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, [state]);
+    }, [state, user]);
+
+    const undo = () => dispatch({ type: 'GLOBAL_UNDO' });
+    const redo = () => dispatch({ type: 'GLOBAL_REDO' });
 
     return (
-        <AppContext.Provider value={{ state, dispatch, syncStatus }}>
+        <AppContext.Provider value={{ 
+            state, 
+            dispatch, 
+            syncStatus,
+            canUndo: historyState.past.length > 0,
+            canRedo: historyState.future.length > 0,
+            undo,
+            redo
+        }}>
             {children}
         </AppContext.Provider>
     );
@@ -448,3 +473,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 export const useAppState = () => useContext(AppContext).state;
 export const useAppDispatch = () => useContext(AppContext).dispatch;
 export const useSyncStatus = () => useContext(AppContext).syncStatus;
+export const useUndoRedo = () => {
+    const context = useContext(AppContext);
+    return {
+        canUndo: context.canUndo,
+        canRedo: context.canRedo,
+        undo: context.undo,
+        redo: context.redo
+    };
+};

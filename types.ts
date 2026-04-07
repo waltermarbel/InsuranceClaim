@@ -219,10 +219,6 @@ export interface ActivityLogEntry {
     app: 'VeritasVault' | 'Gemini';
 }
 
-export type UndoableAction = 
-  | { type: 'DELETE_ITEM'; payload: { item: InventoryItem } }
-  | { type: 'REJECT_SUGGESTION'; payload: { suggestion: ProofSuggestion, itemId: string } };
-
 export interface ProofSuggestion {
     proofId: string;
     confidence: number;
@@ -315,6 +311,7 @@ export interface ClaimScenario {
     likelihood: 'Low' | 'Medium' | 'High';
     relevantCoverage: string;
     riskLevel: number;
+    eventType?: string;
 }
 
 export interface ClaimGapAnalysis {
@@ -390,7 +387,6 @@ export interface AppState {
     processingQueue: PipelineItem[];
 
     activityLog: ActivityLogEntry[];
-    undoAction: UndoableAction | null;
     currentView: AppView;
     selectedItemId: string | null;
     isInitialized: boolean;
@@ -405,10 +401,9 @@ export type Action =
   | { type: 'ADD_INVENTORY_ITEMS'; payload: InventoryItem[] }
   | { type: 'BULK_UPDATE_ITEM_STATUS'; payload: { ids: string[], status: ItemStatus } }
   | { type: 'BULK_EDIT_ITEMS'; payload: { ids: string[], updates: Partial<InventoryItem> } }
+  | { type: 'BULK_DELETE_ITEMS'; payload: { ids: string[] } }
   | { type: 'DELETE_ITEM'; payload: { itemId: string } }
   | { type: 'LOG_ACTIVITY'; payload: { action: string; details: string; app?: 'VeritasVault' | 'Gemini' } }
-  | { type: 'CLEAR_UNDO_ACTION' }
-  | { type: 'UNDO_ACTION'; payload: UndoableAction }
   | { type: 'SAVE_POLICY_FROM_REPORT'; payload: PolicyAnalysisReport }
   | { type: 'UPDATE_POLICY'; payload: ParsedPolicy }
   | { type: 'SET_ACTIVE_POLICY'; payload: string }
@@ -436,4 +431,6 @@ export type Action =
   // Pipeline Actions
   | { type: 'ENQUEUE_PIPELINE_ITEMS'; payload: PipelineItem[] }
   | { type: 'UPDATE_PIPELINE_ITEM_STATUS'; payload: { id: string; status: PipelineItem['status']; error?: string; resultItemId?: string } }
-  | { type: 'CLEAR_PROCESSED_PIPELINE_ITEMS' };
+  | { type: 'CLEAR_PROCESSED_PIPELINE_ITEMS' }
+  | { type: 'GLOBAL_UNDO' }
+  | { type: 'GLOBAL_REDO' };

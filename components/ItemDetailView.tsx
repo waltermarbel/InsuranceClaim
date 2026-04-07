@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useAppState, useAppDispatch } from '../context/AppContext.tsx';
 import { InventoryItem, Proof, UploadProgress } from '../types.ts';
 import {
@@ -39,7 +40,19 @@ const Accordion: React.FC<{ title: string; icon: React.ReactNode; children: Reac
                 </div>
                 {isOpen ? <ChevronUpIcon className="h-5 w-5 text-slate-400" /> : <ChevronDownIcon className="h-5 w-5 text-slate-400" />}
             </button>
-            {isOpen && <div className="p-6 border-t border-slate-100">{children}</div>}
+            <AnimatePresence initial={false}>
+                {isOpen && (
+                    <motion.div 
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.3, ease: "easeInOut" }}
+                        className="overflow-hidden"
+                    >
+                        <div className="p-6 border-t border-slate-100">{children}</div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };
@@ -151,14 +164,17 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
     };
 
     const handleDelete = () => {
-        if (confirm("Are you sure you want to delete this item? This cannot be undone.")) {
-            dispatch({ type: 'DELETE_ITEM', payload: { itemId: item.id } });
-            dispatch({ type: 'SET_VIEW', payload: 'dashboard' });
-        }
+        dispatch({ type: 'DELETE_ITEM', payload: { itemId: item.id } });
+        dispatch({ type: 'SET_VIEW', payload: 'dashboard' });
     };
 
     return (
-        <div className="max-w-5xl mx-auto space-y-6 pb-20 animate-fade-in-up">
+        <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className="max-w-5xl mx-auto space-y-6 pb-20"
+        >
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                 <div>
@@ -239,7 +255,7 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
                                 <button
                                     onClick={handleAutoFill}
                                     disabled={isAutoFilling}
-                                    className="p-3 bg-blue-50 border border-blue-100 text-blue-700 rounded-lg hover:bg-blue-100 transition shadow-sm disabled:opacity-50"
+                                    className="p-3 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-100 transition shadow-sm disabled:opacity-50"
                                     title="Auto-Fill Details from Web"
                                 >
                                     {isAutoFilling ? <SpinnerIcon className="h-5 w-5 animate-spin" /> : <SparklesIcon className="h-5 w-5" />}
@@ -402,7 +418,7 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
                     </div>
                 </div>
             </div>
-        </div>
+        </motion.div>
     );
 };
 

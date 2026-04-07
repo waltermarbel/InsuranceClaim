@@ -1,6 +1,6 @@
 
 import JSZip from 'jszip';
-import { InventoryItem, Proof } from './types.ts';
+import { InventoryItem, Proof } from '../types.ts';
 // Fix: Removed self-import of `sanitizeFileName` which was causing a conflict.
 
 

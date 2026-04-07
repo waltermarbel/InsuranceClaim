@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { GoogleGenAI, LiveSession, LiveServerMessage, Modality, Blob as GenaiBlob } from "@google/genai";
+import { GoogleGenAI, LiveServerMessage, Modality, Blob as GenaiBlob } from "@google/genai";
 import { XIcon, SparklesIcon, CubeIcon, CheckIcon, ArrowDownTrayIcon, MagnifyingGlassIcon } from './icons.tsx';
 import { InventoryItem, ParsedPolicy, ChatMessage } from '../types.ts';
 import * as geminiService from '../services/geminiService.ts';
@@ -52,8 +52,10 @@ interface GeminiAssistantProps {
 }
 
 const GeminiAssistant: React.FC<GeminiAssistantProps> = ({ onClose, onNavigate, onSearch }) => {
-  const { inventory, policies } = useAppState();
+  const { inventory, policies, selectedItemId, claims, currentClaimId } = useAppState();
   const policy = useMemo(() => policies.find(p => p.isActive), [policies]);
+  const selectedItem = useMemo(() => inventory.find(i => i.id === selectedItemId), [inventory, selectedItemId]);
+  const currentClaim = useMemo(() => claims.find(c => c.id === currentClaimId), [claims, currentClaimId]);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
@@ -62,7 +64,7 @@ const GeminiAssistant: React.FC<GeminiAssistantProps> = ({ onClose, onNavigate, 
   const chatEndRef = useRef<HTMLDivElement>(null);
   
   // Live API & TTS refs
-  const sessionPromise = useRef<Promise<LiveSession> | null>(null);
+  const sessionPromise = useRef<Promise<any> | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const inputAudioContextRef = useRef<AudioContext | null>(null);
   const outputAudioContextRef = useRef<AudioContext | null>(null);
@@ -165,10 +167,10 @@ const GeminiAssistant: React.FC<GeminiAssistantProps> = ({ onClose, onNavigate, 
         config: {
             responseModalities: [Modality.AUDIO],
             speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } } },
-            systemInstruction: geminiService.getAssistantContext(inventory, policy),
+            systemInstruction: geminiService.getAssistantContext(inventory, policy, selectedItem, currentClaim),
         },
     });
-  }, [isLive, stopLiveSession, inventory, policy]);
+  }, [isLive, stopLiveSession, inventory, policy, selectedItem, currentClaim]);
 
 
   const handleSubmit = async () => {
@@ -180,7 +182,7 @@ const GeminiAssistant: React.FC<GeminiAssistantProps> = ({ onClose, onNavigate, 
     setInputText('');
 
     try {
-      const response = await geminiService.getChatResponse(messages, inputText, isThinkingMode, inventory, policy);
+      const response = await geminiService.getChatResponse(messages, inputText, isThinkingMode, inventory, policy, selectedItem, currentClaim);
       
       let responseText = response.text || "";
       const toolCalls = response.functionCalls;

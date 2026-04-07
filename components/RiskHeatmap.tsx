@@ -6,9 +6,10 @@ import { ExclamationTriangleIcon, CheckCircleIcon, ChartPieIcon } from './icons.
 interface RiskHeatmapProps {
     gaps: RiskGap[];
     isLoading: boolean;
+    onCategoryClick?: (category: string) => void;
 }
 
-const RiskHeatmap: React.FC<RiskHeatmapProps> = ({ gaps, isLoading }) => {
+const RiskHeatmap: React.FC<RiskHeatmapProps> = ({ gaps, isLoading, onCategoryClick }) => {
     if (isLoading) {
         return <div className="bg-white p-6 rounded-xl border border-slate-200 animate-pulse h-64"></div>;
     }
@@ -46,7 +47,11 @@ const RiskHeatmap: React.FC<RiskHeatmapProps> = ({ gaps, isLoading }) => {
                     const isOverLimit = gap.totalValue > gap.policyLimit;
                     
                     return (
-                        <div key={idx} className="bg-slate-50 rounded-lg p-4 border border-slate-100 relative overflow-hidden group">
+                        <div 
+                            key={idx} 
+                            className={`bg-slate-50 rounded-lg p-4 border border-slate-100 relative overflow-hidden group transition-all ${onCategoryClick ? 'cursor-pointer hover:bg-slate-100 hover:shadow-md' : ''}`}
+                            onClick={() => onCategoryClick && onCategoryClick(gap.category)}
+                        >
                             <div className="flex justify-between items-center mb-2 relative z-10">
                                 <span className="font-semibold text-slate-700">{gap.category}</span>
                                 <span className={`text-xs font-bold px-2 py-1 rounded ${isOverLimit ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
