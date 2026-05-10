@@ -56,17 +56,17 @@ interface InventoryDashboardProps {
 }
 
 // Updated component to load thumbnails asynchronously and handle types
-const DashboardThumbnail: React.FC<{ proof: Proof; categoryIcon: React.ElementType; categoryColor: string; onZoom?: (url: string) => void }> = ({ proof, categoryIcon: CategoryIcon, categoryColor, onZoom }) => {
+const DashboardThumbnail = React.memo<{ proof: Proof; categoryIcon: React.ElementType; categoryColor: string; onZoom?: (url: string) => void }>(({ proof, categoryIcon: CategoryIcon, categoryColor, onZoom }) => {
     const { dataUrl, isLoading } = useProofDataUrl(proof.id);
     const displayUrl = proof.dataUrl || dataUrl;
     const isImage = proof.type === 'image' || proof.mimeType?.startsWith('image/');
 
-    const handleClick = (e: React.MouseEvent) => {
+    const handleClick = useCallback((e: React.MouseEvent) => {
         if (displayUrl && onZoom && isImage) {
             e.stopPropagation();
             onZoom(displayUrl);
         }
-    };
+    }, [displayUrl, onZoom, isImage]);
 
     if (isLoading) {
         return (
@@ -103,30 +103,30 @@ const DashboardThumbnail: React.FC<{ proof: Proof; categoryIcon: React.ElementTy
             <CategoryIcon className="h-6 w-6 opacity-50"/>
         </div>
     );
-};
+});
 
-const StatCard = ({ title, value, subtext, icon: Icon, colorClass, progress, target }: any) => (
+const StatCard = React.memo(({ title, value, subtext, icon: Icon, colorClass, progress, target }: any) => (
     <motion.div 
         whileHover={{ y: -4 }}
-        className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-start space-x-4 transition-transform duration-300"
+        className="bg-white p-6 rounded-2xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex items-start space-x-5 transition-all duration-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)]"
     >
-        <div className={`p-3 rounded-lg ${colorClass} bg-opacity-10`}>
-            <Icon className={`h-6 w-6 ${colorClass.replace('bg-', 'text-')}`} />
+        <div className={`p-4 rounded-xl ${colorClass} bg-opacity-10 shadow-inner`}>
+            <Icon className={`h-7 w-7 ${colorClass.replace('bg-', 'text-')}`} />
         </div>
         <div className="flex-grow">
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">{title}</p>
-            <h3 className="text-2xl font-extrabold text-slate-800 font-heading tracking-tight">{value}</h3>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">{title}</p>
+            <h3 className="text-3xl font-extrabold text-slate-900 font-heading tracking-tight">{value}</h3>
             {progress !== undefined && target !== undefined && target > 0 && (
-                <div className="mt-4 w-full">
-                    <div className="flex justify-between items-end mb-2">
-                        <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase">Extraction Velocity</span>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${(progress/target) > 0.8 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                <div className="mt-5 w-full">
+                    <div className="flex justify-between items-end mb-2.5">
+                         <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase">Extraction Velocity</span>
+                        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${(progress/target) > 0.8 ? 'bg-rose-50 text-rose-700 ring-1 ring-rose-200' : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'}`}>
                             {((progress / target) * 100).toFixed(1)}% of Cap
                         </span>
                     </div>
-                    <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden flex relative shadow-inner">
+                    <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden flex relative shadow-inner">
                         {/* 80% Threshold Line */}
-                        <div className="absolute top-0 bottom-0 border-l border-dashed border-rose-400 z-10" style={{ left: '80%' }}></div>
+                        <div className="absolute top-0 bottom-0 border-l-2 border-dashed border-rose-400 z-10 opacity-70" style={{ left: '80%' }}></div>
                         
                         <motion.div 
                             initial={{ width: 0 }}
@@ -139,12 +139,12 @@ const StatCard = ({ title, value, subtext, icon: Icon, colorClass, progress, tar
                     </div>
                 </div>
             )}
-            {subtext && <p className="text-xs text-slate-400 mt-1 font-medium">{subtext}</p>}
+            {subtext && <p className="text-sm text-slate-500 mt-2 font-medium">{subtext}</p>}
         </div>
     </motion.div>
-);
+));
 
-const StatusBadge: React.FC<{ item: InventoryItem }> = ({ item }) => {
+const StatusBadge = React.memo<{ item: InventoryItem }>(({ item }) => {
     const proofs = item.linkedProofs || [];
     const hasReceipt = proofs.some(p => p.type === 'document' || p.purpose === 'Proof of Purchase');
     const hasPhoto = proofs.some(p => p.type === 'image');
@@ -164,7 +164,105 @@ const StatusBadge: React.FC<{ item: InventoryItem }> = ({ item }) => {
         return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-amber-50 text-amber-700 border border-amber-100"><ExclamationTriangleIcon className="w-3 h-3 mr-1"/> No Receipt</span>;
     }
     return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-slate-100 text-slate-600 border border-slate-200">Review</span>;
-};
+});
+
+// ... 
+
+const DashboardRow = React.memo<{ 
+    item: InventoryItem; 
+    isSelected: boolean; 
+    onSelectRow: (id: string, e: React.ChangeEvent<HTMLInputElement>) => void; 
+    onRowClick: (id: string) => void; 
+    onDelete: (id: string) => void; 
+    onZoom: (url: string) => void; 
+}>(({ item, isSelected, onSelectRow, onRowClick, onDelete, onZoom }) => {
+    const CategoryIcon = CATEGORY_ICONS[item.itemCategory] || CATEGORY_ICONS['Other'];
+    const categoryColor = CATEGORY_COLORS[item.itemCategory] || '#94a3b8';
+    
+    // Prioritize showing an image proof if available
+    const displayProof = (item.linkedProofs || []).find(p => p.type === 'image' || p.mimeType.startsWith('image/')) || (item.linkedProofs || [])[0];
+
+    const healthScore = calculateHealthMetric(item);
+    const highRisk = isHighRiskOfDenial(healthScore);
+
+    return (
+        <motion.tr 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.2 }}
+            className={`group transition-all duration-300 cursor-pointer shadow-sm border-b border-transparent hover:shadow-md hover:border-slate-200 ${isSelected ? 'bg-blue-50/50 hover:bg-blue-50' : 'bg-white hover:bg-white'}`}
+            onClick={() => onRowClick(item.id)}
+        >
+            <td className="px-4 py-4 rounded-l-lg" onClick={(e) => e.stopPropagation()}>
+                 <input 
+                    type="checkbox" 
+                    className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
+                    checked={isSelected}
+                    onChange={(e) => onSelectRow(item.id, e)}
+                 />
+            </td>
+            <td className="px-6 py-4">
+                <div className="flex items-center">
+                    <div className="h-12 w-12 flex-shrink-0 bg-white rounded-lg overflow-hidden border border-slate-200 shadow-sm group-hover:shadow-md transition-shadow relative">
+                        {displayProof ? (
+                            <DashboardThumbnail proof={displayProof} categoryIcon={CategoryIcon} categoryColor={categoryColor} onZoom={onZoom} />
+                        ) : (
+                            <div className="h-full w-full flex items-center justify-center text-slate-300 bg-slate-50">
+                                <CategoryIcon className="h-6 w-6 opacity-50"/>
+                            </div>
+                        )}
+                    </div>
+                    <div className="ml-4">
+                        <div className="flex items-center gap-2">
+                            <CategoryIcon className="h-4 w-4 flex-shrink-0" style={{ color: categoryColor }} />
+                            <div className="text-sm font-bold text-slate-800 font-heading">{item.itemName}</div>
+                        </div>
+                        <div className="text-xs text-slate-500 truncate max-w-[240px] pl-6">{item.brand} {item.model}</div>
+                    </div>
+                </div>
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-slate-50 text-slate-700 border border-slate-100">
+                    <CategoryIcon className="h-3.5 w-3.5 mr-1.5" style={{ color: categoryColor }}/>
+                    {item.itemCategory}
+                </span>
+            </td>
+            <td className="px-6 py-4 text-right whitespace-nowrap">
+                <div className="text-sm text-slate-700">${item.originalCost.toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
+                <div className="text-[10px] text-slate-400">{item.purchaseDate ? new Date(item.purchaseDate).toLocaleDateString() : 'Date Unknown'}</div>
+            </td>
+            <td className="px-6 py-4 text-right whitespace-nowrap">
+                <div className="text-sm font-bold text-slate-900">${(item.replacementCostValueRCV || item.originalCost).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap text-center">
+                <div className="flex flex-col items-center gap-1.5 min-w-[120px]">
+                    <StatusBadge item={item} />
+                    <div className="flex flex-col items-center gap-1 w-full mt-1">
+                        <ScoreIndicator score={healthScore} size="sm" />
+                        {highRisk && (
+                            <span className="text-[9px] font-bold uppercase tracking-widest bg-rose-500 text-white px-1.5 py-0.5 rounded shadow-sm w-full block text-center">High Risk of Denial</span>
+                        )}
+                    </div>
+                </div>
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium rounded-r-lg">
+                <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <span className="text-primary font-semibold text-xs uppercase tracking-wide bg-primary/5 px-3 py-1 rounded-full hover:bg-primary/10 transition-colors">Edit</span>
+                    <button 
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onDelete(item.id);
+                        }}
+                        className="text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 p-1.5 rounded-full transition-colors"
+                        title="Delete Item"
+                    >
+                        <TrashIcon className="h-4 w-4" />
+                    </button>
+                </div>
+            </td>
+        </motion.tr>
+    );
+});
 
 type SortKey = 'itemName' | 'itemCategory' | 'originalCost' | 'replacementCostValueRCV' | 'status';
 
@@ -203,7 +301,26 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
     const [riskGaps, setRiskGaps] = useState<RiskGap[]>([]);
     const [isRiskLoading, setIsRiskLoading] = useState(false);
     const [showSimulator, setShowSimulator] = useState(false);
+    const [isDragging, setIsDragging] = useState(false);
     const filterRef = useRef<HTMLDivElement>(null);
+
+    const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        setIsDragging(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        setIsDragging(false);
+    };
+
+    const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        setIsDragging(false);
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            onItemPhotosSelected(e.dataTransfer.files);
+        }
+    };
 
     const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
     
@@ -278,6 +395,14 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
         }
         setSortConfig({ key, direction });
     };
+
+    const handleRowClick = useCallback((id: string) => {
+        dispatch({ type: 'SELECT_ITEM', payload: id });
+    }, [dispatch]);
+
+    const handleRowDelete = useCallback((id: string) => {
+        dispatch({ type: 'DELETE_ITEM', payload: { itemId: id } });
+    }, [dispatch]);
 
     const activeFilterCount = selectedCategories.size + selectedStatuses.size + selectedConditions.size + (purchaseDateStart ? 1 : 0) + (purchaseDateEnd ? 1 : 0);
 
@@ -371,16 +496,18 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
         }
     };
 
-    const handleSelectRow = (id: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleSelectRow = useCallback((id: string, e: React.ChangeEvent<HTMLInputElement>) => {
         e.stopPropagation();
-        const newSet = new Set(selectedIds);
-        if (e.target.checked) {
-            newSet.add(id);
-        } else {
-            newSet.delete(id);
-        }
-        setSelectedIds(newSet);
-    };
+        setSelectedIds(prev => {
+            const newSet = new Set(prev);
+            if (e.target.checked) {
+                newSet.add(id);
+            } else {
+                newSet.delete(id);
+            }
+            return newSet;
+        });
+    }, []);
 
     const isAllSelected = tableData.length > 0 && selectedIds.size === tableData.length;
     
@@ -427,7 +554,20 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
     };
 
     return (
-        <div className="space-y-8 pb-24">
+        <div 
+            className={`space-y-8 pb-24 relative transition-colors ${isDragging ? 'bg-indigo-50/50 outline-dashed outline-2 outline-indigo-400 rounded-2xl' : ''}`}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+        >
+            {isDragging && (
+                <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm rounded-2xl pointer-events-none">
+                    <CloudArrowUpIcon className="h-24 w-24 text-indigo-500 animate-bounce" />
+                    <h2 className="text-3xl font-bold font-heading text-indigo-800 tracking-tight mt-6">Drop Evidence to Ingest</h2>
+                    <p className="text-indigo-600 mt-2 font-medium">Documents, receipts, photos, or data files.</p>
+                </div>
+            )}
+            
             {/* Stats Ribbon */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <StatCard 
@@ -459,36 +599,37 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                 gaps={riskGaps} 
                 isLoading={isRiskLoading} 
                 onCategoryClick={handleCategoryClick}
+                selectedCategories={selectedCategories}
             />
 
             {/* Toolbar */}
-            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm sticky top-20 z-20 transition-all duration-300 ease-in-out">
-                <div className="flex items-center gap-2 w-full sm:w-auto">
-                    <div className="relative flex-grow sm:flex-grow-0 group">
-                        <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-primary transition-colors" />
+            <div className="flex flex-col xl:flex-row justify-between items-center gap-6 bg-white p-5 rounded-2xl border border-slate-100 shadow-[0_4px_20px_rgb(0,0,0,0.03)] sticky top-24 z-20 transition-all duration-300 ease-in-out">
+                <div className="flex items-center gap-4 w-full xl:w-1/3">
+                    <div className="relative flex-grow group">
+                        <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
                         <input 
                             type="text" 
                             placeholder="Search schedule..." 
-                            className="pl-9 pr-3 py-2.5 text-sm border border-slate-200 bg-slate-50 rounded-lg w-full sm:w-80 focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white transition-all outline-none"
+                            className="pl-12 pr-4 py-3 text-sm border border-slate-200 bg-slate-50 rounded-full w-full focus:ring-4 focus:ring-indigo-600/10 focus:border-indigo-600 focus:bg-white transition-all outline-none text-slate-700"
                             value={searchTerm}
                             onChange={(e) => onSearchTermChange(e.target.value)}
                         />
                     </div>
 
                     {/* Filter Dropdown */}
-                    <div className="relative" ref={filterRef}>
+                    <div className="relative flex-shrink-0" ref={filterRef}>
                         <button 
                             onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-                            className={`flex items-center gap-2 px-3 py-2.5 text-sm font-medium rounded-lg border transition-all ${
+                            className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold rounded-full border transition-all duration-200 ${
                                 activeFilterCount > 0 || showFilterDropdown 
-                                ? 'bg-primary/10 text-primary border-primary/20' 
-                                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                                ? 'bg-indigo-50 text-indigo-700 border-indigo-200 shadow-sm' 
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300 shadow-sm hover:shadow'
                             }`}
                         >
                             <FunnelIcon className="h-4 w-4" />
                             <span className="hidden sm:inline">Filter</span>
                             {activeFilterCount > 0 && (
-                                <span className="flex items-center justify-center bg-primary text-white text-[10px] font-bold h-5 w-5 rounded-full ml-1">
+                                <span className="flex items-center justify-center bg-indigo-600 text-white text-[10px] font-bold h-5 w-5 rounded-full ml-1">
                                     {activeFilterCount}
                                 </span>
                             )}
@@ -614,44 +755,44 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                     </div>
                 </div>
                 
-                <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+                <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto xl:justify-end">
                      {/* Simulator Button */}
                      <button 
                         onClick={() => setShowSimulator(true)}
-                        className="hidden sm:flex items-center gap-2 px-4 py-2 text-primary font-bold bg-primary/10 rounded-lg hover:bg-primary/20 transition text-sm"
+                        className="hidden sm:flex items-center gap-2 px-4 py-2.5 text-indigo-700 font-semibold bg-indigo-50/50 hover:bg-indigo-100/70 rounded-full transition-all duration-200 text-sm border border-indigo-100 shadow-sm"
                     >
-                        <CalculatorIcon className="h-4 w-4"/> What If?
+                        <CalculatorIcon className="h-4 w-4"/> What If Strategy
                     </button>
 
                      {/* Cloud Discovery Button (New) */}
                      <button 
                         onClick={() => setShowDiscoveryModal(true)}
-                        className="flex items-center gap-2 px-4 py-2 text-purple-600 font-bold bg-purple-50 hover:bg-purple-100 rounded-lg border border-purple-100 transition text-sm"
+                        className="flex items-center gap-2 px-4 py-2.5 text-purple-700 font-semibold bg-purple-50/50 hover:bg-purple-100/70 rounded-full border border-purple-100 transition-all duration-200 text-sm shadow-sm"
                     >
-                        <CloudArrowUpIcon className="h-4 w-4"/> Digital Discovery
+                        <CloudArrowUpIcon className="h-4 w-4 text-purple-600"/> Digital Discovery
                     </button>
 
                     {/* Gallery Sync Button */}
                     <button 
                         onClick={() => setShowGallerySyncModal(true)}
-                        className="hidden sm:flex items-center gap-2 px-4 py-2 text-blue-600 font-bold bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-100 transition text-sm"
+                        className="hidden sm:flex items-center gap-2 px-4 py-2.5 text-blue-700 font-semibold bg-blue-50/50 hover:bg-blue-100/70 rounded-full border border-blue-100 transition-all duration-200 text-sm shadow-sm"
                     >
-                        <PhotoIcon className="h-4 w-4"/> Gallery Sync
+                        <PhotoIcon className="h-4 w-4 text-blue-600"/> Gallery Sync
                     </button>
 
                     {/* Batch Conflict Check Button */}
                     <button 
                         onClick={() => setShowBatchConflict(true)}
-                        className="hidden sm:flex items-center gap-2 px-4 py-2 text-amber-600 font-bold bg-amber-50 hover:bg-amber-100 rounded-lg border border-amber-100 transition text-sm"
+                        className="hidden sm:flex items-center gap-2 px-4 py-2.5 text-amber-700 font-semibold bg-amber-50/50 hover:bg-amber-100/70 rounded-full border border-amber-100 transition-all duration-200 text-sm shadow-sm"
                     >
-                        <ExclamationTriangleIcon className="h-4 w-4"/> Batch Conflict
+                        <ExclamationTriangleIcon className="h-4 w-4 text-amber-600"/> Conflict Check
                     </button>
 
                     {/* Bulk Link Evidence Button */}
                     {unlinkedProofs.length > 0 && (
                         <button 
                             onClick={() => setShowBulkLink(true)}
-                            className="hidden sm:flex items-center gap-2 px-4 py-2 text-indigo-600 font-bold bg-indigo-50 hover:bg-indigo-100 rounded-lg border border-indigo-100 transition text-sm"
+                            className="hidden sm:flex items-center gap-2 px-4 py-2.5 text-indigo-600 font-semibold bg-indigo-50 hover:bg-indigo-100 rounded-full border border-indigo-100 transition-all duration-200 text-sm shadow-sm"
                         >
                             <LinkIcon className="h-4 w-4"/> Bulk Link
                         </button>
@@ -659,30 +800,30 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
 
                      <button 
                         onClick={() => setShowImportModal(true)}
-                        className="hidden sm:flex items-center gap-2 px-3 py-2 text-slate-600 hover:text-dark hover:bg-slate-100 rounded-lg border border-transparent hover:border-slate-200 transition text-sm font-medium"
+                        className="hidden sm:flex items-center gap-2 px-4 py-2.5 text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded-full border border-transparent transition-all duration-200 text-sm font-medium"
                     >
                         <ArrowUpTrayIcon className="h-4 w-4"/> Import
                     </button>
                     <button 
                         onClick={handleExportCSV}
-                        className="hidden sm:flex items-center gap-2 px-3 py-2 text-slate-600 hover:text-dark hover:bg-slate-100 rounded-lg border border-transparent hover:border-slate-200 transition text-sm font-medium pt-tooltip"
+                        className="hidden sm:flex items-center gap-2 px-4 py-2.5 text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded-full border border-transparent transition-all duration-200 text-sm font-medium pt-tooltip"
                         title="Export as ISO/Xactimate compatible CSV for Adjusters"
                     >
                         <ArrowDownTrayIcon className="h-4 w-4"/> Adjuster CSV (ISO)
                     </button>
                     <button 
                         onClick={handleGenerateReport}
-                        className="hidden sm:flex items-center gap-2 px-3 py-2 text-slate-600 hover:text-dark hover:bg-slate-100 rounded-lg border border-transparent hover:border-slate-200 transition text-sm font-medium"
+                        className="hidden sm:flex items-center gap-2 px-4 py-2.5 text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded-full border border-transparent transition-all duration-200 text-sm font-medium"
                         title="Generate standard Schedule of Loss Report"
                     >
                         <DocumentTextIcon className="h-4 w-4"/> Loss Schedule PDF
                     </button>
-                    <div className="h-6 w-px bg-slate-200 hidden sm:block"></div>
+                    <div className="h-8 w-px bg-slate-200 hidden xl:block mx-1"></div>
                     <button 
                         onClick={() => fileInputRef.current?.click()}
-                        className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white text-sm font-bold rounded-lg hover:bg-primary-dark shadow-md hover:shadow-lg transition-all active:scale-95"
+                        className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white text-sm font-semibold rounded-full hover:bg-indigo-700 shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 active:translate-y-0"
                     >
-                        <PlusIcon className="h-4 w-4" /> Add Item
+                        <PlusIcon className="h-5 w-5" /> Add Item
                     </button>
                     <input 
                         type="file" 
@@ -782,99 +923,17 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                                             </div>
                                         </td>
                                     </tr>
-                                    {!collapsedCategories.has(group.category) && group.items.map((item) => {
-                                        const CategoryIcon = CATEGORY_ICONS[item.itemCategory] || CATEGORY_ICONS['Other'];
-                                        const categoryColor = CATEGORY_COLORS[item.itemCategory] || '#94a3b8';
-                                        const isSelected = selectedIds.has(item.id);
-                                        
-                                        // Prioritize showing an image proof if available
-                                        const displayProof = (item.linkedProofs || []).find(p => p.type === 'image' || p.mimeType.startsWith('image/')) || (item.linkedProofs || [])[0];
-
-                                        return (
-                                            <motion.tr 
-                                                initial={{ opacity: 0, y: 10 }}
-                                                animate={{ opacity: 1, y: 0 }}
-                                                transition={{ duration: 0.2 }}
-                                                key={item.id} 
-                                                className={`group transition-all duration-300 cursor-pointer shadow-sm border-b border-transparent hover:shadow-md hover:border-slate-200 ${isSelected ? 'bg-blue-50/50 hover:bg-blue-50' : 'bg-white hover:bg-white'}`}
-                                                onClick={() => dispatch({ type: 'SELECT_ITEM', payload: item.id })}
-                                            >
-                                                <td className="px-4 py-4 rounded-l-lg" onClick={(e) => e.stopPropagation()}>
-                                                     <input 
-                                                        type="checkbox" 
-                                                        className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
-                                                        checked={isSelected}
-                                                        onChange={(e) => handleSelectRow(item.id, e)}
-                                                     />
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center">
-                                                        <div className="h-12 w-12 flex-shrink-0 bg-white rounded-lg overflow-hidden border border-slate-200 shadow-sm group-hover:shadow-md transition-shadow relative">
-                                                            {displayProof ? (
-                                                                <DashboardThumbnail proof={displayProof} categoryIcon={CategoryIcon} categoryColor={categoryColor} onZoom={onImageZoom} />
-                                                            ) : (
-                                                                <div className="h-full w-full flex items-center justify-center text-slate-300 bg-slate-50">
-                                                                    <CategoryIcon className="h-6 w-6 opacity-50"/>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                        <div className="ml-4">
-                                                            <div className="flex items-center gap-2">
-                                                                <CategoryIcon className="h-4 w-4 flex-shrink-0" style={{ color: categoryColor }} />
-                                                                <div className="text-sm font-bold text-slate-800 font-heading">{item.itemName}</div>
-                                                            </div>
-                                                            <div className="text-xs text-slate-500 truncate max-w-[240px] pl-6">{item.brand} {item.model}</div>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-slate-50 text-slate-700 border border-slate-100">
-                                                        <CategoryIcon className="h-3.5 w-3.5 mr-1.5" style={{ color: categoryColor }}/>
-                                                        {item.itemCategory}
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4 text-right whitespace-nowrap">
-                                                    <div className="text-sm text-slate-700">${item.originalCost.toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
-                                                    <div className="text-[10px] text-slate-400">{item.purchaseDate ? new Date(item.purchaseDate).toLocaleDateString() : 'Date Unknown'}</div>
-                                                </td>
-                                                <td className="px-6 py-4 text-right whitespace-nowrap">
-                                                    <div className="text-sm font-bold text-slate-900">${(item.replacementCostValueRCV || item.originalCost).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-center">
-                                                    <div className="flex flex-col items-center gap-1.5 min-w-[120px]">
-                                                        <StatusBadge item={item} />
-                                                        {(() => {
-                                                            const healthScore = calculateHealthMetric(item);
-                                                            const highRisk = isHighRiskOfDenial(healthScore);
-                                                            return (
-                                                                <div className="flex flex-col items-center gap-1 w-full mt-1">
-                                                                    <ScoreIndicator score={healthScore} size="sm" />
-                                                                    {highRisk && (
-                                                                        <span className="text-[9px] font-bold uppercase tracking-widest bg-rose-500 text-white px-1.5 py-0.5 rounded shadow-sm w-full block text-center">High Risk of Denial</span>
-                                                                    )}
-                                                                </div>
-                                                            );
-                                                        })()}
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium rounded-r-lg">
-                                                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <span className="text-primary font-semibold text-xs uppercase tracking-wide bg-primary/5 px-3 py-1 rounded-full hover:bg-primary/10 transition-colors">Edit</span>
-                                                        <button 
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                dispatch({ type: 'DELETE_ITEM', payload: { itemId: item.id } });
-                                                            }}
-                                                            className="text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 p-1.5 rounded-full transition-colors"
-                                                            title="Delete Item"
-                                                        >
-                                                            <TrashIcon className="h-4 w-4" />
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </motion.tr>
-                                        );
-                                    })}
+                                    {!collapsedCategories.has(group.category) && group.items.map((item) => (
+                                        <DashboardRow 
+                                            key={item.id}
+                                            item={item}
+                                            isSelected={selectedIds.has(item.id)}
+                                            onSelectRow={handleSelectRow}
+                                            onRowClick={handleRowClick}
+                                            onDelete={handleRowDelete}
+                                            onZoom={onImageZoom}
+                                        />
+                                    ))}
                                 </React.Fragment>
                             ))}
                             {tableData.length === 0 && (

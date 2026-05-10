@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { processEvidenceForTimeline } from '../services/geminiService.ts';
 
 export const TimelineView: React.FC = () => {
-    const { timeline, policies } = useAppState();
+    const { timeline, policies, inventory, unlinkedProofs } = useAppState();
     const activePolicy = policies.find(p => p.isActive);
     const dispatch = useAppDispatch();
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -67,6 +67,17 @@ export const TimelineView: React.FC = () => {
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
+    };
+
+    const handleToggleLink = (type: 'linkedItemIds' | 'linkedDocumentIds', valId: string) => {
+        setFormData(prev => {
+            const current = (prev[type] as string[]) || [];
+            if (current.includes(valId)) {
+                return { ...prev, [type]: current.filter(x => x !== valId) };
+            } else {
+                return { ...prev, [type]: [...current, valId] };
+            }
+        });
     };
 
     const handleProcessEvidence = async () => {
@@ -211,7 +222,23 @@ export const TimelineView: React.FC = () => {
                                     <div className="flex justify-between items-start">
                                         <div>
                                             <p className="font-mono text-sm font-bold text-slate-500">{new Date(event.date).toLocaleString()}</p>
-                                            <p className={`mt-1 text-base ${event.type === 'INFERRED_NARRATIVE' ? 'text-fuchsia-900 italic' : 'text-slate-800'}`}>{event.description}</p>
+                                            {event.title && <h4 className="text-lg font-bold text-slate-800 mt-1">{event.title}</h4>}
+                                            <p className={`mt-1 text-base ${event.type === 'INFERRED_NARRATIVE' ? 'text-fuchsia-900 italic' : 'text-slate-800'} ${event.title ? 'text-sm opacity-80' : ''}`}>{event.description}</p>
+                                            {(event.linkedItemIds?.length! > 0 || event.linkedDocumentIds?.length! > 0) && (
+                                                <div className="flex gap-3 mt-3">
+                                                    {event.linkedItemIds?.length! > 0 && (
+                                                        <span className="flex items-center gap-1 text-xs font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md">
+                                                            <span>Items Linked: {event.linkedItemIds?.length}</span>
+                                                        </span>
+                                                    )}
+                                                    {event.linkedDocumentIds?.length! > 0 && (
+                                                        <span className="flex items-center gap-1 text-xs font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md">
+                                                            <PhotoIcon className="h-3.5 w-3.5" />
+                                                            <span>Evidence Attached: {event.linkedDocumentIds?.length}</span>
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full ${event.type === 'FACT' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : event.type === 'INFERRED_NARRATIVE' ? 'bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-200' : 'bg-indigo-50 text-indigo-700 border border-indigo-200'}`}>
@@ -261,12 +288,23 @@ export const TimelineView: React.FC = () => {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Description</label>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Title</label>
+                                    <input 
+                                        type="text" 
+                                        name="title" 
+                                        value={formData.title || ''} 
+                                        onChange={handleChange} 
+                                        placeholder="Brief title (e.g., Police Arrived)" 
+                                        className="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Description / Notes</label>
                                     <textarea 
                                         name="description" 
                                         value={formData.description || ''} 
                                         onChange={handleChange} 
-                                        placeholder="What happened?" 
+                                        placeholder="What happened? Add details, recollections, or evidence context..." 
                                         className="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none transition-all resize-none h-24"
                                         required 
                                     />
@@ -284,6 +322,48 @@ export const TimelineView: React.FC = () => {
                                         <option value="INFERRED_NARRATIVE" disabled>AI Inferred Narrative</option>
                                     </select>
                                 </div>
+                                
+                                {inventory.length > 0 && (
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Link Schedule Items</label>
+                                        <div className="max-h-32 overflow-y-auto space-y-2 border border-slate-200 rounded-xl p-3 bg-slate-50">
+                                            {inventory.map(item => (
+                                                <label key={item.id} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        checked={formData.linkedItemIds?.includes(item.id) || false}
+                                                        onChange={() => handleToggleLink('linkedItemIds', item.id)}
+                                                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                                    />
+                                                    {item.itemName}
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                                
+                                {(() => {
+                                    const allProofs = [...unlinkedProofs, ...inventory.flatMap(i => i.linkedProofs)];
+                                    if (allProofs.length === 0) return null;
+                                    return (
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Link Evidence</label>
+                                            <div className="max-h-32 overflow-y-auto space-y-2 border border-slate-200 rounded-xl p-3 bg-slate-50">
+                                                {allProofs.map(proof => (
+                                                    <label key={proof.id} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                                                        <input 
+                                                            type="checkbox" 
+                                                            checked={formData.linkedDocumentIds?.includes(proof.id) || false}
+                                                            onChange={() => handleToggleLink('linkedDocumentIds', proof.id)}
+                                                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                                        />
+                                                        <span className="truncate">{proof.fileName}</span>
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
                             </div>
                             <div className="mt-8 flex justify-end gap-3">
                                 <button 

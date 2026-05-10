@@ -164,6 +164,12 @@ export const EvidenceVault: React.FC<EvidenceVaultProps> = ({ onImageZoom }) => 
                                         {proof.extractedData.itemNames && proof.extractedData.itemNames.length > 0 && (
                                             <div className="text-[10px] text-slate-500 truncate">Items: {proof.extractedData.itemNames.join(', ')}</div>
                                         )}
+                                        {proof.extractedData.suggestedCategory && (
+                                            <div className="text-[10px] text-indigo-600 font-medium">Category: {proof.extractedData.suggestedCategory}</div>
+                                        )}
+                                        {proof.extractedData.basicDetails && (
+                                            <div className="text-[10px] text-slate-500 truncate" title={proof.extractedData.basicDetails}>Details: {proof.extractedData.basicDetails}</div>
+                                        )}
                                     </div>
                                 )}
 

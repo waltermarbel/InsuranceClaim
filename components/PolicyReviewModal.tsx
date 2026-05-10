@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ParsedPolicy, PolicyAnalysisReport, CoverageLimit } from '../types.ts';
 import { XIcon, CheckCircleIcon, InformationCircleIcon, TrashIcon, PlusIcon, ExclamationTriangleIcon, BoltIcon, ShieldExclamationIcon, CurrencyDollarIcon, DocumentTextIcon, TagIcon } from './icons.tsx';
 
@@ -63,10 +63,108 @@ const ArrayEditor: React.FC<{
     );
 };
 
+const RecordEditor: React.FC<{
+    items: Record<string, number>;
+    onChange: (items: Record<string, number>) => void;
+    emptyText: string;
+    keyPlaceholder: string;
+    valuePlaceholder: string;
+}> = ({ items, onChange, emptyText, keyPlaceholder, valuePlaceholder }) => {
+    const entries = Object.entries(items || {});
+    
+    const updateKey = (oldKey: string, newKey: string, value: number) => {
+        const newItems = { ...items };
+        if (oldKey !== newKey) {
+            delete newItems[oldKey];
+        }
+        newItems[newKey] = value;
+        onChange(newItems);
+    };
+
+    const updateValue = (key: string, value: number) => {
+        const newItems = { ...items };
+        newItems[key] = value;
+        onChange(newItems);
+    };
+
+    const deleteItem = (key: string) => {
+        const newItems = { ...items };
+        delete newItems[key];
+        onChange(newItems);
+    };
+
+    const addItem = () => {
+        const newItems = { ...items };
+        let count = 1;
+        while (newItems[`New Entry ${count}`] !== undefined) count++;
+        newItems[`New Entry ${count}`] = 0;
+        onChange(newItems);
+    };
+
+    return (
+        <div className="space-y-3">
+            {entries.length === 0 && <p className="text-sm text-slate-400 italic py-4 text-center border-2 border-dashed border-slate-100 rounded-lg">{emptyText}</p>}
+            {entries.map(([key, value], i) => (
+                <div key={i} className="flex gap-2 group items-center">
+                    <input 
+                        type="text"
+                        className="flex-grow p-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-shadow"
+                        value={key}
+                        onChange={(e) => updateKey(key, e.target.value, value)}
+                        placeholder={keyPlaceholder}
+                    />
+                    <div className="relative w-48 shrink-0">
+                        <span className="absolute left-3 top-2.5 text-slate-400">$</span>
+                        <input 
+                            type="number"
+                            className="w-full p-2.5 pl-6 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-shadow"
+                            value={value}
+                            onChange={(e) => updateValue(key, parseFloat(e.target.value) || 0)}
+                            placeholder={valuePlaceholder}
+                        />
+                    </div>
+                    <button onClick={() => deleteItem(key)} className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-md transition-colors opacity-0 group-hover:opacity-100">
+                        <TrashIcon className="h-4 w-4"/>
+                    </button>
+                </div>
+            ))}
+            <button onClick={addItem} className="flex items-center gap-2 text-sm font-bold text-primary hover:text-primary-dark transition-colors px-1">
+                <PlusIcon className="h-4 w-4"/> Add Entry
+            </button>
+        </div>
+    );
+};
+
 const PolicyReviewModal: React.FC<PolicyReviewModalProps> = ({ report, onSave, onClose }) => {
   const [editedPolicy, setEditedPolicy] = useState<ParsedPolicy>(report.parsedPolicy as ParsedPolicy);
   const [warnings, setWarnings] = useState<string[]>(report.warnings || []);
-  const [activeTab, setActiveTab] = useState<'info' | 'triggers' | 'limits' | 'exclusions' | 'conditions' | 'comparison' | 'strategy'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'triggers' | 'limits' | 'exclusions' | 'conditions' | 'comparison' | 'strategy' | 'validation'>('info');
+
+  useEffect(() => {
+    const newWarnings: string[] = [];
+    if (!editedPolicy.policyNumber) newWarnings.push("Missing Policy Number.");
+    if (!editedPolicy.provider) newWarnings.push("Missing Insurance Provider name.");
+    if (!editedPolicy.policyHolder) newWarnings.push("Missing Policyholder name.");
+    if (!editedPolicy.deductible || editedPolicy.deductible <= 0) newWarnings.push("Deductible is missing or zero. A standard deductible is usually required.");
+    if (!editedPolicy.coverage || editedPolicy.coverage.length === 0) {
+        newWarnings.push("No Coverage Limits found. A standard policy should list limits (e.g., Dwelling, Personal Property).");
+    } else {
+        const hasPersonalProperty = editedPolicy.coverage.some(c => c.category.toLowerCase().includes('personal property') || c.category.includes('Coverage C'));
+        if (!hasPersonalProperty) {
+            newWarnings.push("Missing Personal Property (Coverage C) limit. This is required to determine maximum payout for inventory items.");
+        }
+    }
+    if (!editedPolicy.exclusions || editedPolicy.exclusions.length === 0) {
+        newWarnings.push("No exclusions detected. All standard insurance policies contain exclusions (e.g., Flood, Earth Movement).");
+    }
+    if (!editedPolicy.triggers || editedPolicy.triggers.length === 0) {
+        newWarnings.push("No covered perils (triggers) detected. The policy must list what causes of loss are covered.");
+    }
+    
+    // Merge existing warnings from the report that might not be static schema checks
+    const aiWarnings = (report.warnings || []).filter(w => !newWarnings.includes(w));
+    setWarnings([...newWarnings, ...aiWarnings]);
+  }, [editedPolicy, report.warnings]);
 
   const handleSubmit = () => {
     onSave({ ...report, parsedPolicy: editedPolicy, warnings: warnings });
@@ -150,6 +248,13 @@ const PolicyReviewModal: React.FC<PolicyReviewModalProps> = ({ report, onSave, o
                     label="Compare Policies" 
                 />
             )}
+            <TabButton 
+                active={activeTab === 'validation'} 
+                onClick={() => setActiveTab('validation')} 
+                icon={<ExclamationTriangleIcon className="h-4 w-4"/>} 
+                label="Validation" 
+                count={warnings.length > 0 ? warnings.length : undefined}
+            />
         </div>
 
         {/* Content Area */}
@@ -186,6 +291,22 @@ const PolicyReviewModal: React.FC<PolicyReviewModalProps> = ({ report, onSave, o
                             <div>
                                 <label className="block text-xs font-semibold text-slate-600 mb-1">Policyholder(s)</label>
                                 <input type="text" value={editedPolicy.policyHolder || ''} onChange={e => updateField('policyHolder', e.target.value)} className="w-full p-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none" />
+                            </div>
+
+                            <div className="pt-4 border-t border-slate-200 mt-6">
+                                <label className="block text-xs font-semibold text-slate-600 mb-2">Specific Deductibles</label>
+                                <RecordEditor
+                                    items={editedPolicy.state?.deductibles || {}}
+                                    onChange={(newDeductibles) => {
+                                        updateField('state', {
+                                            ...(editedPolicy.state || { subLimits: {}, exclusions: [] }),
+                                            deductibles: newDeductibles
+                                        });
+                                    }}
+                                    keyPlaceholder="Peril (e.g., Wind/Hail)"
+                                    valuePlaceholder="Amount"
+                                    emptyText="No specific deductibles found."
+                                />
                             </div>
                         </div>
                     </div>
@@ -226,6 +347,38 @@ const PolicyReviewModal: React.FC<PolicyReviewModalProps> = ({ report, onSave, o
                 </div>
             )}
 
+            {activeTab === 'validation' && (
+                <div className="max-w-3xl mx-auto space-y-6">
+                    <div className="mb-6 flex items-center gap-3 bg-amber-50 p-4 rounded-lg border border-amber-100 text-amber-900">
+                        <ExclamationTriangleIcon className="h-6 w-6"/>
+                        <div>
+                            <h4 className="font-bold">Data Validation Issues</h4>
+                            <p className="text-sm opacity-80">We cross-referenced the extracted data against common insurance policy structures. Address these potential discrepancies.</p>
+                        </div>
+                    </div>
+                    
+                    {warnings.length === 0 ? (
+                        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-8 text-center text-emerald-800">
+                            <CheckCircleIcon className="h-12 w-12 mx-auto mb-3 opacity-80" />
+                            <h4 className="font-bold text-lg">All Checks Passed</h4>
+                            <p className="text-sm mt-1">The parsed policy appears to have all required structural elements and thresholds.</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {warnings.map((warning, i) => (
+                                <div key={i} className="flex gap-3 items-start bg-white border border-rose-100 p-4 rounded-xl shadow-sm text-rose-800 hover:shadow-md transition">
+                                    <ExclamationTriangleIcon className="h-5 w-5 shrink-0 mt-0.5 text-rose-500" />
+                                    <div>
+                                        <p className="font-semibold text-sm">{warning}</p>
+                                        <p className="text-xs text-rose-600/80 mt-1">Please navigate to the appropriate tab to manually update this information.</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
             {activeTab === 'triggers' && (
                 <div className="max-w-3xl mx-auto">
                     <div className="mb-6 flex items-center gap-3 bg-indigo-50 p-4 rounded-lg border border-indigo-100 text-indigo-900">
@@ -245,20 +398,38 @@ const PolicyReviewModal: React.FC<PolicyReviewModalProps> = ({ report, onSave, o
             )}
 
             {activeTab === 'limits' && (
-                <div className="max-w-3xl mx-auto">
-                    <div className="mb-6 flex items-center gap-3 bg-slate-50 p-4 rounded-lg border border-slate-200 text-slate-800">
-                        <TagIcon className="h-6 w-6"/>
-                        <div>
-                            <h4 className="font-bold">Special Limits Clauses</h4>
-                            <p className="text-sm opacity-80">Specific sub-limits described in text (e.g. '$200 for money'). Used for fine-tuning coverage.</p>
+                <div className="max-w-3xl mx-auto space-y-8">
+                    <div>
+                        <div className="mb-6 flex items-center gap-3 bg-slate-50 p-4 rounded-lg border border-slate-200 text-slate-800">
+                            <TagIcon className="h-6 w-6"/>
+                            <div>
+                                <h4 className="font-bold">Granular Sub-Limits</h4>
+                                <p className="text-sm opacity-80">Limits based on category extracted via AI (e.g., Electronics, Jewelry).</p>
+                            </div>
                         </div>
+                        <RecordEditor
+                            items={editedPolicy.state?.subLimits || {}}
+                            onChange={(newSubLimits) => {
+                                updateField('state', {
+                                    ...(editedPolicy.state || { deductibles: {}, exclusions: [] }),
+                                    subLimits: newSubLimits
+                                });
+                            }}
+                            keyPlaceholder="Category (e.g., Jewelry)"
+                            valuePlaceholder="Amount"
+                            emptyText="No granular sub-limits found."
+                        />
                     </div>
-                    <ArrayEditor 
-                        items={editedPolicy.limits || []} 
-                        onChange={(items) => updateField('limits', items)}
-                        emptyText="No special textual limits detected."
-                        placeholder="e.g. $1,500 limit for jewelry theft"
-                    />
+
+                    <div className="pt-6 border-t border-slate-200">
+                        <h4 className="font-bold text-slate-700 mb-4">Unstructured Limit Clauses</h4>
+                        <ArrayEditor 
+                            items={editedPolicy.limits || []} 
+                            onChange={(items) => updateField('limits', items)}
+                            emptyText="No special textual limits detected."
+                            placeholder="e.g. $1,500 limit for jewelry theft"
+                        />
+                    </div>
                 </div>
             )}
 

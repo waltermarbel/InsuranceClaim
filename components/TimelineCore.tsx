@@ -158,10 +158,10 @@ export const TimelineCore: React.FC<TimelineCoreProps> = ({ claimDetails, onUpda
                             <textarea value={selectedEvent.description} onChange={e => handleUpdateEvent(selectedEvent.id, { description: e.target.value })} rows={3} className="w-full text-sm border-slate-200 rounded p-2 focus:ring-primary focus:border-primary"/>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             {/* Evidence Links */}
                             <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
-                                <h4 className="font-bold text-slate-700 text-sm mb-3 flex items-center gap-2"><DocumentTextIcon className="h-4 w-4 text-slate-400"/> Documents / Evidence</h4>
+                                <h4 className="font-bold text-slate-700 text-sm mb-3 flex items-center gap-2"><DocumentTextIcon className="h-4 w-4 text-slate-400"/> Evidence</h4>
                                 <div className="space-y-2 mb-3">
                                     {selectedEvent.linkedDocumentIds.map(docId => {
                                         const d = availableDocs.find(x => x.id === docId);
@@ -174,7 +174,7 @@ export const TimelineCore: React.FC<TimelineCoreProps> = ({ claimDetails, onUpda
                                     })}
                                 </div>
                                 <select 
-                                    className="w-full text-xs border-slate-200 rounded p-1"
+                                    className="w-full text-xs border-slate-200 rounded p-1.5 focus:ring-primary focus:border-primary"
                                     onChange={e => {
                                         if (e.target.value && !selectedEvent.linkedDocumentIds.includes(e.target.value)) {
                                             handleUpdateEvent(selectedEvent.id, { linkedDocumentIds: [...selectedEvent.linkedDocumentIds, e.target.value] });
@@ -189,9 +189,39 @@ export const TimelineCore: React.FC<TimelineCoreProps> = ({ claimDetails, onUpda
                                 </select>
                             </div>
 
+                            {/* Linked Items */}
+                            <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
+                                <h4 className="font-bold text-slate-700 text-sm mb-3 flex items-center gap-2"><CubeIcon className="h-4 w-4 text-slate-400"/> Linked Items</h4>
+                                <div className="space-y-2 mb-3">
+                                    {selectedEvent.linkedItemIds?.map(itemId => {
+                                        const item = availableItems.find(x => x.id === itemId);
+                                        return item ? (
+                                            <div key={itemId} className="flex justify-between items-center text-xs bg-white border border-slate-200 p-2 rounded">
+                                                <span className="truncate">{item.claimDescription || item.category}</span>
+                                                <button onClick={() => handleUpdateEvent(selectedEvent.id, { linkedItemIds: (selectedEvent.linkedItemIds || []).filter(id => id !== itemId) })} className="text-slate-400 hover:text-rose-500">&times;</button>
+                                            </div>
+                                        ) : null;
+                                    })}
+                                </div>
+                                <select 
+                                    className="w-full text-xs border-slate-200 rounded p-1.5 focus:ring-primary focus:border-primary"
+                                    onChange={e => {
+                                        if (e.target.value && !(selectedEvent.linkedItemIds || []).includes(e.target.value)) {
+                                            handleUpdateEvent(selectedEvent.id, { linkedItemIds: [...(selectedEvent.linkedItemIds || []), e.target.value] });
+                                        }
+                                        e.target.value = '';
+                                    }}
+                                >
+                                    <option value="">+ Link Item</option>
+                                    {availableItems.filter(i => !(selectedEvent.linkedItemIds || []).includes(i.id)).map(i => (
+                                        <option key={i.id} value={i.id}>{i.claimDescription || i.category}</option>
+                                    ))}
+                                </select>
+                            </div>
+
                             {/* Involved Persons */}
                             <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
-                                <h4 className="font-bold text-slate-700 text-sm mb-3 flex items-center gap-2"><UserGroupIcon className="h-4 w-4 text-slate-400"/> Involved Persons</h4>
+                                <h4 className="font-bold text-slate-700 text-sm mb-3 flex items-center gap-2"><UserGroupIcon className="h-4 w-4 text-slate-400"/> People</h4>
                                 <div className="flex flex-wrap gap-2 mb-3">
                                     {selectedEvent.involvedPersons.map((person, idx) => (
                                         <span key={idx} className="flex items-center gap-1 text-xs bg-white border border-slate-200 px-2 py-1 rounded-full text-slate-700 font-medium">

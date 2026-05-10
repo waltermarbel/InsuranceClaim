@@ -190,7 +190,19 @@ Coverage A (Dwelling): $500,000
 Coverage B (Other Structures): $50,000
 Coverage C (Personal Property): $250,000
 Coverage D (Loss of Use): $100,000
-Deductible: $${simulatedDeductible}
+
+DEDUCTIBLES:
+All Peril Deductible: $${simulatedDeductible}
+Windstorm/Hail Deductible: $${simulatedDeductible * 2}
+Hurricane Deductible: 2% of Coverage A ($10,000)
+
+SPECIAL LIMITS OF LIABILITY:
+1. $200 on money, bank notes, bullion, gold other than goldware.
+2. $1,500 on securities, accounts, deeds, evidences of debt, letters of credit.
+3. $1,500 for loss by theft of jewelry, watches, furs, precious and semiprecious stones.
+4. $2,500 for loss by theft of firearms.
+5. $2,500 for loss by theft of silverware and goldware.
+
 Endorsements: Replacement Cost Value (RCV) applicable to Personal Property.
 `;
                               const simulatedFile = new File([simulatedContent], `Simulated_Policy_${riskProfile.carriers[0].replace(/\s+/g, '_')}.txt`, { type: 'text/plain' });

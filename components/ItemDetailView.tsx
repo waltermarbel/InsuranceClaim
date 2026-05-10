@@ -77,21 +77,25 @@ const ProofThumbnail: React.FC<{ proof: Proof, onZoom: (url: string) => void, on
                     onClick={() => onZoom(displayUrl)} 
                 />
             ) : (
-                <div className="h-full w-full flex flex-col items-center justify-center text-slate-400">
-                    <DocumentTextIcon className="h-8 w-8" />
-                    <span className="text-[9px] mt-1 truncate max-w-full px-1">{proof.fileName}</span>
+                <div className="h-full w-full flex flex-col items-center justify-center text-slate-500 bg-slate-100/50 p-2 text-center">
+                    {proof.type === 'audio' || proof.mimeType?.startsWith('audio/') ? (
+                        <MicrophoneIcon className="h-7 w-7 mb-1 text-slate-400" />
+                    ) : (
+                        <DocumentTextIcon className="h-7 w-7 mb-1 text-slate-400" />
+                    )}
+                    <span className="text-[10px] w-full truncate font-medium">{proof.fileName}</span>
                 </div>
             )}
             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                {displayUrl && (
+                    <button onClick={() => onZoom(displayUrl!)} className="p-1.5 bg-white/90 rounded-full text-slate-700 hover:text-blue-500 transition" title={isImage ? "Zoom Image" : "View Document"}>
+                        <MagnifyingGlassIcon className="h-4 w-4" />
+                    </button>
+                )}
                 {isImage && (
-                    <>
-                        <button onClick={() => onZoom(displayUrl!)} className="p-1.5 bg-white/90 rounded-full text-slate-700 hover:text-blue-500 transition" title="Zoom Image">
-                            <MagnifyingGlassIcon className="h-4 w-4" />
-                        </button>
-                        <button onClick={onEdit} className="p-1.5 bg-white/90 rounded-full text-slate-700 hover:text-primary transition" title="Edit Image">
-                            <PencilSquareIcon className="h-4 w-4" />
-                        </button>
-                    </>
+                    <button onClick={onEdit} className="p-1.5 bg-white/90 rounded-full text-slate-700 hover:text-primary transition" title="Edit Image">
+                        <PencilSquareIcon className="h-4 w-4" />
+                    </button>
                 )}
             </div>
         </div>
@@ -428,21 +432,21 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
                             <div className="flex gap-2">
                                 <button
                                     onClick={() => onRecordAudio(item)}
-                                    className="flex items-center gap-1 px-3 py-1.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-md text-xs font-bold hover:bg-rose-100 transition shadow-sm"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 text-rose-700 border border-rose-100 rounded-full text-xs font-semibold hover:bg-rose-100 transition shadow-sm"
                                 >
                                     <MicrophoneIcon className="h-4 w-4" />
                                     Record Audio
                                 </button>
                                 <button
                                     onClick={onFindWebImage}
-                                    className="flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-md text-xs font-bold hover:bg-blue-100 transition shadow-sm"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-100 rounded-full text-xs font-semibold hover:bg-blue-100 transition shadow-sm"
                                 >
                                     <GlobeIcon className="h-4 w-4" />
                                     Web Image
                                 </button>
                                 <button 
                                     onClick={() => fileInputRef.current?.click()}
-                                    className="flex items-center gap-1 px-3 py-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-md text-xs font-bold hover:bg-indigo-100 transition shadow-sm"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-full text-xs font-semibold hover:bg-indigo-100 transition shadow-sm"
                                 >
                                     <ArrowUpTrayIcon className="h-4 w-4" />
                                     Upload

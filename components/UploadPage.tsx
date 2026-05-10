@@ -1,16 +1,17 @@
 import React, { useRef } from 'react';
 import { motion } from 'motion/react';
 import { UploadIcon, CubeIcon, SpinnerIcon } from './icons.tsx';
-import { UploadProgress } from '../types.ts';
+import { UploadProgress, ParsedPolicy } from '../types.ts';
 
 interface UploadPageProps {
   onFilesSelected: (files: FileList) => void;
   onPolicySelected: (file: File) => void;
   uploadProgress: UploadProgress | null;
   isAnalyzingPolicy?: boolean;
+  activePolicy?: ParsedPolicy | null;
 }
 
-const UploadPage: React.FC<UploadPageProps> = ({ onFilesSelected, onPolicySelected, uploadProgress, isAnalyzingPolicy }) => {
+const UploadPage: React.FC<UploadPageProps> = ({ onFilesSelected, onPolicySelected, uploadProgress, isAnalyzingPolicy, activePolicy }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -152,6 +153,26 @@ const UploadPage: React.FC<UploadPageProps> = ({ onFilesSelected, onPolicySelect
                     Upload Evidence
                 </button>
             </div>
+            {activePolicy && (
+               <div className="mt-8 text-sm text-indigo-800 bg-indigo-50 p-5 border border-indigo-200 rounded-xl text-left max-w-xl w-full shadow-sm" onClick={e => e.stopPropagation()}>
+                  <p className="font-semibold mb-3 flex items-center gap-2">
+                     <svg className="w-5 h-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                     </svg>
+                     Upload Guidance for {activePolicy.policyName || activePolicy.policyNumber}
+                  </p>
+                  <ul className="list-disc list-inside space-y-2 text-indigo-700">
+                     {activePolicy.conditions?.some(c => c.toLowerCase().includes('receipt') || c.toLowerCase().includes('invoice')) && (
+                         <li>This policy strictly requires clear, legible receipts for all claims. PDF format is highly recommended.</li>
+                     )}
+                     {activePolicy.exclusions?.some(c => c.toLowerCase().includes('jewelry') || c.toLowerCase().includes('art') || c.toLowerCase().includes('electronics')) && (
+                         <li>Certain high-value categories (e.g. jewelry or electronics) require an appraisal or serial number. Standard photos alone may be insufficient.</li>
+                     )}
+                     <li>Ensure photos are well-lit and serial numbers or identifying marks are clearly visible.</li>
+                     <li>Audio notes and PDF documents are fully supported for additional context.</li>
+                  </ul>
+               </div>
+            )}
         </div>
       </div>
       <p className="mt-6 text-sm text-slate-500">

@@ -11,6 +11,7 @@ import { EvidenceVault } from './components/EvidenceVault.tsx';
 import { TimelineView } from './components/TimelineView.tsx';
 import { CollaboratorsView } from './components/CollaboratorsView.tsx';
 import PolicyIngestorPage from './components/PolicyIngestorPage.tsx';
+import PolicyComparisonView from './components/PolicyComparisonView.tsx';
 import ScenarioSimulationPage from './components/ScenarioSimulationPage.tsx';
 import AuditLogPage from './components/AuditLogPage.tsx';
 import { ScribeModule } from './components/ScribeModule.tsx';
@@ -37,7 +38,7 @@ const App: React.FC = () => {
     const { inventory, isInitialized, currentView, selectedItemId, lastScrollPosition, processingQueue } = state;
     
     // Workflow State
-    const [activeTab, setActiveTab] = useState<'evidence' | 'timeline' | 'collaborators' | 'inventory' | 'claim' | 'policy-ingestor' | 'simulation' | 'audit' | 'scribe'>('claim');
+    const [activeTab, setActiveTab] = useState<'evidence' | 'timeline' | 'collaborators' | 'inventory' | 'claim' | 'policy-ingestor' | 'simulation' | 'audit' | 'scribe' | 'policy-comparison'>('claim');
     // New: Central search state for AI control
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -186,12 +187,16 @@ startxref
 
 
     // --- NAVIGATION HANDLER ---
-    const handleNavigate = (tab: 'evidence' | 'timeline' | 'collaborators' | 'inventory' | 'claim' | 'policy-ingestor' | 'simulation' | 'audit') => {
-        setActiveTab(tab);
+    const handleNavigate = useCallback((tab: 'evidence' | 'timeline' | 'collaborators' | 'inventory' | 'claim' | 'policy-ingestor' | 'simulation' | 'audit' | 'scribe' | 'policy-comparison') => {
+        setActiveTab(tab as any);
         if (currentView !== 'dashboard') {
             dispatch({ type: 'SET_VIEW', payload: 'dashboard' });
         }
-    };
+    }, [currentView, dispatch]);
+
+    const handleAskGemini = useCallback(() => {
+        setShowAssistant(true);
+    }, []);
 
     // --- AUTOMATED ENRICHMENT PIPELINE ---
     const runForensicEnrichment = useCallback(async (items: InventoryItem[]) => {
@@ -803,6 +808,10 @@ startxref
                     key = 'policy-ingestor';
                     content = <PolicyIngestorPage onPolicySelected={handlePolicyUpload} isAnalyzingPolicy={isAnalyzingPolicy} />;
                     break;
+                case 'policy-comparison':
+                    key = 'policy-comparison';
+                    content = <PolicyComparisonView />;
+                    break;
                 case 'simulation':
                     key = 'simulation';
                     content = <ScenarioSimulationPage inventory={inventory} policies={state.policies} />;
@@ -860,7 +869,9 @@ startxref
             <Header 
                 activeTab={activeTab}
                 onNavigate={handleNavigate}
-                onAskGemini={() => setShowAssistant(true)}
+                onAskGemini={handleAskGemini}
+                searchTerm={searchTerm}
+                onSearchTermChange={setSearchTerm}
             />
             
             <main className="container mx-auto px-4 md:px-8 py-8 transition-all duration-300">

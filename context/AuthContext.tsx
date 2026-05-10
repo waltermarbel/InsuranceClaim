@@ -28,8 +28,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return () => unsubscribe();
     }, []);
 
+    const contextValue = React.useMemo(() => ({
+        user,
+        isAuthReady,
+        signIn: signInWithGoogle,
+        signOut: logOut
+    }), [user, isAuthReady]);
+
     return (
-        <AuthContext.Provider value={{ user, isAuthReady, signIn: signInWithGoogle, signOut: logOut }}>
+        <AuthContext.Provider value={contextValue}>
             {children}
         </AuthContext.Provider>
     );

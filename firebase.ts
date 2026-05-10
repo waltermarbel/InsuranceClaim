@@ -38,6 +38,22 @@ export const logOut = async () => {
     }
 };
 
+export const connectGooglePhotos = async () => {
+    const provider = new GoogleAuthProvider();
+    provider.addScope('https://www.googleapis.com/auth/photoslibrary.readonly');
+    const result = await signInWithPopup(auth, provider);
+    const credential = GoogleAuthProvider.credentialFromResult(result);
+    return credential?.accessToken;
+};
+
+export const connectGmail = async () => {
+    const provider = new GoogleAuthProvider();
+    provider.addScope('https://www.googleapis.com/auth/gmail.readonly');
+    const result = await signInWithPopup(auth, provider);
+    const credential = GoogleAuthProvider.credentialFromResult(result);
+    return credential?.accessToken;
+};
+
 export enum OperationType {
     CREATE = 'create',
     UPDATE = 'update',

@@ -219,6 +219,7 @@ const StrategicDashboard: React.FC<StrategicDashboardProps> = ({ onPolicyUpload,
     const [selectedItemForNarrative, setSelectedItemForNarrative] = useState<InventoryItem | null>(null);
     const [optimizedNarrative, setOptimizedNarrative] = useState<string>('');
     const [isNarrativeLoading, setIsNarrativeLoading] = useState(false);
+    const [isGeneratingClaimNarrative, setIsGeneratingClaimNarrative] = useState(false);
     const [showReportGenerator, setShowReportGenerator] = useState(false);
     const [showNewClaimWizard, setShowNewClaimWizard] = useState(false);
     const [showEscalationManager, setShowEscalationManager] = useState(false);
@@ -355,6 +356,27 @@ const StrategicDashboard: React.FC<StrategicDashboardProps> = ({ onPolicyUpload,
             if (logActivity) logActivity('CLAIM_DETAILS_UPDATED', `Updated claim incident/details logic params.`, 'User Manual Input', 'Assert');
         }
     };
+
+    const handleGenerateClaimNarrative = useCallback(async () => {
+        if (!currentClaim || !activePolicy || !accountHolder) return;
+        setIsGeneratingClaimNarrative(true);
+        try {
+            const claimItemsData = inventory.filter(img => currentClaim.claimItems.some(ci => ci.masterItemId === img.id));
+            const narrative = await geminiService.generateClaimNarrative(
+                currentClaim.incidentDetails, 
+                accountHolder, 
+                claimItemsData, 
+                activePolicy
+            );
+            handleUpdateClaimDetails({ narrative });
+            if (logActivity) logActivity('CLAIM_NARRATIVE_GENERATED', `AI generated a claim narrative.`, 'System Action', 'Gemini');
+        } catch (error) {
+            console.error("Failed to generate claim narrative:", error);
+            alert("Failed to generate narrative. See console for details.");
+        } finally {
+            setIsGeneratingClaimNarrative(false);
+        }
+    }, [currentClaim, activePolicy, accountHolder, inventory, logActivity]);
 
     const handleGenerateNarrative = useCallback(async () => {
         if (!selectedItemForNarrative || !activePolicy || !currentClaim) return;
@@ -722,6 +744,8 @@ const StrategicDashboard: React.FC<StrategicDashboardProps> = ({ onPolicyUpload,
                             <ClaimDetailsEditor 
                                 details={currentClaim.incidentDetails} 
                                 onUpdate={handleUpdateClaimDetails} 
+                                onGenerateNarrative={handleGenerateClaimNarrative}
+                                isGeneratingNarrative={isGeneratingClaimNarrative}
                             />
                             
                             {/* Timeline Core */}

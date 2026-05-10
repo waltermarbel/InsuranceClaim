@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ActivityLogEntry } from '../types.ts';
 import { DocumentMagnifyingGlassIcon, SparklesIcon, CubeIcon, ExclamationTriangleIcon, CheckCircleIcon } from './icons.tsx';
-import { useAppState } from '../context/AppContext.tsx';
+import { useAppState, useAppDispatch } from '../context/AppContext.tsx';
 import { runAuditorAnalysis } from '../services/geminiService.ts';
 
 interface AuditLogPageProps {
@@ -11,16 +11,21 @@ interface AuditLogPageProps {
 
 const AuditLogPage: React.FC<AuditLogPageProps> = ({ activityLog }) => {
     const { claims, inventory, accountHolder } = useAppState();
+    const dispatch = useAppDispatch();
     
     const [activeTab, setActiveTab] = useState<'ledger' | 'auditor'>('auditor');
     const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [actorFilter, setActorFilter] = useState<'all' | 'Assert' | 'Gemini'>('all');
+    
     const [analysisResult, setAnalysisResult] = useState<{
          priceWarnings: { id: string, title: string, finding: string, type: 'success' | 'warning' }[],
          lifestyleWarnings: { id: string, title: string, finding: string, suggestion: string, type: 'warning' }[]
     } | null>(null);
 
-    // Sort log entries newest first
-    const sortedLog = [...activityLog].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    // Sort log entries newest first and apply filter
+    const sortedLog = [...activityLog]
+        .filter(entry => actorFilter === 'all' || entry.app === actorFilter)
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
     const runAnalysis = async () => {
         setIsAnalyzing(true);
@@ -34,6 +39,18 @@ const AuditLogPage: React.FC<AuditLogPageProps> = ({ activityLog }) => {
             });
             const result = await runAuditorAnalysis(claims, inventory, accountHolder, timelineEvents);
             setAnalysisResult(result);
+            
+            const totalWarnings = result.priceWarnings.filter(w => w.type === 'warning').length + result.lifestyleWarnings.length;
+            dispatch({
+                type: 'LOG_ACTIVITY',
+                payload: {
+                    action: 'AI_AUDIT_RUN',
+                    details: `System Auditor completed full review. Found ${totalWarnings} warnings.`,
+                    reasonForChange: 'Background Validation',
+                    app: 'Gemini'
+                }
+            });
+            
         } catch(e) {
             console.error(e);
         } finally {
@@ -146,6 +163,17 @@ const AuditLogPage: React.FC<AuditLogPageProps> = ({ activityLog }) => {
 
             {activeTab === 'ledger' && (
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex-1 flex flex-col">
+                <div className="border-b border-slate-100 p-4 shrink-0 flex justify-end">
+                    <select 
+                        value={actorFilter} 
+                        onChange={(e) => setActorFilter(e.target.value as any)}
+                        className="text-sm form-select px-3 py-1.5 border-slate-200 rounded-lg cursor-pointer bg-slate-50 text-slate-700 font-medium"
+                    >
+                        <option value="all">All Actors</option>
+                        <option value="Assert">System / User</option>
+                        <option value="Gemini">AI Validation (Gemini)</option>
+                    </select>
+                </div>
                 {sortedLog.length === 0 ? (
                     <div className="flex flex-col items-center justify-center p-12 text-slate-400 flex-1">
                         <DocumentMagnifyingGlassIcon className="h-12 w-12 mb-4 text-slate-300" />

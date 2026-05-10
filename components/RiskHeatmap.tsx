@@ -7,9 +7,10 @@ interface RiskHeatmapProps {
     gaps: RiskGap[];
     isLoading: boolean;
     onCategoryClick?: (category: string) => void;
+    selectedCategories?: Set<string>;
 }
 
-const RiskHeatmap: React.FC<RiskHeatmapProps> = ({ gaps, isLoading, onCategoryClick }) => {
+const RiskHeatmap: React.FC<RiskHeatmapProps> = ({ gaps, isLoading, onCategoryClick, selectedCategories = new Set() }) => {
     if (isLoading) {
         return <div className="bg-white p-6 rounded-xl border border-slate-200 animate-pulse h-64"></div>;
     }
@@ -45,26 +46,27 @@ const RiskHeatmap: React.FC<RiskHeatmapProps> = ({ gaps, isLoading, onCategoryCl
                 {gaps.map((gap, idx) => {
                     const percentage = Math.min((gap.totalValue / gap.policyLimit) * 100, 100);
                     const isOverLimit = gap.totalValue > gap.policyLimit;
+                    const isSelected = selectedCategories.has(gap.category);
                     
                     return (
                         <div 
                             key={idx} 
-                            className={`bg-slate-50 rounded-lg p-4 border border-slate-100 relative overflow-hidden group transition-all ${onCategoryClick ? 'cursor-pointer hover:bg-slate-100 hover:shadow-md' : ''}`}
+                            className={`bg-slate-50 rounded-lg p-4 border transition-all ${onCategoryClick ? 'cursor-pointer' : ''} ${isSelected ? 'border-primary ring-2 ring-primary/20 bg-primary/5' : 'border-slate-100 hover:bg-slate-100 hover:shadow-md'}`}
                             onClick={() => onCategoryClick && onCategoryClick(gap.category)}
                         >
                             <div className="flex justify-between items-center mb-2 relative z-10">
-                                <span className="font-semibold text-slate-700">{gap.category}</span>
+                                <span className={`font-semibold ${isSelected ? 'text-primary' : 'text-slate-700'}`}>{gap.category}</span>
                                 <span className={`text-xs font-bold px-2 py-1 rounded ${isOverLimit ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
                                     {isOverLimit ? 'Limit Exceeded' : 'Covered'}
                                 </span>
                             </div>
                             
-                            <div className="flex justify-between text-xs text-slate-500 mb-1 relative z-10">
+                            <div className={`flex justify-between text-xs mb-1 relative z-10 ${isSelected ? 'text-primary/70' : 'text-slate-500'}`}>
                                 <span>${gap.totalValue.toLocaleString()} Value</span>
                                 <span>Limit: ${gap.policyLimit.toLocaleString()}</span>
                             </div>
 
-                            <div className="w-full bg-slate-200 rounded-full h-2 mb-3 relative z-10">
+                            <div className={`w-full rounded-full h-2 mb-3 relative z-10 ${isSelected ? 'bg-primary/20' : 'bg-slate-200'}`}>
                                 <div 
                                     className={`h-2 rounded-full transition-all duration-500 ${isOverLimit ? 'bg-red-500' : 'bg-emerald-500'}`} 
                                     style={{ width: `${percentage}%` }}

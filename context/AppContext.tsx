@@ -557,19 +557,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
     }, [state, user]);
 
-    const undo = () => dispatch({ type: 'GLOBAL_UNDO' });
-    const redo = () => dispatch({ type: 'GLOBAL_REDO' });
+    const canUndo = historyState.past.length > 0;
+    const canRedo = historyState.future.length > 0;
+    const undo = React.useCallback(() => dispatch({ type: 'GLOBAL_UNDO' }), []);
+    const redo = React.useCallback(() => dispatch({ type: 'GLOBAL_REDO' }), []);
+
+    const contextValue = React.useMemo(() => ({
+        state,
+        dispatch,
+        syncStatus,
+        canUndo,
+        canRedo,
+        undo,
+        redo
+    }), [state, dispatch, syncStatus, canUndo, canRedo, undo, redo]);
 
     return (
-        <AppContext.Provider value={{ 
-            state, 
-            dispatch, 
-            syncStatus,
-            canUndo: historyState.past.length > 0,
-            canRedo: historyState.future.length > 0,
-            undo,
-            redo
-        }}>
+        <AppContext.Provider value={contextValue}>
             {children}
         </AppContext.Provider>
     );

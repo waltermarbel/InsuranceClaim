@@ -173,16 +173,16 @@ const GeminiAssistant: React.FC<GeminiAssistantProps> = ({ onClose, onNavigate, 
   }, [isLive, stopLiveSession, inventory, policy, selectedItem, currentClaim]);
 
 
-  const handleSubmit = async () => {
-    if (!inputText.trim()) return;
-    const userMessage: ChatMessage = { id: `user-${Date.now()}`, role: 'user', text: inputText };
+  const handleSend = async (textToSubmit: string) => {
+    if (!textToSubmit.trim()) return;
+    const userMessage: ChatMessage = { id: `user-${Date.now()}`, role: 'user', text: textToSubmit };
     const loadingMessage: ChatMessage = { id: `model-${Date.now()}`, role: 'model', text: '', isLoading: true };
 
     setMessages(prev => [...prev, userMessage, loadingMessage]);
     setInputText('');
 
     try {
-      const response = await geminiService.getChatResponse(messages, inputText, isThinkingMode, inventory, policy, selectedItem, currentClaim);
+      const response = await geminiService.getChatResponse(messages, textToSubmit, isThinkingMode, inventory, policy, selectedItem, currentClaim);
       
       let responseText = response.text || "";
       const toolCalls = response.functionCalls;
@@ -217,6 +217,8 @@ const GeminiAssistant: React.FC<GeminiAssistantProps> = ({ onClose, onNavigate, 
     }
   };
 
+  const handleSubmit = () => handleSend(inputText);
+
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-center items-center p-4" onClick={onClose}>
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl h-[80vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
@@ -226,6 +228,26 @@ const GeminiAssistant: React.FC<GeminiAssistantProps> = ({ onClose, onNavigate, 
         </div>
         
         <div className="flex-grow p-4 overflow-y-auto space-y-4">
+          {!isLive && messages.length === 0 && (
+              <div className="flex flex-col items-center justify-center h-full space-y-6 text-center text-medium">
+                <SparklesIcon className="h-12 w-12 text-slate-300" />
+                <p className="text-lg">How can I help you today?</p>
+                <div className="flex flex-col gap-2 w-full max-w-sm">
+                  <button onClick={() => handleSend('Summarize my active claim')} className="px-4 py-3 bg-white border border-slate-200 rounded-lg shadow-sm hover:bg-slate-50 hover:border-primary transition text-sm text-dark font-medium text-left flex items-center justify-between group">
+                    Summarize my active claim
+                    <span className="text-primary opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+                  </button>
+                  <button onClick={() => handleSend('Find evidence for item ID ABC')} className="px-4 py-3 bg-white border border-slate-200 rounded-lg shadow-sm hover:bg-slate-50 hover:border-primary transition text-sm text-dark font-medium text-left flex items-center justify-between group">
+                    Find evidence for item ID ABC
+                    <span className="text-primary opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+                  </button>
+                  <button onClick={() => handleSend('Navigate to my inventory')} className="px-4 py-3 bg-white border border-slate-200 rounded-lg shadow-sm hover:bg-slate-50 hover:border-primary transition text-sm text-dark font-medium text-left flex items-center justify-between group">
+                    Navigate to my inventory
+                    <span className="text-primary opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+                  </button>
+                </div>
+              </div>
+          )}
           {messages.map((msg) => (
             <div key={msg.id} className={`flex items-start gap-3 ${msg.role === 'user' ? 'justify-end' : ''}`}>
               {msg.role === 'model' && <div className="flex-shrink-0 bg-primary/10 rounded-full p-2 mt-1"><SparklesIcon className="h-5 w-5 text-primary"/></div>}

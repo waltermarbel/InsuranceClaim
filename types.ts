@@ -20,6 +20,8 @@ export interface Proof {
         date?: string;
         amount?: number;
         itemNames?: string[];
+        basicDetails?: string;
+        suggestedCategory?: string;
     };
     contradictionFlag?: string;
     exif?: {
@@ -211,6 +213,7 @@ export interface ClaimDetails {
     location: string;
     policeReport: string;
     propertyDamageDetails: string;
+    narrative?: string;
     claimDateRange?: ClaimDateRange;
     fairRentalValuePerDay?: number;
     aleProofs: Proof[];
