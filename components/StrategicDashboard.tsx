@@ -14,40 +14,50 @@ import { ScoreIndicator } from './ScoreIndicator.tsx';
 import { TaskBoard } from './TaskBoard.tsx';
 import EscalationManager from './EscalationManager.tsx';
 import ScenarioSimulatorModal from './ScenarioSimulatorModal.tsx';
+import { TimelineCore } from './TimelineCore.tsx';
+import ClaimStrategyGuide from './ClaimStrategyGuide.tsx';
 
 interface StrategicDashboardProps {
     onPolicyUpload: (file: File) => void;
     isPolicyAnalyzing: boolean;
+    logActivity?: (action: string, details: string, reasonForChange?: string, app?: 'Assert' | 'Gemini') => void;
 }
 
-const STAGES: ClaimStage[] = ['Incident', 'Inventory', 'Valuation', 'Evidence', 'Review', 'Submitted'];
+const STAGES: ClaimStage[] = ['INTAKE', 'BROKEN_REVIEW', 'READY_TO_FILE', 'FILED', 'CLAIM_BOUND', 'READY_TO_SUBMIT', 'UNDER_REVIEW', 'APPROVED'];
 
 const StageStepper: React.FC<{ currentStage: ClaimStage }> = ({ currentStage }) => {
     const currentIndex = STAGES.indexOf(currentStage);
     
     return (
-        <div className="flex items-center w-full mb-8 overflow-x-auto py-2">
-            {STAGES.map((stage, idx) => {
-                const isCompleted = idx < currentIndex;
-                const isCurrent = idx === currentIndex;
-                
-                return (
-                    <React.Fragment key={stage}>
-                        <div className={`flex items-center gap-2 ${isCurrent ? 'opacity-100' : 'opacity-60'}`}>
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all 
-                                ${isCompleted ? 'bg-emerald-500 border-emerald-500 text-white' : 
-                                  isCurrent ? 'bg-white border-primary text-primary shadow-lg scale-110' : 
-                                  'bg-slate-50 border-slate-300 text-slate-400'}`}>
-                                {isCompleted ? <CheckIcon className="h-4 w-4"/> : idx + 1}
+        <div className="w-full mb-8">
+            <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+                <CheckIcon className="h-4 w-4 text-primary" /> Current Claim Stage
+            </h3>
+            <div className="flex items-center w-full overflow-x-auto py-2">
+                {STAGES.map((stage, idx) => {
+                    const isCompleted = idx < currentIndex;
+                    const isCurrent = idx === currentIndex;
+                    
+                    return (
+                        <React.Fragment key={stage}>
+                            <div className={`flex items-center gap-2 ${isCurrent ? 'opacity-100' : 'opacity-60'} ${isCurrent ? 'scale-105 transition-transform' : ''}`}>
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all 
+                                    ${isCompleted ? 'bg-emerald-500 border-emerald-500 text-white' : 
+                                      isCurrent ? 'bg-white border-primary text-primary shadow-lg scale-110' : 
+                                      'bg-slate-50 border-slate-300 text-slate-400'}`}>
+                                    {isCompleted ? <CheckIcon className="h-4 w-4"/> : idx + 1}
+                                </div>
+                                <span className={`text-[10px] sm:text-xs font-bold whitespace-nowrap ${isCurrent ? 'text-primary' : 'text-slate-500'}`}>
+                                    {stage.replace(/_/g, ' ')}
+                                </span>
                             </div>
-                            <span className={`text-xs font-bold whitespace-nowrap ${isCurrent ? 'text-primary' : 'text-slate-500'}`}>{stage}</span>
-                        </div>
-                        {idx < STAGES.length - 1 && (
-                            <div className={`h-0.5 w-8 mx-2 ${isCompleted ? 'bg-emerald-500' : 'bg-slate-200'}`}></div>
-                        )}
-                    </React.Fragment>
-                );
-            })}
+                            {idx < STAGES.length - 1 && (
+                                <div className={`h-0.5 min-w-[1rem] flex-grow mx-2 ${isCompleted ? 'bg-emerald-500' : 'bg-slate-200'}`}></div>
+                            )}
+                        </React.Fragment>
+                    );
+                })}
+            </div>
         </div>
     );
 };
@@ -56,7 +66,7 @@ const ClaimWizard: React.FC<{
     activePolicy: ParsedPolicy, 
     inventory: InventoryItem[],
     onClose: () => void,
-    onCreateClaim: (incidentType: string, date: string, description: string) => void,
+    onCreateClaim: (incidentType: string, date: string, description: string, inferredCategories?: string[]) => void,
     suggestedScenarios: ClaimScenario[]
 }> = ({ activePolicy, inventory, onClose, onCreateClaim, suggestedScenarios }) => {
     const [step, setStep] = useState(1);
@@ -77,29 +87,19 @@ const ClaimWizard: React.FC<{
         if (!prompt.trim()) return;
         setIsAnalyzing(true);
         try {
-            // Simulated AI extraction from natural language
-            // In a real app, this would use geminiService to extract intent
-            const simulatedDelay = (ms: number) => new Promise(res => setTimeout(res, ms));
-            await simulatedDelay(1500);
+            const intent = await geminiService.extractClaimIntent(prompt, policyTriggers);
             
-            // Mock logic for demo purposes based on keywords
-            const lowerPrompt = prompt.toLowerCase();
-            if (lowerPrompt.includes('fire') || lowerPrompt.includes('kitchen')) {
-                setSelectedIncident('Fire');
-                setDescription(prompt);
-            } else if (lowerPrompt.includes('stole') || lowerPrompt.includes('theft')) {
-                setSelectedIncident('Theft');
-                setDescription(prompt);
-            } else if (lowerPrompt.includes('water') || lowerPrompt.includes('leak')) {
-                setSelectedIncident('Water Damage');
-                setDescription(prompt);
-            } else {
-                setSelectedIncident('Other');
-                setDescription(prompt);
-            }
-            setStep(2);
+            // Bypass step 2 and go straight to claim creation to reduce user input
+            onCreateClaim(
+                intent.incidentType || 'Other', 
+                intent.inferredDateOfLoss || new Date().toISOString().split('T')[0], 
+                intent.description || prompt,
+                intent.inferredItemCategories
+            );
         } catch (e) {
             console.error(e);
+            alert("Analysis failed. Proceeding manually.");
+            setStep(2);
         } finally {
             setIsAnalyzing(false);
         }
@@ -188,7 +188,7 @@ const ClaimWizard: React.FC<{
                                 />
                             </div>
 
-                            <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-100 text-sm text-indigo-800">
+                            <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 text-sm text-blue-800">
                                 <p className="font-bold flex items-center gap-2"><InformationCircleIcon className="h-4 w-4"/> Next Steps</p>
                                 <p className="mt-1">We will generate a task list and document checklist specific to <strong>{selectedIncident}</strong> claims.</p>
                             </div>
@@ -210,7 +210,7 @@ const ClaimWizard: React.FC<{
     );
 };
 
-const StrategicDashboard: React.FC<StrategicDashboardProps> = ({ onPolicyUpload, isPolicyAnalyzing }) => {
+const StrategicDashboard: React.FC<StrategicDashboardProps> = ({ onPolicyUpload, isPolicyAnalyzing, logActivity }) => {
     const { inventory, policies, claims, currentClaimId, accountHolder } = useAppState();
     const dispatch = useAppDispatch();
     
@@ -223,6 +223,7 @@ const StrategicDashboard: React.FC<StrategicDashboardProps> = ({ onPolicyUpload,
     const [showNewClaimWizard, setShowNewClaimWizard] = useState(false);
     const [showEscalationManager, setShowEscalationManager] = useState(false);
     const [showSimulator, setShowSimulator] = useState(false);
+    const [showStrategyGuide, setShowStrategyGuide] = useState(false);
     const [autoSaveStatus, setAutoSaveStatus] = useState<'saved' | 'saving'>('saved');
     
     // Scenarios State
@@ -271,7 +272,7 @@ const StrategicDashboard: React.FC<StrategicDashboardProps> = ({ onPolicyUpload,
         }
     }, [activePolicy, inventory.length, suggestedScenarios.length, refreshScenarios]);
 
-    const handleCreateClaim = (incidentType: string, date: string, description: string) => {
+    const handleCreateClaim = (incidentType: string, date: string, description: string, inferredCategories?: string[]) => {
         if (!activePolicy) return;
         
         const incident: ClaimDetails = {
@@ -285,8 +286,9 @@ const StrategicDashboard: React.FC<StrategicDashboardProps> = ({ onPolicyUpload,
             claimDocuments: []
         };
 
-        const newClaim = claimService.generateClaimInventory(inventory, activePolicy, incident);
+        const newClaim = claimService.generateClaimInventory(inventory, activePolicy, incident, inferredCategories);
         dispatch({ type: 'CREATE_CLAIM', payload: newClaim });
+        if (logActivity) logActivity('CLAIM_CREATED', `Initialized new claim strategy for ${incidentType}`, 'Auto-Pilot Inference / Wizard Execution', 'Gemini');
 
         const requirements = claimService.getIncidentRequirements(incidentType);
         
@@ -343,12 +345,14 @@ const StrategicDashboard: React.FC<StrategicDashboardProps> = ({ onPolicyUpload,
     const handleUpdateClaimItem = (item: ClaimItem, updates: Partial<ClaimItem>) => {
         if (currentClaim) {
             dispatch({ type: 'UPDATE_CLAIM_ITEM', payload: { claimId: currentClaim.id, item: { ...item, ...updates } } });
+            if (logActivity) logActivity('CLAIM_ITEM_UPDATED', `Updated mapping logic for claim item via manual adjustment.`, 'User Manual Override', 'Assert');
         }
     };
     
     const handleUpdateClaimDetails = (updates: Partial<ClaimDetails>) => {
         if (currentClaim) {
             dispatch({ type: 'UPDATE_CLAIM_DETAILS', payload: { claimId: currentClaim.id, details: updates } });
+            if (logActivity) logActivity('CLAIM_DETAILS_UPDATED', `Updated claim incident/details logic params.`, 'User Manual Input', 'Assert');
         }
     };
 
@@ -359,13 +363,14 @@ const StrategicDashboard: React.FC<StrategicDashboardProps> = ({ onPolicyUpload,
         try {
             const result = await geminiService.generateOptimizedNarrative(selectedItemForNarrative, activePolicy, currentClaim.incidentDetails);
             setOptimizedNarrative(result);
+            if (logActivity) logActivity('NARRATIVE_ENGINEERED', `Autonomous Narrative engineered for item ID: ${selectedItemForNarrative.id}`, 'Policy-Compliant Execution', 'Gemini');
         } catch (error) {
             console.error(error);
             setOptimizedNarrative("Error: Could not generate an optimized narrative.");
         } finally {
             setIsNarrativeLoading(false);
         }
-    }, [selectedItemForNarrative, activePolicy, currentClaim]);
+    }, [selectedItemForNarrative, activePolicy, currentClaim, logActivity]);
 
     const handleUpdatePolicy = (policy: ParsedPolicy) => {
         dispatch({ type: 'UPDATE_POLICY', payload: policy });
@@ -394,8 +399,8 @@ const StrategicDashboard: React.FC<StrategicDashboardProps> = ({ onPolicyUpload,
         >
             <div className="flex justify-between items-end mb-8 pt-4">
                 <div>
-                    <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight font-heading">Command Center</h1>
-                    <p className="text-sm text-slate-500 mt-1">Manage claim lifecycle, compliance, and strategy.</p>
+                    <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight font-heading">Autonomous Claims Arbitrage Engine</h1>
+                    <p className="text-sm text-slate-500 mt-1">Node C: Optimize valuation, enforce state compliance, and manage policy limits.</p>
                 </div>
                 <div className="flex items-center gap-4">
                     <div className="text-xs font-bold text-slate-400 flex items-center gap-1.5 bg-slate-100 px-3 py-1.5 rounded-full">
@@ -414,12 +419,20 @@ const StrategicDashboard: React.FC<StrategicDashboardProps> = ({ onPolicyUpload,
                         <CalculatorIcon className="h-4 w-4"/>
                         Simulate Claim
                     </button>
+                    
+                    <button 
+                        onClick={() => setShowStrategyGuide(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-bold rounded-lg hover:bg-indigo-100 transition-all shadow-sm"
+                    >
+                        <BriefcaseIcon className="h-4 w-4"/>
+                        Review Playbooks
+                    </button>
 
                     {currentClaim && (
                         <div className="flex gap-2">
                             <button 
                                 onClick={() => setShowEscalationManager(true)}
-                                disabled={currentClaim.stage !== 'Submitted' && currentClaim.stage !== 'Review'}
+                                disabled={currentClaim.stage !== 'APPROVED' && currentClaim.stage !== 'UNDER_REVIEW'}
                                 className="flex items-center gap-2 px-4 py-2 bg-rose-600 text-white text-xs font-bold rounded-lg hover:bg-rose-700 shadow-md transition-all active:scale-95 disabled:opacity-50 disabled:bg-slate-300 disabled:cursor-not-allowed"
                             >
                                 <ShieldExclamationIcon className="h-3 w-3" />
@@ -464,7 +477,7 @@ const StrategicDashboard: React.FC<StrategicDashboardProps> = ({ onPolicyUpload,
                                                 <p className={`text-sm font-bold truncate max-w-[150px] ${currentClaimId === claim.id ? 'text-primary' : 'text-slate-700'}`}>{claim.name}</p>
                                                 <p className="text-xs text-slate-500 mt-0.5">{claim.incidentDetails.incidentType}</p>
                                             </div>
-                                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${claim.stage === 'Submitted' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{claim.stage}</span>
+                                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${claim.stage === 'FILED' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{claim.stage}</span>
                                         </div>
                                         <div className="flex justify-between items-center mt-2">
                                             <p className="text-xs font-bold text-slate-700">${claim.totalClaimValue.toLocaleString()}</p>
@@ -554,39 +567,120 @@ const StrategicDashboard: React.FC<StrategicDashboardProps> = ({ onPolicyUpload,
 
                             {/* Metrics & Strategy */}
                             {claimMetrics && (
-                                <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-                                    <div className="md:col-span-8 bg-white rounded-xl border border-slate-200 shadow-sm p-6 flex flex-col justify-between">
-                                        <div className="flex justify-between items-start mb-6">
-                                            <div>
-                                                <h2 className="text-lg font-bold text-slate-900 font-heading">Financial Projection</h2>
-                                                <p className="text-xs text-slate-500">Live estimate based on policy terms & inventory.</p>
+                                <div className="space-y-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+                                        <div className="md:col-span-8 bg-white rounded-xl border border-slate-200 shadow-sm p-6 flex flex-col justify-between">
+                                            <div className="flex justify-between items-start mb-6">
+                                                <div>
+                                                    <h2 className="text-lg font-bold text-slate-900 font-heading">Arbitrage Matrix</h2>
+                                                    <p className="text-xs text-slate-500">Live dynamic extraction projection.</p>
+                                                </div>
+                                                <div className={`px-3 py-1 rounded-full text-xs font-bold border ${claimMetrics.netPayout > 0 ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-slate-50 text-slate-500 border-slate-100'}`}>
+                                                    {claimMetrics.netPayout > 0 ? 'Extraction Active' : 'Below Deductible'}
+                                                </div>
                                             </div>
-                                            <div className={`px-3 py-1 rounded-full text-xs font-bold border ${claimMetrics.netPayout > 0 ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-slate-50 text-slate-500 border-slate-100'}`}>
-                                                {claimMetrics.netPayout > 0 ? 'Payout Likely' : 'Below Deductible'}
+                                            <div className="grid grid-cols-3 gap-8">
+                                                <div>
+                                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Gross Loss</p>
+                                                    <p className="text-xl font-bold text-slate-900">${claimMetrics.grossLoss.toLocaleString()}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Deductible</p>
+                                                    <p className="text-xl font-bold text-rose-500">-${claimMetrics.deductible.toLocaleString()}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Net Extraction Expected</p>
+                                                    <p className="text-2xl font-extrabold text-emerald-600">${claimMetrics.netPayout.toLocaleString()}</p>
+                                                </div>
                                             </div>
                                         </div>
-                                        <div className="grid grid-cols-3 gap-8">
-                                            <div>
-                                                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Gross Loss</p>
-                                                <p className="text-xl font-bold text-slate-900">${claimMetrics.grossLoss.toLocaleString()}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Deductible</p>
-                                                <p className="text-xl font-bold text-rose-500">-${claimMetrics.deductible.toLocaleString()}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Net Expected</p>
-                                                <p className="text-2xl font-extrabold text-emerald-600">${claimMetrics.netPayout.toLocaleString()}</p>
+                                        <div className="md:col-span-4 bg-slate-900 rounded-xl shadow-lg p-6 text-white flex flex-col items-center justify-center text-center relative overflow-hidden">
+                                            <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-10 -mt-10"></div>
+                                            <div className="relative z-10">
+                                                <ScoreIndicator score={claimMetrics.strategyScore} size="lg" />
+                                                <p className="mt-3 font-bold uppercase tracking-widest text-xs text-slate-400">Optimization Score</p>
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="md:col-span-4 bg-slate-900 rounded-xl shadow-lg p-6 text-white flex flex-col items-center justify-center text-center relative overflow-hidden">
-                                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-10 -mt-10"></div>
-                                        <div className="relative z-10">
-                                            <ScoreIndicator score={claimMetrics.strategyScore} size="lg" />
-                                            <p className="mt-3 font-bold uppercase tracking-widest text-xs text-slate-400">Strategy Score</p>
-                                        </div>
-                                    </div>
+
+                                    {/* Aggregate Limit Evasion Node */}
+                                    {(() => {
+                                        const personalPropertyLimit = activePolicy?.state?.aggregateLimits?.['Personal Property'] ?? (activePolicy?.coverage?.find(c => c.type === 'main' && c.category === 'Personal Property')?.limit || 0);
+                                        const aggregateLimit = personalPropertyLimit > 0 ? personalPropertyLimit : (activePolicy?.coverageD_limit || 50000);
+                                        const evasionThreshold = aggregateLimit * 0.8;
+                                        const priorClaimsTotal = 750; // Mock prior total
+                                        const totalProjected = (claimMetrics?.netPayout || 0) + priorClaimsTotal;
+                                        const limitPercentage = Math.min((totalProjected / aggregateLimit) * 100, 100);
+                                        const isBreaching = totalProjected >= evasionThreshold;
+
+                                        return (
+                                            <div className="bg-white border text-slate-800 border-slate-200 rounded-xl p-6 shadow-sm relative overflow-hidden">
+                                                <div className="flex justify-between items-end mb-6 relative z-10">
+                                                    <div>
+                                                        <h3 className="font-bold text-slate-800 flex items-center gap-2 text-sm uppercase tracking-wider mb-1">
+                                                            <ChartPieIcon className="h-5 w-5 text-emerald-600" /> Capital Extraction Velocity
+                                                        </h3>
+                                                        <div className="flex items-baseline gap-2">
+                                                            <span className="text-3xl font-extrabold tracking-tight">${totalProjected.toLocaleString()}</span>
+                                                            <span className="text-sm font-bold text-slate-400">/ ${aggregateLimit.toLocaleString()} CAP</span>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div className="text-right">
+                                                        <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Burn Rate</div>
+                                                        <div className={`text-lg font-bold ${isBreaching ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                                            {limitPercentage.toFixed(1)}%
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                
+                                                {/* Proportioned Velocity Bar */}
+                                                <div className="relative w-full h-4 bg-slate-100 rounded-full mb-6 relative z-10 shadow-inner">
+                                                    {/* The Risk Threshold Marker */}
+                                                    <div 
+                                                        className="absolute top-0 bottom-0 border-l-2 border-dashed border-rose-500 z-20"
+                                                        style={{ left: '80%' }}
+                                                    >
+                                                        <div className="absolute -top-5 -translate-x-1/2 text-[10px] font-bold text-rose-500 whitespace-nowrap bg-white px-1">EVASION LINE</div>
+                                                    </div>
+
+                                                    {/* Progress Fill Base */}
+                                                    <div 
+                                                        className={`absolute top-0 left-0 bottom-0 rounded-full transition-all duration-1000 ${isBreaching ? 'bg-rose-500' : 'bg-emerald-500'}`}
+                                                        style={{ width: `${limitPercentage}%` }}
+                                                    >
+                                                        {/* Striped overlay for velocity feel */}
+                                                        <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] rounded-full"></div>
+                                                    </div>
+
+                                                    {/* Prior vs Projected Split Marker */}
+                                                    <div 
+                                                        className="absolute top-0 bottom-0 border-r-2 border-white/50 z-20"
+                                                        style={{ width: `${Math.min((priorClaimsTotal / aggregateLimit) * 100, 100)}%` }}
+                                                    ></div>
+                                                </div>
+                                                
+                                                <div className="flex justify-between text-xs font-bold text-slate-500 relative z-10 px-1">
+                                                    <span>PRIOR: ${priorClaimsTotal.toLocaleString()}</span>
+                                                    <span>NEW TARGET: ${(claimMetrics?.netPayout || 0).toLocaleString()}</span>
+                                                    <span>REMAINING: ${Math.max(0, aggregateLimit - totalProjected).toLocaleString()}</span>
+                                                </div>
+
+                                                {isBreaching && (
+                                                    <div className="mt-6 bg-rose-50 border border-rose-200 text-rose-800 p-4 rounded-lg text-sm flex gap-3 relative z-10 shadow-sm">
+                                                        <ShieldExclamationIcon className="h-6 w-6 flex-shrink-0 text-rose-600"/>
+                                                        <div>
+                                                            <p className="font-bold text-rose-900 uppercase tracking-wide text-xs mb-1">Threshold Breach Detected</p>
+                                                            <p className="text-rose-700 leading-relaxed">
+                                                                Extraction velocity exceeds the safe ${evasionThreshold.toLocaleString()} algorithmic evasion threshold. 
+                                                                <span className="block mt-2 font-bold">Node Action Required: Substitute assigned policyholder or shift asset to alternate risk vector.</span>
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
                             )}
 
@@ -630,6 +724,14 @@ const StrategicDashboard: React.FC<StrategicDashboardProps> = ({ onPolicyUpload,
                                 onUpdate={handleUpdateClaimDetails} 
                             />
                             
+                            {/* Timeline Core */}
+                            <TimelineCore 
+                                claimDetails={currentClaim.incidentDetails}
+                                onUpdateClaimDetails={handleUpdateClaimDetails}
+                                availableItems={currentClaim.claimItems}
+                                availableDocs={[...currentClaim.incidentDetails.claimDocuments, ...currentClaim.incidentDetails.aleProofs]}
+                            />
+                            
                             {/* Claim Inventory Table */}
                             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                                 <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
@@ -638,7 +740,7 @@ const StrategicDashboard: React.FC<StrategicDashboardProps> = ({ onPolicyUpload,
                                             <h3 className="font-bold text-slate-800">Claim Schedule (Layer 2)</h3>
                                             <p className="text-xs text-slate-500">{currentClaim.name}</p>
                                         </div>
-                                        <div className="hidden md:flex items-center gap-1.5 bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-full border border-indigo-100 text-[10px] font-bold uppercase tracking-wide cursor-help group relative">
+                                        <div className="hidden md:flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full border border-blue-100 text-[10px] font-bold uppercase tracking-wide cursor-help group relative">
                                             <InformationCircleIcon className="h-3 w-3"/>
                                             Snapshot Mode
                                             <div className="absolute left-0 top-full mt-2 w-64 bg-slate-800 text-white text-xs font-medium p-3 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition z-50 normal-case leading-snug">
@@ -736,13 +838,13 @@ const StrategicDashboard: React.FC<StrategicDashboardProps> = ({ onPolicyUpload,
                                 </div>
                             </div>
 
-                            {/* Narrative Architect */}
+                            {/* Narrative Engineering Protocol */}
                             <div className="bg-white p-8 rounded-xl border border-slate-200 shadow-sm">
                                 <div className="flex items-center gap-3 mb-6">
                                      <div className="bg-purple-100 p-2 rounded-lg">
                                         <SparklesIcon className="h-6 w-6 text-purple-600"/>
                                      </div>
-                                     <h2 className="text-lg font-bold text-slate-800 font-heading">Narrative Architect</h2>
+                                     <h2 className="text-lg font-bold text-slate-800 font-heading">Narrative Engineering Protocol</h2>
                                 </div>
                                 <div className="space-y-4">
                                     <div>
@@ -754,11 +856,11 @@ const StrategicDashboard: React.FC<StrategicDashboardProps> = ({ onPolicyUpload,
                                     </div>
                                     <button onClick={handleGenerateNarrative} disabled={!selectedItemForNarrative || isNarrativeLoading} className="mt-6 w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-bold bg-purple-600 text-white rounded-lg shadow-md hover:bg-purple-700 transition disabled:opacity-50">
                                         {isNarrativeLoading ? <SpinnerIcon className="h-5 w-5"/> : <SparklesIcon className="h-5 w-5"/>}
-                                        {isNarrativeLoading ? 'Architecting Narrative...' : 'Generate Optimized Narrative'}
+                                        {isNarrativeLoading ? 'Executing Payload...' : 'Execute Arbitrage Narrative Generation'}
                                     </button>
                                     {optimizedNarrative && (
                                          <div className="mt-6 pt-6 border-t border-slate-100">
-                                            <label className="block text-xs font-bold uppercase text-slate-400 mb-2">AI-Optimized Narrative</label>
+                                            <label className="block text-xs font-bold uppercase text-slate-400 mb-2">Compiled Narrative Text</label>
                                             <textarea value={optimizedNarrative} onChange={e => setOptimizedNarrative(e.target.value)} rows={8} className="w-full p-4 bg-purple-50 border border-purple-100 rounded-lg text-sm text-slate-800 leading-relaxed focus:outline-none focus:ring-2 focus:ring-purple-500/20"/>
                                          </div>
                                      )}
@@ -766,13 +868,68 @@ const StrategicDashboard: React.FC<StrategicDashboardProps> = ({ onPolicyUpload,
                             </div>
                         </>
                     ) : (
-                        <div className="flex flex-col items-center justify-center h-96 bg-white rounded-xl border border-slate-200 shadow-sm">
-                            <BriefcaseIcon className="h-16 w-16 text-slate-300 mb-4"/>
-                            <h3 className="text-xl font-bold text-slate-700">No Claim Selected</h3>
-                            <p className="text-slate-500 mb-6 max-w-md text-center">Select a claim from the sidebar or create a new one to start the autonomous claim optimization process.</p>
-                            <button onClick={() => setShowNewClaimWizard(true)} className="flex items-center gap-2 px-6 py-3 bg-primary text-white font-bold rounded-lg hover:bg-primary-dark transition shadow-md">
-                                <PlusIcon className="h-5 w-5"/> Create New Claim
-                            </button>
+                        <div className="flex flex-col items-center justify-center p-12 bg-white rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+                            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-5 pointer-events-none"></div>
+                            
+                            {/* Generic Illustration Dashboard */}
+                            <div className="w-full max-w-4xl text-left relative z-10 opacity-70 pointer-events-none blur-[1px]">
+                                <div className="grid grid-cols-3 gap-6 mb-8">
+                                    <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
+                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Gross Loss</p>
+                                        <p className="text-xl font-bold text-slate-400">$45,250</p>
+                                    </div>
+                                    <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
+                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Deductible</p>
+                                        <p className="text-xl font-bold text-slate-400">-${activePolicy?.deductible ? activePolicy.deductible.toLocaleString() : '1,000'}</p>
+                                    </div>
+                                    <div className="bg-slate-50 p-6 rounded-xl border border-emerald-100/50">
+                                        <p className="text-xs font-bold text-emerald-400/80 uppercase tracking-wider mb-1">Net Extraction Expected</p>
+                                        <p className="text-2xl font-extrabold text-emerald-400/70">${activePolicy?.deductible ? (45250 - activePolicy.deductible).toLocaleString() : '44,250'}</p>
+                                    </div>
+                                </div>
+                                <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 mb-8 h-48 flex items-center justify-center">
+                                    <div className="w-full max-w-md bg-slate-200 h-4 rounded-full overflow-hidden">
+                                        <div className="bg-slate-400 h-full w-[65%]"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            {/* Call to action Overlay */}
+                            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/60 backdrop-blur-sm p-4 text-center">
+                                <BriefcaseIcon className="h-16 w-16 text-primary mb-4 shadow-sm rounded-xl bg-white p-2 border border-slate-100"/>
+                                <h3 className="text-2xl font-bold text-slate-800 mb-2 font-heading">Welcome to the Arbitrage Matrix</h3>
+                                <p className="text-slate-600 mb-8 max-w-md">Initialize the engine by processing your insurance policy or creating your first claim strategy.</p>
+                                
+                                <div className="flex gap-4">
+                                    {!activePolicy && (
+                                        <button 
+                                            onClick={() => {
+                                                // Trigger policy ingestor via prop
+                                                const fileInput = document.createElement('input');
+                                                fileInput.type = 'file';
+                                                fileInput.accept = 'application/pdf';
+                                                fileInput.onchange = (e: any) => {
+                                                    if (e.target.files && e.target.files.length > 0) {
+                                                        onPolicyUpload(e.target.files[0]);
+                                                    }
+                                                };
+                                                fileInput.click();
+                                            }} 
+                                            className="flex items-center gap-2 px-6 py-3 bg-white text-slate-700 border border-slate-300 font-bold rounded-lg hover:bg-slate-50 transition shadow-sm"
+                                        >
+                                            <DocumentTextIcon className="h-5 w-5 text-slate-500"/> Ingest Policy
+                                        </button>
+                                    )}
+                                    <button 
+                                        onClick={() => setShowNewClaimWizard(true)} 
+                                        className="flex items-center gap-2 px-6 py-3 bg-primary text-white font-bold rounded-lg hover:bg-primary-dark transition shadow-md"
+                                        disabled={!activePolicy}
+                                        title={!activePolicy ? "Upload a policy first" : ""}
+                                    >
+                                        <PlusIcon className="h-5 w-5"/> Create New Claim
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -807,6 +964,10 @@ const StrategicDashboard: React.FC<StrategicDashboardProps> = ({ onPolicyUpload,
                     policy={activePolicy}
                     onClose={() => setShowSimulator(false)}
                 />
+            )}
+            
+            {showStrategyGuide && (
+                <ClaimStrategyGuide onClose={() => setShowStrategyGuide(false)} />
             )}
         </motion.div>
     );

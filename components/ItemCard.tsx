@@ -5,6 +5,8 @@ import { SpinnerIcon, CheckCircleIcon, ExclamationIcon, PencilIcon, XCircleIcon,
 import { ScoreIndicator } from './ScoreIndicator.tsx';
 import { CATEGORY_COLORS, CATEGORY_ICONS } from '../constants.ts';
 
+import { calculateHealthMetric, isHighRiskOfDenial } from '../utils/healthMetric.ts';
+
 interface ItemCardProps {
   item: InventoryItem;
   onSelect: () => void;
@@ -114,11 +116,18 @@ const ItemCard: React.FC<ItemCardProps> = ({ item, onSelect, onApprove, onReject
             )}
           </div>
           <StatusIndicator status={item.status} />
-          {item.proofStrengthScore !== undefined && !isSelected && (
-            <div className="absolute top-2 left-2">
-                <ScoreIndicator score={item.proofStrengthScore} size="sm" />
-            </div>
-          )}
+          {(() => {
+              const healthScore = calculateHealthMetric(item);
+              const highRisk = isHighRiskOfDenial(healthScore);
+              return !isSelected && (
+                <div className="absolute top-2 left-2 flex flex-col gap-1 items-start">
+                    <ScoreIndicator score={healthScore} size="sm" />
+                    {highRisk && (
+                        <span className="text-[9px] font-bold uppercase tracking-widest bg-rose-500 text-white px-1.5 py-0.5 rounded shadow-sm">High Risk of Denial</span>
+                    )}
+                </div>
+              );
+          })()}
           <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all duration-300 flex items-center justify-center">
             <span className="text-white font-bold opacity-0 group-hover:opacity-100 transition-opacity duration-300">
               View Details

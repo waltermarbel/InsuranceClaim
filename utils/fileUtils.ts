@@ -127,25 +127,36 @@ export const sanitizeFileName = (name: string): string => {
 
 
 export const exportToCSV = (items: InventoryItem[], filename: string) => {
+    // Standard ISO/Xactimate-style columns
     const headers = [
-        "Item Name", "Description", "Category", "Original Cost", "RCV", "ACV",
-        "Purchase Date", "Brand", "Model", "Serial Number", "Condition", "Proof Strength", "Is Claimed", "Primary Proof Note"
+        "Room/Location", "Category", "Description", "Brand", "Model", "Serial Number", 
+        "Quantity", "Purchase Date", "Age (Months)", "Condition", "Unit Replacement Cost (RCV)",
+        "Actual Cash Value (ACV)", "Notes/Proof"
     ];
+
+    const calculateAgeMonths = (dateStr: string | undefined) => {
+        if (!dateStr) return '';
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return '';
+        const now = new Date();
+        const months = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
+        return Math.max(0, months).toString();
+    };
+
     const rows = items.map(item => [
-        `"${item.itemName.replace(/"/g, '""')}"`,
-        `"${item.itemDescription.replace(/"/g, '""')}"`,
-        item.itemCategory,
-        item.originalCost,
-        item.replacementCostValueRCV || '',
+        `"Unknown"`, // Could be extracted if location is available
+        `"${item.itemCategory}"`,
+        `"${item.itemName} - ${item.itemDescription.replace(/"/g, '""')}"`,
+        `"${item.brand || ''}"`,
+        `"${item.model || ''}"`,
+        `"${item.serialNumber || ''}"`,
+        "1", // Default quantity to 1 for structured entries
+        `"${item.purchaseDate || ''}"`,
+        calculateAgeMonths(item.purchaseDate),
+        `"${item.condition || 'Average'}"`,
+        item.replacementCostValueRCV || item.originalCost || '',
         item.actualCashValueACV || '',
-        item.purchaseDate || '',
-        item.brand || '',
-        item.model || '',
-        item.serialNumber || '',
-        item.condition || '',
-        item.proofStrengthScore || '',
-        item.status === 'claimed' ? 'Yes' : 'No',
-        `"${item.linkedProofs[0]?.notes?.replace(/"/g, '""') || ''}"`
+        `"${item.linkedProofs.length} proof(s) attached"`
     ]);
 
     const csvContent = "data:text/csv;charset=utf-8,"
@@ -267,7 +278,7 @@ export const exportToZip = async (inventory: InventoryItem[], unlinkedProofs: Pr
     const content = await zip.generateAsync({ type: "blob" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(content);
-    link.download = `VeritasVault_Forensic_Export_${new Date().toISOString().split('T')[0]}.zip`;
+    link.download = `Assert_Forensic_Export_${new Date().toISOString().split('T')[0]}.zip`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

@@ -76,6 +76,8 @@ export const saveState = async (state: AppState): Promise<void> => {
     syncCollection('claims', state.claims, previousState?.claims);
     syncCollection('tasks', state.tasks, previousState?.tasks);
     syncCollection('proofs', state.unlinkedProofs, previousState?.unlinkedProofs);
+    syncCollection('timeline', state.timeline, previousState?.timeline);
+    syncCollection('collaborators', state.collaborators, previousState?.collaborators);
 
     if (writeCount > 0) {
       await batch.commit();
@@ -104,12 +106,14 @@ export const loadState = async (): Promise<AppState | undefined> => {
             });
         };
 
-        const [inventory, policies, claims, tasks, unlinkedProofs] = await Promise.all([
+        const [inventory, policies, claims, tasks, unlinkedProofs, timeline, collaborators] = await Promise.all([
             fetchCollection('inventory'),
             fetchCollection('policies'),
             fetchCollection('claims'),
             fetchCollection('tasks'),
-            fetchCollection('proofs')
+            fetchCollection('proofs'),
+            fetchCollection('timeline'),
+            fetchCollection('collaborators')
         ]);
 
         const newState = {
@@ -118,7 +122,9 @@ export const loadState = async (): Promise<AppState | undefined> => {
             policies: policies.length > 0 ? policies : localState?.policies || [],
             claims: claims.length > 0 ? claims : localState?.claims || [],
             tasks: tasks.length > 0 ? tasks : localState?.tasks || [],
-            unlinkedProofs: unlinkedProofs.length > 0 ? unlinkedProofs : localState?.unlinkedProofs || []
+            unlinkedProofs: unlinkedProofs.length > 0 ? unlinkedProofs : localState?.unlinkedProofs || [],
+            timeline: timeline.length > 0 ? timeline : localState?.timeline || [],
+            collaborators: collaborators.length > 0 ? collaborators : localState?.collaborators || []
         };
 
         previousState = JSON.parse(JSON.stringify(newState));
@@ -151,33 +157,9 @@ export const deleteProof = async (proofId: string): Promise<void> => {
   await tx.done;
 };
 
-export const clearAllData = async (): Promise<void> => {
+export const clearAllProofs = async (): Promise<void> => {
     const localDb = await initDB();
-    
-    // Clear IndexedDB stores
-    const tx = localDb.transaction([PROOF_STORE_NAME, STATE_STORE_NAME], 'readwrite');
+    const tx = localDb.transaction(PROOF_STORE_NAME, 'readwrite');
     await tx.objectStore(PROOF_STORE_NAME).clear();
-    await tx.objectStore(STATE_STORE_NAME).clear();
     await tx.done;
-
-    // Clear Firestore collections if user is logged in
-    const user = auth.currentUser;
-    if (user) {
-        try {
-            const collectionsToClear = ['inventory', 'policies', 'claims', 'tasks', 'proofs'];
-            
-            for (const collectionName of collectionsToClear) {
-                const snapshot = await getDocs(collection(db, `users/${user.uid}/${collectionName}`));
-                const batch = writeBatch(db);
-                snapshot.docs.forEach(doc => {
-                    batch.delete(doc.ref);
-                });
-                await batch.commit();
-            }
-            
-            previousState = null;
-        } catch (error) {
-            console.error("Failed to clear Firestore data", error);
-        }
-    }
 };

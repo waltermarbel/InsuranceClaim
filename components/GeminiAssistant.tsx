@@ -111,7 +111,7 @@ const GeminiAssistant: React.FC<GeminiAssistantProps> = ({ onClose, onNavigate, 
     setIsLive(true);
     setMessages([]);
     
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
     
     inputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
     outputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
@@ -120,7 +120,7 @@ const GeminiAssistant: React.FC<GeminiAssistantProps> = ({ onClose, onNavigate, 
     streamRef.current = stream;
 
     sessionPromise.current = ai.live.connect({
-        model: 'gemini-2.5-flash-native-audio-preview-09-2025',
+        model: 'gemini-3.1-flash-live-preview',
         callbacks: {
             onopen: () => {
                 const source = inputAudioContextRef.current!.createMediaStreamSource(stream);

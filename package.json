@@ -11,6 +11,10 @@
   },
   "dependencies": {
     "@google/genai": "^1.21.0",
+    "@types/node": "^22.14.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "date-fns": "^4.1.0",
+    "exifr": "^7.1.3",
     "firebase": "^12.11.0",
     "idb": "7",
     "jspdf": "^4.2.0",
@@ -20,12 +24,10 @@
     "motion": "^12.34.3",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "url": "^0.11.4"
-  },
-  "devDependencies": {
-    "@types/node": "^22.14.0",
-    "@vitejs/plugin-react": "^5.0.0",
+    "react-markdown": "^10.1.0",
+    "recharts": "^3.8.1",
     "typescript": "~5.8.2",
+    "url": "^0.11.4",
     "vite": "^6.2.0"
   }
 }

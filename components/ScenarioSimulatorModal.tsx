@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { InventoryItem, ParsedPolicy, ScenarioAnalysis, ClaimScenario } from '../types.ts';
+import { InventoryItem, ParsedPolicy, ScenarioSimulationCard, ClaimScenario } from '../types.ts';
 import { XIcon, SparklesIcon, SpinnerIcon, ExclamationTriangleIcon, CalculatorIcon, DocumentTextIcon, CheckCircleIcon, BoltIcon } from './icons.tsx';
 import * as geminiService from '../services/geminiService.ts';
 
@@ -12,11 +12,21 @@ interface ScenarioSimulatorModalProps {
 
 const SCENARIO_TYPES = ["Theft / Burglary", "Fire", "Water Damage", "Lost during Travel", "Power Surge", "Other"];
 
+const EXCLUSION_MODIFIERS = [
+    "Surface Water / Flood",
+    "Earth Movement / Earthquake",
+    "Wear and Tear / Gradual Deterioration",
+    "Intentional Damage",
+    "Pipe Burst / Plumbing Leak",
+    "Power Surge from Utility Grid"
+];
+
 const ScenarioSimulatorModal: React.FC<ScenarioSimulatorModalProps> = ({ inventory, policy, onClose }) => {
     const [eventType, setEventType] = useState(SCENARIO_TYPES[0]);
     const [description, setDescription] = useState('');
+    const [modifiers, setModifiers] = useState<string[]>([]);
     const [isLoading, setIsLoading] = useState(false);
-    const [result, setResult] = useState<ScenarioAnalysis | null>(null);
+    const [result, setResult] = useState<any | null>(null);
     const [suggestedScenarios, setSuggestedScenarios] = useState<ClaimScenario[]>([]);
     const [isSuggesting, setIsSuggesting] = useState(false);
 
@@ -35,12 +45,13 @@ const ScenarioSimulatorModal: React.FC<ScenarioSimulatorModalProps> = ({ invento
         loadSuggestions();
     }, [inventory, policy]);
 
-    const handleSimulate = async () => {
+    const handleSimulate = async (currentModifiers: string[] = modifiers) => {
         if (!description.trim()) return;
         setIsLoading(true);
-        setResult(null);
+        // Do not clear the previous result immediately to allow smooth transition, but optional
+        // setResult(null); // Keep previous result visible while loading for instant recalculation feel
         try {
-            const analysis = await geminiService.runScenarioSimulation(inventory, policy, description, eventType);
+            const analysis = await geminiService.runScenarioSimulation(inventory, policy, description, eventType, currentModifiers);
             setResult(analysis);
         } catch (error) {
             console.error(error);
@@ -50,14 +61,25 @@ const ScenarioSimulatorModal: React.FC<ScenarioSimulatorModalProps> = ({ invento
         }
     };
 
+    const toggleModifier = (mod: string) => {
+        const nextModifiers = modifiers.includes(mod) ? modifiers.filter(m => m !== mod) : [...modifiers, mod];
+        setModifiers(nextModifiers);
+        // Instantly recalculate if description is already filled (i.e. already ran once or want to run on toggle)
+        if (description.trim() && result) {
+             handleSimulate(nextModifiers);
+        }
+    };
+
     const loadDemoScenario = () => {
         setEventType("Theft / Burglary");
         setDescription("My MacBook Pro was stolen during a move.");
+        setModifiers([]);
     };
 
     const loadSuggestedScenario = (scenario: ClaimScenario) => {
         setEventType(scenario.eventType || "Other");
         setDescription(scenario.description);
+        setModifiers([]);
     };
 
     return (
@@ -150,8 +172,24 @@ const ScenarioSimulatorModal: React.FC<ScenarioSimulatorModalProps> = ({ invento
                                         className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
                                     />
                                 </div>
-                                <button 
-                                    onClick={handleSimulate} 
+                                <div>
+                                    <label className="block text-xs font-bold uppercase text-slate-400 mb-2">Exclusion / Condition Modifiers</label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {EXCLUSION_MODIFIERS.map(mod => (
+                                            <button
+                                                key={mod}
+                                                onClick={() => toggleModifier(mod)}
+                                                className={`px-3 py-1.5 rounded-full text-[10px] font-bold border transition ${
+                                                    modifiers.includes(mod) ? 'bg-primary text-white border-primary shadow-sm' : 'bg-white text-slate-500 border-slate-200 hover:border-primary/50'
+                                                }`}
+                                            >
+                                                {mod}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => handleSimulate()}
                                     disabled={isLoading || !description.trim()} 
                                     className="w-full flex items-center justify-center gap-2 py-3 bg-primary text-white font-bold rounded-lg shadow-md hover:bg-primary-dark transition disabled:opacity-50"
                                 >
@@ -161,7 +199,7 @@ const ScenarioSimulatorModal: React.FC<ScenarioSimulatorModalProps> = ({ invento
                             </div>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                        <div className={`grid grid-cols-1 lg:grid-cols-12 gap-8 transition-opacity duration-300 ${isLoading ? 'opacity-50' : 'opacity-100'}`}>
                             {/* Left: Financial Summary */}
                             <div className="lg:col-span-4 space-y-6">
                                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 text-center">
@@ -198,6 +236,31 @@ const ScenarioSimulatorModal: React.FC<ScenarioSimulatorModalProps> = ({ invento
 
                             {/* Right: Detailed Analysis */}
                             <div className="lg:col-span-8 space-y-6">
+                                {/* Modifiers Toggle */}
+                                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h4 className="font-bold text-slate-800 flex items-center gap-2">
+                                            <SparklesIcon className="h-5 w-5 text-indigo-500"/> Exclusion Modifiers (Insta-Recalculate)
+                                        </h4>
+                                        {isLoading && <SpinnerIcon className="h-4 w-4 text-primary animate-spin" />}
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {EXCLUSION_MODIFIERS.map(mod => (
+                                            <button
+                                                key={mod}
+                                                onClick={() => toggleModifier(mod)}
+                                                disabled={isLoading}
+                                                className={`px-3 py-1.5 rounded-full text-xs font-bold border transition ${
+                                                    modifiers.includes(mod) ? 'bg-primary text-white border-primary shadow-sm' : 'bg-white text-slate-500 border-slate-200 hover:border-primary/50'
+                                                } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                            >
+                                                {mod}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 mt-3 uppercase tracking-wider font-bold">Toggle exclusions to see how policy gates respond</p>
+                                </div>
+
                                 {/* Sub-limits */}
                                 {result.subLimitHits.length > 0 && (
                                     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">

@@ -12,7 +12,6 @@ interface UploadPageProps {
 
 const UploadPage: React.FC<UploadPageProps> = ({ onFilesSelected, onPolicySelected, uploadProgress, isAnalyzingPolicy }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const policyInputRef = useRef<HTMLInputElement>(null);
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -35,12 +34,6 @@ const UploadPage: React.FC<UploadPageProps> = ({ onFilesSelected, onPolicySelect
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       onFilesSelected(e.target.files);
-    }
-  };
-
-  const handlePolicyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      onPolicySelected(e.target.files[0]);
     }
   };
 
@@ -149,7 +142,7 @@ const UploadPage: React.FC<UploadPageProps> = ({ onFilesSelected, onPolicySelect
                 Start Building Your Digital Vault
             </h1>
             <p className="mt-3 text-lg text-medium max-w-xl">
-                Drag and drop all your evidence here—photos of items, receipts, warranties. Or, upload your insurance policy to get started.
+                Drag and drop all your evidence here—photos of items, receipts, warranties.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row gap-4">
                  <button 
@@ -158,23 +151,9 @@ const UploadPage: React.FC<UploadPageProps> = ({ onFilesSelected, onPolicySelect
                  >
                     Upload Evidence
                 </button>
-                 <button 
-                    onClick={(e) => { e.stopPropagation(); policyInputRef.current?.click(); }}
-                    disabled={isAnalyzingPolicy}
-                    className="px-6 py-3 text-sm font-semibold bg-white text-primary border border-primary rounded-md shadow-sm hover:bg-slate-50 transition disabled:opacity-50"
-                 >
-                    Upload Policy
-                </button>
             </div>
         </div>
       </div>
-      <input 
-          type="file" 
-          ref={policyInputRef} 
-          onChange={handlePolicyChange} 
-          className="hidden"
-          accept="application/pdf"
-      />
       <p className="mt-6 text-sm text-slate-500">
         You can upload multiple files at once. Supported formats: JPG, PNG, PDF.
       </p>

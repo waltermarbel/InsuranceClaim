@@ -1,6 +1,6 @@
 {
-  "name": "VeritasVault Adjuster",
-  "description": "prepare data for insurance claims.",
+  "name": "Assert",
+  "description": "Assert is a secure, intelligent project management platform designed specifically for high-stakes insurance claims, combining document management, narrative construction, and AI-powered validation.",
   "requestFramePermissions": [
     "camera",
     "microphone"

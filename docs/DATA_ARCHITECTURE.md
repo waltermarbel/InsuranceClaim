@@ -1,7 +1,7 @@
 
 # Two-Layer Inventory Architecture
 
-VeritasVault utilizes a **Two-Layer Inventory System** to ensure data integrity during the insurance claim process. This architecture separates the user's permanent asset record ("Master") from the specific snapshot used for a claim ("Claim").
+Assert utilizes a **Two-Layer Inventory System** to ensure data integrity during the insurance claim process. This architecture separates the user's permanent asset record ("Master") from the specific snapshot used for a claim ("Claim").
 
 ## 1. Concept
 

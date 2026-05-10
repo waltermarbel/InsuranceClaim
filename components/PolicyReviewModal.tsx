@@ -66,7 +66,7 @@ const ArrayEditor: React.FC<{
 const PolicyReviewModal: React.FC<PolicyReviewModalProps> = ({ report, onSave, onClose }) => {
   const [editedPolicy, setEditedPolicy] = useState<ParsedPolicy>(report.parsedPolicy as ParsedPolicy);
   const [warnings, setWarnings] = useState<string[]>(report.warnings || []);
-  const [activeTab, setActiveTab] = useState<'info' | 'triggers' | 'limits' | 'exclusions' | 'conditions'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'triggers' | 'limits' | 'exclusions' | 'conditions' | 'comparison' | 'strategy'>('info');
 
   const handleSubmit = () => {
     onSave({ ...report, parsedPolicy: editedPolicy, warnings: warnings });
@@ -106,6 +106,14 @@ const PolicyReviewModal: React.FC<PolicyReviewModalProps> = ({ report, onSave, o
                 icon={<InformationCircleIcon className="h-4 w-4"/>} 
                 label="General & Limits" 
             />
+            {report.highValueClaimAvenues && report.highValueClaimAvenues.length > 0 && (
+                <TabButton 
+                    active={activeTab === 'strategy'} 
+                    onClick={() => setActiveTab('strategy')} 
+                    icon={<DocumentTextIcon className="h-4 w-4" />} 
+                    label="Strategic Avenues" 
+                />
+            )}
             <TabButton 
                 active={activeTab === 'triggers'} 
                 onClick={() => setActiveTab('triggers')} 
@@ -134,6 +142,14 @@ const PolicyReviewModal: React.FC<PolicyReviewModalProps> = ({ report, onSave, o
                 label="Conditions" 
                 count={(editedPolicy.conditions || []).length}
             />
+            {report.comparison && report.comparison.hasDifferences && (
+                <TabButton 
+                    active={activeTab === 'comparison'} 
+                    onClick={() => setActiveTab('comparison')} 
+                    icon={<DocumentTextIcon className="h-4 w-4"/>} 
+                    label="Compare Policies" 
+                />
+            )}
         </div>
 
         {/* Content Area */}
@@ -279,6 +295,82 @@ const PolicyReviewModal: React.FC<PolicyReviewModalProps> = ({ report, onSave, o
                         emptyText="No conditions detected."
                         placeholder="e.g. You must notify the police in case of theft..."
                     />
+                </div>
+            )}
+
+            {activeTab === 'strategy' && report.highValueClaimAvenues && (
+                <div className="max-w-3xl mx-auto space-y-6">
+                    <div className="mb-6 flex items-center gap-3 bg-emerald-50 p-4 rounded-lg border border-emerald-100 text-emerald-900">
+                        <DocumentTextIcon className="h-6 w-6"/>
+                        <div>
+                            <h4 className="font-bold">High-Value Claim Avenues</h4>
+                            <p className="text-sm opacity-80">Strategic opportunities identified in your policy, highlighting scenarios covered most generously.</p>
+                        </div>
+                    </div>
+                    
+                    <div className="space-y-4">
+                        {report.highValueClaimAvenues.map((avenue, index) => (
+                            <div key={index} className="bg-white border border-emerald-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
+                                <h5 className="font-bold text-emerald-800 text-lg mb-2">{avenue.title}</h5>
+                                <p className="text-slate-700 text-sm mb-4 leading-relaxed">{avenue.description}</p>
+                                {avenue.coverageMatches && avenue.coverageMatches.length > 0 && (
+                                    <div className="bg-emerald-50 rounded-lg p-3">
+                                        <h6 className="text-xs font-bold text-emerald-700 uppercase tracking-widest mb-2">Relevant Coverages</h6>
+                                        <ul className="list-disc pl-5 text-sm text-emerald-800 space-y-1">
+                                            {avenue.coverageMatches.map((match, i) => <li key={i}>{match}</li>)}
+                                        </ul>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'comparison' && report.comparison && (
+                <div className="max-w-3xl mx-auto space-y-8">
+                    <div className="mb-6 flex items-center gap-3 bg-blue-50 p-4 rounded-lg border border-blue-100 text-blue-900">
+                        <DocumentTextIcon className="h-6 w-6"/>
+                        <div>
+                            <h4 className="font-bold">Policy Comparison</h4>
+                            <p className="text-sm opacity-80">We detected existing policies. Here are the highlighted differences in the new policy.</p>
+                        </div>
+                    </div>
+                    
+                    <div className="space-y-6">
+                        <div>
+                            <h4 className="text-sm font-bold text-slate-800 mb-2 border-b pb-1">Coverage Differences</h4>
+                            {report.comparison.coverageDifferences?.length > 0 ? (
+                                <ul className="list-disc pl-5 space-y-2 text-sm text-slate-700">
+                                    {report.comparison.coverageDifferences.map((diff, i) => <li key={i}>{diff}</li>)}
+                                </ul>
+                            ) : (
+                                <p className="text-sm text-slate-500 italic">No coverage differences detected.</p>
+                            )}
+                        </div>
+                        
+                        <div>
+                            <h4 className="text-sm font-bold text-slate-800 mb-2 border-b pb-1">Limit Differences</h4>
+                            {report.comparison.limitDifferences?.length > 0 ? (
+                                <ul className="list-disc pl-5 space-y-2 text-sm text-slate-700">
+                                    {report.comparison.limitDifferences.map((diff, i) => <li key={i}>{diff}</li>)}
+                                </ul>
+                            ) : (
+                                <p className="text-sm text-slate-500 italic">No limit differences detected.</p>
+                            )}
+                        </div>
+
+                        <div>
+                            <h4 className="text-sm font-bold text-slate-800 mb-2 border-b pb-1">Exclusion Differences</h4>
+                            {report.comparison.exclusionDifferences?.length > 0 ? (
+                                <ul className="list-disc pl-5 space-y-2 text-sm text-slate-700">
+                                    {report.comparison.exclusionDifferences.map((diff, i) => <li key={i}>{diff}</li>)}
+                                </ul>
+                            ) : (
+                                <p className="text-sm text-slate-500 italic">No exclusion differences detected.</p>
+                            )}
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

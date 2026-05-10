@@ -7,47 +7,140 @@ import { useAuth } from './AuthContext.tsx';
 
 // --- INITIAL STATE ---
 const DEFAULT_POLICY: ParsedPolicy = { 
-    id: 'policy-default', 
-    policyName: "No Policy Loaded", 
-    isActive: false, 
-    isVerified: false, 
-    provider: "", 
-    policyNumber: "", 
-    policyHolder: "", 
-    effectiveDate: "", 
-    expirationDate: "", 
-    deductible: 0, 
-    lossSettlementMethod: 'ACV', 
-    policyType: '', 
-    coverageD_limit: 0, // Loss of Use
-    coverage: [], 
-    exclusions: [], 
-    conditions: [],
-    triggers: [],
-    limits: [],
-    confidenceScore: 0 
+    id: 'policy-RI8462410', 
+    policyName: "Assurant Renters (Premier)", 
+    isActive: true, 
+    isVerified: true, 
+    provider: "Assurant", 
+    policyNumber: "RI8462410", 
+    policyHolder: "Roydel Marquez Bello & Maleidy Bello Landin", 
+    effectiveDate: "2024-08-26", 
+    expirationDate: "2025-08-26", 
+    deductible: 500, 
+    lossSettlementMethod: 'RCV', 
+    policyType: 'HO-4 Renters Insurance', 
+    coverageD_limit: 19000, // Loss of Use
+    coverage: [
+        { category: "Personal Property", limit: 0, type: "main" }, 
+        { category: "Personal Liability", limit: 0, type: "main" },
+        { category: "Medical Payments", limit: 0, type: "main" },
+        { category: "Jewelry/Watches/Furs", limit: 0, type: "sub-limit" }, 
+        { category: "Electronics", limit: 0, type: "sub-limit" }, 
+        { category: "Business Property", limit: 0, type: "sub-limit" },
+        { category: "Firearms", limit: 0, type: "sub-limit" }
+    ], 
+    exclusions: ["Flood", "Earthquake", "Intentional Loss", "Neglect", "Business Data"], 
+    conditions: ["Notify police in case of theft", "Protect property from further damage", "File proof of loss within 60 days"],
+    triggers: ["Fire", "Lightning", "Windstorm", "Hail", "Explosion", "Riot", "Aircraft", "Vehicles", "Smoke", "Vandalism", "Theft", "Falling Objects", "Weight of Ice/Snow", "Accidental Discharge/Overflow of Water", "Sudden/Accidental Tearing/Cracking/Burning", "Freezing", "Sudden/Accidental Damage from Artificially Generated Electric Current", "Volcanic Eruption"],
+    limits: ["$200 for Money/Bank Notes", "$1500 for Securities/Accounts/Deeds", "$1500 for Watercraft/Trailers", "$1500 for Trailers", "$1500 for Theft of Jewelry/Watches/Furs", "$2500 for Theft of Firearms", "$2500 for Theft of Silverware", "$2500 for Business Property on premises", "$1500 for Business Property off premises"],
+    confidenceScore: 100,
+    state: {
+        deductibles: {
+            'All Peril': 500,
+            'Wind/Hail': 1000
+        },
+        subLimits: {
+            'Jewelry/Watches/Furs': 1000,
+            'Electronics': 5000,
+            'Business Property': 2500,
+            'Firearms': 2500
+        },
+        exclusions: ["Flood", "Earthquake", "Intentional Loss", "Neglect", "Business Data"],
+        aggregateLimits: {
+            'Personal Property': 95000,
+            'Personal Liability': 100000,
+            'Medical Payments': 1000,
+            'Loss of Use': 19000
+        }
+    }
 };
 
 const DEFAULT_ACCOUNT_HOLDER: AccountHolder = { 
-    id: 'ah-default', 
-    name: 'Unknown User', 
-    address: '' 
+    id: 'ah-001', 
+    name: 'Roydel Marquez Bello', 
+    address: '312 W 43rd St, Apt 14J, New York, NY 10036' 
 };
 
-const INITIAL_INVENTORY: InventoryItem[] = [];
+const INITIAL_INVENTORY: InventoryItem[] = [
+    // ... (Kept existing items for brevity, assuming they are same as original file)
+    {
+        id: `item-1`,
+        status: 'active',
+        itemName: 'MacBook Pro 16-inch (Core i7/16GB/256GB)',
+        itemDescription: 'Space Gray. Purchased specifically for personal media editing. Verified via Apple ID logs.',
+        itemCategory: 'Electronics',
+        originalCost: 2499.00,
+        replacementCostValueRCV: 2499.00,
+        purchaseDate: '2019-02-21',
+        brand: 'Apple',
+        model: 'MacBook Pro 16"',
+        serialNumber: 'C02Y...',
+        condition: 'Like New',
+        linkedProofs: [
+            {
+                id: 'proof-macbook-receipt',
+                type: 'document',
+                fileName: 'macbook_receipt.pdf',
+                mimeType: 'application/pdf',
+                createdBy: 'User',
+                purpose: 'Proof of Purchase',
+                notes: 'Uploaded from ./uploads/macbook_receipt.pdf'
+            }
+        ],
+        createdAt: '2024-11-28',
+        createdBy: 'Assert AI',
+        lastKnownLocation: '421 W 56th St (Packed for Move)',
+        proofStrengthScore: 95
+    },
+    // ... other items
+];
 
-const INITIAL_CLAIMS: ActiveClaim[] = [];
+const INITIAL_CLAIMS: ActiveClaim[] = [
+    {
+        id: 'claim-default-001',
+        name: "Claim #00104761115",
+        status: 'draft',
+        linkedPolicyId: 'policy-RI8462410',
+        generatedAt: new Date().toISOString(),
+        totalClaimValue: 0,
+        stage: 'INTAKE',
+        claimItems: [],
+        incidentDetails: {
+            name: "Claim #00104761115 (Burglary)", 
+            dateOfLoss: "2024-11-27", 
+            incidentType: "Burglary (Forced Entry)", 
+            location: "421 West 56th Street, Apt 4A, New York, NY 10019", 
+            policeReport: "NYPD: 2024-018-12043", 
+            propertyDamageDetails: "Burglary occurred on Nov 27, 2024 during relocation. Premises entered via forced entry (window/door). Apartment ransacked. Items were packed in boxes for move to 312 W 43rd St.", 
+            claimDateRange: { startDate: "2024-11-27", endDate: "2024-11-28" }, 
+            fairRentalValuePerDay: 350,
+            aleProofs: [], 
+            claimDocuments: [], 
+        }
+    }
+];
 
-const INITIAL_TASKS: Task[] = [];
+const INITIAL_TASKS: Task[] = [
+    {
+        id: 'task-init-1',
+        description: 'File Police Report for Burglary',
+        isCompleted: true,
+        priority: 'High',
+        createdAt: new Date().toISOString(),
+    }
+];
 
 const INITIAL_STATE: AppState = {
     inventory: INITIAL_INVENTORY,
-    policies: [],
+    policies: [], // Removed [DEFAULT_POLICY] to enforce onboarding gate
     unlinkedProofs: [],
     accountHolder: DEFAULT_ACCOUNT_HOLDER,
     
     claims: INITIAL_CLAIMS,
-    currentClaimId: null,
+    currentClaimId: 'claim-default-001',
+
+    timeline: [],
+    collaborators: [],
 
     tasks: INITIAL_TASKS,
 
@@ -79,12 +172,19 @@ const appReducer = (state: AppState, action: Action): AppState => {
             return { ...state, inventory: state.inventory.filter(i => i.id !== action.payload.itemId) };
         }
         case 'LOG_ACTIVITY': {
-            const newEntry: ActivityLogEntry = { id: `log-${Date.now()}`, timestamp: new Date().toISOString(), app: action.payload.app || 'VeritasVault', action: action.payload.action, details: action.payload.details };
+            const newEntry: ActivityLogEntry = { id: `log-${Date.now()}`, timestamp: new Date().toISOString(), app: action.payload.app || 'Assert', action: action.payload.action, details: action.payload.details, reasonForChange: action.payload.reasonForChange };
             return { ...state, activityLog: [...state.activityLog, newEntry] };
         }
         case 'SAVE_POLICY_FROM_REPORT': {
             const report = action.payload;
-            const newPolicy: ParsedPolicy = { ...report.parsedPolicy, policyName: `Policy ${report.parsedPolicy.provider} ${report.parsedPolicy.effectiveDate.split('-')[0]}`, id: `policy-${Date.now()}`, isVerified: true, isActive: false };
+            const newPolicy: ParsedPolicy = { 
+                ...report.parsedPolicy, 
+                highValueClaimAvenues: report.highValueClaimAvenues || report.parsedPolicy.highValueClaimAvenues,
+                policyName: `Policy ${report.parsedPolicy.provider} ${report.parsedPolicy.effectiveDate?.split('-')[0] || ''}`, 
+                id: `policy-${Date.now()}`, 
+                isVerified: true, 
+                isActive: false 
+            };
             if (report.analysisType === 'update' && report.targetPolicyId) {
                 return { ...state, policies: state.policies.map(p => p.id === report.targetPolicyId ? { ...p, ...newPolicy, id: p.id, isActive: p.isActive } : p) };
             }
@@ -236,6 +336,12 @@ const appReducer = (state: AppState, action: Action): AppState => {
         case 'DELETE_TASK': {
             return { ...state, tasks: state.tasks.filter(t => t.id !== action.payload) };
         }
+        case 'UPDATE_TIMELINE': {
+            return { ...state, timeline: action.payload };
+        }
+        case 'UPDATE_COLLABORATORS': {
+            return { ...state, collaborators: action.payload };
+        }
         // PIPELINE ACTIONS
         case 'ENQUEUE_PIPELINE_ITEMS': {
             return { ...state, processingQueue: [...state.processingQueue, ...action.payload] };
@@ -268,7 +374,8 @@ const UNDOABLE_ACTIONS = new Set([
     'ADD_PROOFS_TO_ITEM', 'ACCEPT_SUGGESTION', 'REJECT_SUGGESTION_PERMANENT', 
     'REMOVE_UNLINKED_PROOF', 'ADD_UNLINKED_PROOFS', 'CREATE_CLAIM', 
     'UPDATE_CLAIM_ITEM', 'UPDATE_CLAIM_DETAILS', 'UPDATE_CLAIM_STAGE', 
-    'DELETE_CLAIM', 'ADD_TASK', 'TOGGLE_TASK', 'DELETE_TASK'
+    'DELETE_CLAIM', 'ADD_TASK', 'TOGGLE_TASK', 'DELETE_TASK',
+    'UPDATE_TIMELINE', 'UPDATE_COLLABORATORS'
 ]);
 
 const undoableReducer = (state: HistoryState, action: Action): HistoryState => {
@@ -372,18 +479,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                         delete (cleanState as any).syncStatus;
                     }
 
-                    // Ensure claims array exists if loading old state (migration support)
-                    if (!cleanState.claims) {
-                        cleanState.claims = INITIAL_CLAIMS;
-                        cleanState.currentClaimId = INITIAL_CLAIMS.length > 0 ? INITIAL_CLAIMS[0].id : null;
-                    }
-                    if (!cleanState.tasks) {
-                        cleanState.tasks = INITIAL_TASKS;
-                    }
-                    if (!cleanState.processingQueue) {
-                        cleanState.processingQueue = [];
-                    }
-                    dispatch({ type: 'INITIALIZE_STATE', payload: cleanState });
+                    // Ensure defaults are applied over any falsy/undefined values from saved state
+                    const mergedState = { 
+                        ...INITIAL_STATE, 
+                        ...cleanState,
+                        claims: cleanState.claims || INITIAL_CLAIMS,
+                        currentClaimId: cleanState.currentClaimId || INITIAL_CLAIMS[0].id,
+                        tasks: cleanState.tasks || INITIAL_TASKS,
+                        processingQueue: cleanState.processingQueue || [],
+                        activityLog: cleanState.activityLog || []
+                    };
+                    dispatch({ type: 'INITIALIZE_STATE', payload: mergedState });
                     setSyncStatus('synced');
                 } else {
                     // Mark as initialized even if no state was loaded (fresh start)

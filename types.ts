@@ -1,9 +1,12 @@
 
 
-export type AppView = 'dashboard' | 'item-detail' | 'autonomous-processor' | 'autonomous-review';
+export type AppView = 'dashboard' | 'item-detail' | 'autonomous-processor' | 'autonomous-review' | 'scribe';
 
 export type ItemStatus = 'processing' | 'clustering' | 'enriching' | 'needs-review' | 'active' | 'claimed' | 'archived' | 'error' | 'rejected';
 
+import { ITEM_CONDITIONS } from './constants.ts';
+
+// Rest of types...
 export interface Proof {
     id: string;
     type: 'image' | 'document' | 'audio';
@@ -12,6 +15,20 @@ export interface Proof {
     dataUrl?: string; // Optional, might be loaded async or blob stored separately
     createdBy: string;
     createdAt?: string;
+    extractedData?: {
+        vendor?: string;
+        date?: string;
+        amount?: number;
+        itemNames?: string[];
+    };
+    contradictionFlag?: string;
+    exif?: {
+        dateTimeOriginal?: string;
+        make?: string;
+        model?: string;
+        latitude?: number;
+        longitude?: number;
+    };
     purpose?: 'Proof of Purchase' | 'Proof of Possession' | 'Proof of Value' | 'Supporting Document' | 'Unknown';
     notes?: string;
     sourceType?: 'local' | 'cloud' | 'web';
@@ -56,6 +73,8 @@ export interface ValuationResponse {
     rcv: number;
     acv: number;
     sources: { url: string; price: number; type: 'RCV' | 'ACV'; title: string }[];
+    isUnderclaiming?: boolean;
+    reasoning?: string;
 }
 
 /**
@@ -115,6 +134,13 @@ export interface CoverageLimit {
     type: 'main' | 'sub-limit';
 }
 
+export interface PolicyState {
+    deductibles: Record<string, number>; // e.g., { 'All Peril': 1000, 'Wind/Hail': 2000 }
+    subLimits: Record<string, number>; // e.g., { 'Jewelry': 5000, 'Electronics': 10000 }
+    exclusions: string[];
+    aggregateLimits: Record<string, number>; // e.g., { 'Personal Property': 100000, 'Liability': 300000 }
+}
+
 export interface ParsedPolicy {
     id: string;
     policyName?: string;
@@ -136,6 +162,15 @@ export interface ParsedPolicy {
     limits?: string[];
     endorsements?: string[];
     confidenceScore: number;
+    state?: PolicyState;
+    highValueClaimAvenues?: { title: string; description: string; coverageMatches: string[] }[];
+}
+
+export interface PolicyComparison {
+    hasDifferences: boolean;
+    coverageDifferences: string[];
+    limitDifferences: string[];
+    exclusionDifferences: string[];
 }
 
 export interface PolicyAnalysisReport {
@@ -143,6 +178,8 @@ export interface PolicyAnalysisReport {
     warnings: string[];
     parsedPolicy: ParsedPolicy;
     targetPolicyId?: string | null;
+    comparison?: PolicyComparison;
+    highValueClaimAvenues?: { title: string; description: string; coverageMatches: string[] }[];
 }
 
 export interface AccountHolder {
@@ -156,6 +193,17 @@ export interface ClaimDateRange {
     endDate: string;
 }
 
+export interface TimelineEvent {
+    id: string;
+    title?: string;
+    date: string;
+    description: string;
+    linkedDocumentIds?: string[]; // references Proof IDs
+    linkedItemIds?: string[];     // references ClaimItem IDs
+    involvedPersons?: string[];   // names or roles
+    type: 'FACT' | 'NARRATIVE_ELEMENT' | 'INFERRED_NARRATIVE';
+}
+
 export interface ClaimDetails {
     name: string;
     dateOfLoss: string;
@@ -167,6 +215,7 @@ export interface ClaimDetails {
     fairRentalValuePerDay?: number;
     aleProofs: Proof[];
     claimDocuments: Proof[];
+    timelineEvents?: TimelineEvent[];
 }
 
 /**
@@ -188,7 +237,7 @@ export interface ClaimItem {
     policyNotes?: string;
 }
 
-export type ClaimStage = 'Incident' | 'Inventory' | 'Valuation' | 'Evidence' | 'Review' | 'Submitted';
+export type ClaimStage = 'INTAKE' | 'BROKEN_REVIEW' | 'READY_TO_FILE' | 'FILED' | 'CLAIM_BOUND' | 'READY_TO_SUBMIT' | 'UNDER_REVIEW' | 'APPROVED';
 
 export interface ActiveClaim {
     id: string;
@@ -211,12 +260,20 @@ export interface Task {
     createdAt: string;
 }
 
+export interface BatchConflict {
+    type: 'DUPLICATE_SERIAL' | 'DATE_OVERLAP' | 'VALUATION_INCONSISTENCY';
+    items: string[]; // item IDs
+    description: string;
+    severity: 'High' | 'Medium' | 'Low';
+}
+
 export interface ActivityLogEntry {
     id: string;
     timestamp: string;
     action: string;
     details: string;
-    app: 'VeritasVault' | 'Gemini';
+    reasonForChange?: string;
+    app: 'Assert' | 'Gemini';
 }
 
 export interface ProofSuggestion {
@@ -272,15 +329,54 @@ export interface WebScrapeResult {
     sourceUrl: string;
 }
 
-export interface ScenarioAnalysis {
-    scenarioTitle: string;
-    grossLoss: number;
-    appliedDeductible: number;
+export interface SimulationGateResult {
+    validityGate: boolean;
+    causeGate: boolean;
+    conditionGate: boolean;
+}
+
+export interface SimulationFinancialSummary {
+    grossLossTotal: number;
+    depreciationApplied: number;
+    deductibleApplied: number;
+    sublimitReductions: number;
+    sublimitGaps?: { category: string; limit: number; assetValue: number; gap: number }[];
     netPayout: number;
-    deniedItems: { itemName: string; reason: string; value: number }[];
-    subLimitHits: { category: string; totalValue: number; limit: number }[];
-    warnings: string[];
-    actionPlan: string[];
+}
+
+export interface ScenarioSimulationCard {
+    simulationId: string;
+    timestamp: string;
+    policyContext: {
+        policyType: string;
+        jurisdiction: string;
+        limits: {
+            coverageA: number;
+            coverageC: number;
+            deductible: number;
+        };
+        endorsements: string[];
+    };
+    lossScenario: {
+        scenarioFamily: string;
+        causeOfLoss: string;
+        lossDate: string;
+        reportDate: string;
+        mitigationStatus: boolean;
+    };
+    claimItems: {
+        itemId: string;
+        description: string;
+        category: string;
+        valuationBasis: string;
+        grossLossAmount: number;
+        proofLevel: number;
+    }[];
+    coverageDetermination: {
+        gateResults: SimulationGateResult;
+        financialSummary: SimulationFinancialSummary;
+        denialReasons: string[];
+    };
 }
 
 export interface ChatMessage {
@@ -372,6 +468,41 @@ export interface PipelineItem {
 
 export type PipelineStage = 'idle' | 'processing';
 
+
+
+export interface Collaborator {
+    id: string;
+    name: string;
+    type: 'TRUSTED' | 'THIRD_PARTY';
+    script?: string;
+    email?: string;
+    phone?: string;
+    tasks?: { id: string, text: string, completed: boolean }[];
+    communicationLog?: { id: string, date: string, type: 'Email'|'Call'|'Meeting', summary: string }[];
+    dossier?: {
+        roleDescription: string;
+        script: string;
+        boundaries: string;
+        compensationModel: string;
+    };
+}
+
+export interface StrategicResourcePlan {
+    documentationGuidance: {
+        title: string;
+        instructions: string;
+        validityDescription: string;
+    }[];
+    corroborationNetwork: {
+        role: string;
+        namePlaceholder: string;
+        roleDescription: string;
+        script: string;
+        boundaries: string;
+        suggestedCompensation: string;
+    }[];
+}
+
 export interface AppState {
     inventory: InventoryItem[]; 
     policies: ParsedPolicy[];
@@ -380,6 +511,9 @@ export interface AppState {
     
     claims: ActiveClaim[];
     currentClaimId: string | null;
+
+    timeline: TimelineEvent[];
+    collaborators: Collaborator[];
 
     tasks: Task[];
 
@@ -403,7 +537,7 @@ export type Action =
   | { type: 'BULK_EDIT_ITEMS'; payload: { ids: string[], updates: Partial<InventoryItem> } }
   | { type: 'BULK_DELETE_ITEMS'; payload: { ids: string[] } }
   | { type: 'DELETE_ITEM'; payload: { itemId: string } }
-  | { type: 'LOG_ACTIVITY'; payload: { action: string; details: string; app?: 'VeritasVault' | 'Gemini' } }
+  | { type: 'LOG_ACTIVITY'; payload: { action: string; details: string; reasonForChange?: string; app?: 'Assert' | 'Gemini' } }
   | { type: 'SAVE_POLICY_FROM_REPORT'; payload: PolicyAnalysisReport }
   | { type: 'UPDATE_POLICY'; payload: ParsedPolicy }
   | { type: 'SET_ACTIVE_POLICY'; payload: string }
@@ -428,6 +562,8 @@ export type Action =
   | { type: 'ADD_TASK', payload: Task }
   | { type: 'TOGGLE_TASK', payload: string }
   | { type: 'DELETE_TASK', payload: string }
+  | { type: 'UPDATE_TIMELINE', payload: TimelineEvent[] }
+  | { type: 'UPDATE_COLLABORATORS', payload: Collaborator[] }
   // Pipeline Actions
   | { type: 'ENQUEUE_PIPELINE_ITEMS'; payload: PipelineItem[] }
   | { type: 'UPDATE_PIPELINE_ITEM_STATUS'; payload: { id: string; status: PipelineItem['status']; error?: string; resultItemId?: string } }

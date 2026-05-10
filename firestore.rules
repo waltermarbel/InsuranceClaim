@@ -237,6 +237,24 @@ service cloud.firestore {
              (!('owner' in data) || (data.owner is string && data.owner.size() < 100));
     }
 
+    function isValidTimelineEvent(data) {
+      return hasRequiredFields(['id', 'date', 'description', 'type', 'uid']) &&
+             data.id is string && data.id.size() > 0 && data.id.size() < 100 &&
+             data.date is string && data.date.size() > 0 && data.date.size() < 50 &&
+             data.description is string && data.description.size() > 0 && data.description.size() < 2000 &&
+             data.type is string && data.type.size() > 0 && data.type.size() < 50 &&
+             data.uid is string && data.uid.size() > 0 && data.uid.size() < 100;
+    }
+
+    function isValidCollaborator(data) {
+      return hasRequiredFields(['id', 'name', 'type', 'uid']) &&
+             data.id is string && data.id.size() > 0 && data.id.size() < 100 &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.type is string && data.type.size() > 0 && data.type.size() < 50 &&
+             data.uid is string && data.uid.size() > 0 && data.uid.size() < 100 &&
+             (!('script' in data) || (data.script is string && data.script.size() < 5000));
+    }
+
     // ===============================================================
     // Security Rules
     // ===============================================================
@@ -276,6 +294,20 @@ service cloud.firestore {
         allow read: if isOwner(userId);
         allow create: if isOwner(userId) && isValidProof(request.resource.data) && uidUnchanged();
         allow update: if isOwner(userId) && isValidProof(request.resource.data) && uidNotModified() && areImmutableFieldsUnchanged(['createdAt', 'uid']);
+        allow delete: if isOwner(userId);
+      }
+      
+      match /timeline/{eventId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidTimelineEvent(request.resource.data) && uidUnchanged();
+        allow update: if isOwner(userId) && isValidTimelineEvent(request.resource.data) && uidNotModified() && areImmutableFieldsUnchanged(['uid']);
+        allow delete: if isOwner(userId);
+      }
+      
+      match /collaborators/{collabId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidCollaborator(request.resource.data) && uidUnchanged();
+        allow update: if isOwner(userId) && isValidCollaborator(request.resource.data) && uidNotModified() && areImmutableFieldsUnchanged(['uid']);
         allow delete: if isOwner(userId);
       }
     }

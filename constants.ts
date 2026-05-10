@@ -32,6 +32,8 @@ export const CATEGORIES = [
     'Other'
 ];
 
+export const ITEM_CONDITIONS = ['New', 'Like New', 'Good', 'Fair', 'Poor'] as const;
+
 export const CATEGORY_COLORS = {
     'Electronics': '#3b82f6',
     'Furniture': '#a16207',

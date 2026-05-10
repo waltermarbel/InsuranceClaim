@@ -38,7 +38,8 @@ const generateClaimDescription = (item: InventoryItem): string => {
 export const generateClaimInventory = (
     masterInventory: InventoryItem[],
     policy: ParsedPolicy,
-    incident: ClaimDetails
+    incident: ClaimDetails,
+    inferredItemCategories?: string[]
 ): ActiveClaim => {
     if (!incident.dateOfLoss) {
         throw new Error("Date of Loss is required to generate a claim inventory.");
@@ -58,6 +59,18 @@ export const generateClaimInventory = (
         // Apply Filters
         if (!isTemporallyEligible(masterItem, incident.dateOfLoss)) return;
         if (!isPhysicallyPlausible(masterItem)) return;
+        
+        // Use inferred categories to pre-filter items to include. If inferredCategories array is provided and not empty, include only those items.
+        // Also include items with 'unknown' category just in case.
+        if (inferredItemCategories && inferredItemCategories.length > 0) {
+            const isCategoryMatching = inferredItemCategories.some(cat => 
+                masterItem.itemCategory.toLowerCase().includes(cat.toLowerCase()) || 
+                cat.toLowerCase().includes(masterItem.itemCategory.toLowerCase())
+            );
+            if (!isCategoryMatching && masterItem.itemCategory.toLowerCase() !== 'unknown') {
+                return; // skip if doesn't match inferred category
+            }
+        }
         
         let status: 'included' | 'excluded' | 'flagged' = 'included';
         let exclusionReason: string | undefined;
@@ -124,7 +137,7 @@ export const generateClaimInventory = (
         generatedAt: new Date().toISOString(),
         totalClaimValue: totalValue,
         status: 'draft',
-        stage: 'Incident',
+        stage: 'INTAKE',
         linkedPolicyId: policy.id,
         incidentDetails: incident
     };
@@ -140,12 +153,17 @@ export const getIncidentRequirements = (incidentType: string): IncidentRequireme
     
     if (type.includes('theft') || type.includes('burglary')) {
         return {
-            requiredDocuments: ['Police Report', 'Proof of Entry (Photos)', 'Original Receipts'],
+            requiredDocuments: [
+                'Prompt Notice of Loss to the insurer or agent.',
+                'Official Police Report detailing the break-in and list of stolen items.',
+                'Detailed Inventory of Stolen Property (quantity, description, ACV, amount of loss for each item).',
+                'Sworn Proof of Loss (signed/sworn statement within 60 days).',
+                'Replacement Receipts/Invoices showing completion of replacement.'
+            ],
             recommendedTasks: [
-                'File a Police Report immediately',
-                'Take photos of any forced entry damage (broken locks, windows)',
-                'Collect statements from witnesses/neighbors',
-                'Secure premises to prevent further loss'
+                'Obtain Proof of Theft Incident: using the official police report as primary proof.',
+                'Obtain Proof of Ownership and Value: Original purchase receipts, credit card statements, photographs, gift receipts, or professional appraisals.',
+                'Obtain Proof of Replacement: Receipts or invoices for replacement items.',
             ]
         };
     }
@@ -247,8 +265,8 @@ export const calculateClaimMetrics = (claim: ActiveClaim, policy: ParsedPolicy, 
     const proofCompleteness = includedItems.length > 0 ? (itemsWithProofs / includedItems.length) * 100 : 100;
 
     // 4. Coverage Health (Is the claim within limits?)
-    const coverageLimit = policy.coverage.find(c => c.type === 'main' && c.category === 'Personal Property')?.limit || 0;
-    const coverageDLimit = policy.coverageD_limit || 0;
+    const coverageLimit = policy.state?.aggregateLimits?.['Personal Property'] ?? (policy.coverage.find(c => c.type === 'main' && c.category === 'Personal Property')?.limit || 0);
+    const coverageDLimit = policy.state?.aggregateLimits?.['Loss of Use'] ?? (policy.coverageD_limit || 0);
 
     // Check Property Limit
     if (grossLoss > coverageLimit) {
@@ -279,28 +297,28 @@ export const calculateClaimMetrics = (claim: ActiveClaim, policy: ParsedPolicy, 
 
 export const determineNextAction = (claim: ActiveClaim, metrics: ClaimMetrics): { action: string, stage: ClaimStage, reason: string } => {
     if (claim.status === 'finalized') {
-        return { action: 'Monitor Carrier Response', stage: 'Submitted', reason: 'Claim package has been generated and sealed.' };
+        return { action: 'Monitor Carrier Response', stage: 'UNDER_REVIEW', reason: 'Claim package has been generated and sealed.' };
     }
 
     // 1. Incident Details
     if (!claim.incidentDetails.policeReport && claim.incidentDetails.incidentType.includes('Theft')) {
-        return { action: 'Upload Police Report', stage: 'Incident', reason: 'Theft claims require a police report number.' };
+        return { action: 'Upload Police Report', stage: 'INTAKE', reason: 'Theft claims require a police report number.' };
     }
 
     // 2. Inventory Selection
     if (claim.claimItems.length === 0) {
-        return { action: 'Add Items to Claim', stage: 'Inventory', reason: 'No items have been added to the schedule of loss.' };
+        return { action: 'Add Items to Claim', stage: 'BROKEN_REVIEW', reason: 'No items have been added to the schedule of loss.' };
     }
 
     // 3. Valuation (Look for $0 items or ACV only where RCV is possible)
     const zeroValueItems = claim.claimItems.filter(i => i.claimedValue === 0 && i.status === 'included');
     if (zeroValueItems.length > 0) {
-        return { action: 'Set Item Values', stage: 'Valuation', reason: `${zeroValueItems.length} items have $0 value.` };
+        return { action: 'Set Item Values', stage: 'BROKEN_REVIEW', reason: `${zeroValueItems.length} items have $0 value.` };
     }
 
     // 4. Evidence (Look for missing proofs)
     if (metrics.proofCompleteness < 80) {
-        return { action: 'Upload Missing Evidence', stage: 'Evidence', reason: 'Proof score is below 80%. Photos/Receipts missing.' };
+        return { action: 'Upload Missing Evidence', stage: 'READY_TO_FILE', reason: 'Proof score is below 80%. Photos/Receipts missing.' };
     }
 
     // 5. Review (Look for Sub-Limit Warnings)
@@ -308,13 +326,13 @@ export const determineNextAction = (claim: ActiveClaim, metrics: ClaimMetrics): 
     const aleIssues = metrics.actionItems.filter(i => i.itemId === 'ale-limit');
     
     if (aleIssues.length > 0) {
-        return { action: 'Review ALE Costs', stage: 'Review', reason: 'Loss of Use expenses exceed policy limits.' };
+        return { action: 'Review ALE Costs', stage: 'READY_TO_SUBMIT', reason: 'Loss of Use expenses exceed policy limits.' };
     }
 
     if (flaggedItems.length > 0) {
-        return { action: 'Review Sub-Limits', stage: 'Review', reason: `${flaggedItems.length} items exceed policy sub-limits.` };
+        return { action: 'Review Sub-Limits', stage: 'READY_TO_SUBMIT', reason: `${flaggedItems.length} items exceed policy sub-limits.` };
     }
 
     // Ready
-    return { action: 'Generate Claim Package', stage: 'Review', reason: 'Claim is healthy and ready for final review.' };
+    return { action: 'Generate Claim Package', stage: 'READY_TO_SUBMIT', reason: 'Claim is healthy and ready for final review.' };
 };

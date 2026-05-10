@@ -4,7 +4,7 @@ import { useAppDispatch } from '../context/AppContext.tsx';
 import { InventoryItem } from '../types.ts';
 import { XIcon, ArrowUpTrayIcon, CheckCircleIcon, DocumentTextIcon, SpinnerIcon, SparklesIcon, ExclamationTriangleIcon, FunnelIcon } from './icons.tsx';
 import { parseCSV } from '../utils/fileUtils.ts';
-import { CATEGORIES } from '../constants.ts';
+import { CATEGORIES, ITEM_CONDITIONS } from '../constants.ts';
 
 interface ImportCSVModalProps {
     onClose: () => void;
@@ -120,7 +120,7 @@ const ImportCSVModal: React.FC<ImportCSVModalProps> = ({ onClose, onImport }) =>
             brand: getValue('brand') ? String(getValue('brand')) : undefined,
             model: getValue('model') ? String(getValue('model')) : undefined,
             serialNumber: getValue('serialNumber') ? String(getValue('serialNumber')) : undefined,
-            condition: ['New', 'Like New', 'Good', 'Fair', 'Poor'].includes(String(getValue('condition'))) ? getValue('condition') as any : undefined,
+            condition: ITEM_CONDITIONS.includes(String(getValue('condition')) as any) ? getValue('condition') as any : undefined,
             lastKnownLocation: getValue('lastKnownLocation') ? String(getValue('lastKnownLocation')) : undefined,
             linkedProofs: [],
             createdAt: new Date().toISOString(),
@@ -147,7 +147,7 @@ const ImportCSVModal: React.FC<ImportCSVModalProps> = ({ onClose, onImport }) =>
                 onImport(newItems);
             } else {
                 dispatch({ type: 'ADD_INVENTORY_ITEMS', payload: newItems });
-                dispatch({ type: 'LOG_ACTIVITY', payload: { action: 'CSV_IMPORT', details: `Imported ${newItems.length} items from ${file!.name}`, app: 'VeritasVault' } });
+                dispatch({ type: 'LOG_ACTIVITY', payload: { action: 'CSV_IMPORT', details: `Imported ${newItems.length} items from ${file!.name}`, app: 'Assert' } });
             }
             
             onClose();

@@ -2,7 +2,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { InventoryItem, ValuationReport } from "../types.ts";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 export const getMarketValuation = async (item: InventoryItem): Promise<ValuationReport | null> => {
     const prompt = `
@@ -28,7 +28,7 @@ export const getMarketValuation = async (item: InventoryItem): Promise<Valuation
 
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-3-pro-preview',
+            model: 'gemini-3.1-pro-preview',
             contents: prompt,
             config: {
                 tools: [{ googleSearch: {} }],

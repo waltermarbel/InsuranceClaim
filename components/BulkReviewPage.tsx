@@ -5,6 +5,8 @@ import { InventoryItem } from '../types.ts';
 import { CheckCircleIcon, DocumentTextIcon, TagIcon, TrashIcon, XCircleIcon } from './icons';
 import { ScoreIndicator } from './ScoreIndicator';
 
+import { calculateHealthMetric, isHighRiskOfDenial } from '../utils/healthMetric.ts';
+
 interface BulkReviewPageProps {
   items: InventoryItem[];
   onFinalize: (approvedItems: InventoryItem[], rejectedItems: InventoryItem[]) => void;
@@ -90,7 +92,7 @@ const BulkReviewPage: React.FC<BulkReviewPageProps> = ({ items, onFinalize }) =>
                             <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-dark sm:pl-6">Item</th>
                             <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-dark">Category</th>
                             <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-dark">AI Valuation (RCV)</th>
-                            <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-dark">Proof Strength</th>
+                            <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-dark">Claim Readiness</th>
                             <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6">
                                 <span className="sr-only">Actions</span>
                             </th>
@@ -131,7 +133,12 @@ const BulkReviewPage: React.FC<BulkReviewPageProps> = ({ items, onFinalize }) =>
                                     <div className="font-semibold text-dark">${(item.replacementCostValueRCV || item.originalCost).toFixed(2)}</div>
                                 </td>
                                 <td className="whitespace-nowrap px-3 py-4 text-sm text-medium">
-                                    {item.proofStrengthScore !== undefined && <ScoreIndicator score={item.proofStrengthScore} size="sm" />}
+                                    <div className="flex flex-col gap-1 items-start">
+                                        <ScoreIndicator score={calculateHealthMetric(item)} size="sm" />
+                                        {isHighRiskOfDenial(calculateHealthMetric(item)) && (
+                                            <span className="text-[9px] font-bold uppercase tracking-widest bg-rose-500 text-white px-1.5 py-0.5 rounded shadow-sm">High Risk</span>
+                                        )}
+                                    </div>
                                 </td>
                                 <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
                                     {selection[item.id] === 'approved' ? (

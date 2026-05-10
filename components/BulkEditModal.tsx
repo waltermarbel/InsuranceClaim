@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { InventoryItem, ItemStatus } from '../types.ts';
+import { ITEM_CONDITIONS } from '../constants.ts';
 import { XIcon, CheckCircleIcon, SparklesIcon, SpinnerIcon, BoltIcon } from './icons.tsx';
 import * as geminiService from '../services/geminiService.ts';
 
@@ -105,7 +106,7 @@ const BulkEditModal: React.FC<BulkEditModalProps> = ({ itemCount, itemCategories
     };
 
     const itemStatuses: ItemStatus[] = ['active', 'claimed', 'archived', 'rejected', 'needs-review'];
-    const itemConditions: (InventoryItem['condition'])[] = ['New', 'Like New', 'Good', 'Fair', 'Poor'];
+    const itemConditions = ITEM_CONDITIONS;
 
     return (
         <div

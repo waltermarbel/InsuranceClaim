@@ -111,8 +111,8 @@ const GallerySyncModal: React.FC<GallerySyncModalProps> = ({ onClose }) => {
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh]">
                 <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                     <div className="flex items-center gap-3">
-                        <div className="bg-indigo-100 p-2 rounded-lg">
-                            <PhotoIcon className="h-6 w-6 text-indigo-600"/>
+                        <div className="bg-blue-100 p-2 rounded-lg">
+                            <PhotoIcon className="h-6 w-6 text-blue-600"/>
                         </div>
                         <div>
                             <h2 className="text-xl font-bold text-slate-900 font-heading">Gallery Sync & Auto-Discovery</h2>
@@ -153,7 +153,7 @@ const GallerySyncModal: React.FC<GallerySyncModalProps> = ({ onClose }) => {
                             )}
 
                             {isProcessing && (
-                                <div className="bg-indigo-50 p-4 rounded-lg flex items-center gap-3 text-indigo-700">
+                                <div className="bg-blue-50 p-4 rounded-lg flex items-center gap-3 text-blue-700">
                                     <SpinnerIcon className="h-5 w-5 animate-spin"/>
                                     <span className="text-sm font-bold">{progress}</span>
                                 </div>

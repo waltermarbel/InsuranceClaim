@@ -1,5 +1,5 @@
 
-import React, { useMemo, useState, useRef, useEffect } from 'react';
+import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { motion } from 'motion/react';
 import { useAppState, useAppDispatch } from '../context/AppContext.tsx';
 import { InventoryItem, Proof, RiskGap } from '../types.ts';
@@ -24,19 +24,24 @@ import {
     SpinnerIcon,
     CalculatorIcon,
     CloudArrowUpIcon,
-    XIcon
+    XIcon,
+    LinkIcon
 } from './icons.tsx';
-import { CATEGORY_ICONS, CATEGORIES, CATEGORY_COLORS } from '../constants.ts';
+import { CATEGORY_ICONS, CATEGORIES, CATEGORY_COLORS, ITEM_CONDITIONS } from '../constants.ts';
 import BulkEditModal from './BulkEditModal.tsx';
 import ImportCSVModal from './ImportCSVModal.tsx';
 import RiskHeatmap from './RiskHeatmap.tsx';
 import ScenarioSimulatorModal from './ScenarioSimulatorModal.tsx';
 import DigitalDiscoveryModal from './DigitalDiscoveryModal.tsx'; // Import new modal
 import GallerySyncModal from './GallerySyncModal.tsx';
+import BatchConflictCheckModal from './BatchConflictCheckModal.tsx';
+import BulkLinkEvidenceModal from './BulkLinkEvidenceModal.tsx';
 import { exportToCSV } from '../utils/fileUtils.ts';
 import { useProofDataUrl } from '../hooks/useProofDataUrl.ts';
 import * as geminiService from '../services/geminiService.ts';
 import { generateInventoryReport } from '../utils/pdfGenerator.ts';
+import { calculateHealthMetric, isHighRiskOfDenial } from '../utils/healthMetric.ts';
+import { ScoreIndicator } from './ScoreIndicator.tsx';
 
 interface InventoryDashboardProps {
     filteredItems: InventoryItem[];
@@ -111,19 +116,26 @@ const StatCard = ({ title, value, subtext, icon: Icon, colorClass, progress, tar
         <div className="flex-grow">
             <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">{title}</p>
             <h3 className="text-2xl font-extrabold text-slate-800 font-heading tracking-tight">{value}</h3>
-            {progress !== undefined && target !== undefined && (
-                <div className="mt-2">
-                    <div className="flex justify-between text-[10px] font-semibold text-slate-400 mb-1">
-                        <span>Progress</span>
-                        <span>{Math.round((progress / target) * 100)}% of Limit</span>
+            {progress !== undefined && target !== undefined && target > 0 && (
+                <div className="mt-4 w-full">
+                    <div className="flex justify-between items-end mb-2">
+                        <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase">Extraction Velocity</span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${(progress/target) > 0.8 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                            {((progress / target) * 100).toFixed(1)}% of Cap
+                        </span>
                     </div>
-                    <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                    <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden flex relative shadow-inner">
+                        {/* 80% Threshold Line */}
+                        <div className="absolute top-0 bottom-0 border-l border-dashed border-rose-400 z-10" style={{ left: '80%' }}></div>
+                        
                         <motion.div 
                             initial={{ width: 0 }}
                             animate={{ width: `${Math.min((progress / target) * 100, 100)}%` }}
-                            transition={{ duration: 1, ease: "easeOut" }}
-                            className={`h-full rounded-full ${colorClass.replace('bg-', 'bg-').replace('text-', '')}`} 
-                        ></motion.div>
+                            transition={{ duration: 1, ease: 'easeOut', delay: 0.2 }}
+                            className={`h-full relative z-0 ${(progress/target) > 0.8 ? 'bg-rose-500' : colorClass.split(' ')[0]}`}
+                        >
+                            <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]"></div>
+                        </motion.div>
                     </div>
                 </div>
             )}
@@ -139,7 +151,7 @@ const StatusBadge: React.FC<{ item: InventoryItem }> = ({ item }) => {
     const hasSerial = !!item.serialNumber;
     
     if(item.status === 'enriching') {
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-indigo-50 text-indigo-700 border border-indigo-100 animate-pulse"><SpinnerIcon className="w-3 h-3 mr-1"/> Enriching</span>;
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-blue-50 text-blue-700 border border-blue-100 animate-pulse"><SpinnerIcon className="w-3 h-3 mr-1"/> Enriching</span>;
     }
 
     if (hasReceipt && hasPhoto && hasSerial) {
@@ -170,22 +182,59 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
     onImageZoom,
     onImportInventory
 }) => {
-    const { inventory, policies, accountHolder } = useAppState();
+    const { inventory, policies, accountHolder, unlinkedProofs } = useAppState();
     const dispatch = useAppDispatch();
     const fileInputRef = useRef<HTMLInputElement>(null);
     
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
+    const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(new Set());
+    const [selectedConditions, setSelectedConditions] = useState<Set<string>>(new Set());
+    const [purchaseDateStart, setPurchaseDateStart] = useState<string>('');
+    const [purchaseDateEnd, setPurchaseDateEnd] = useState<string>('');
     const [showFilterDropdown, setShowFilterDropdown] = useState(false);
     const [showBulkEdit, setShowBulkEdit] = useState(false);
     const [showImportModal, setShowImportModal] = useState(false);
     const [showDiscoveryModal, setShowDiscoveryModal] = useState(false); // New state
+    const [showBatchConflict, setShowBatchConflict] = useState(false);
+    const [showBulkLink, setShowBulkLink] = useState(false);
     const [showGallerySyncModal, setShowGallerySyncModal] = useState(false);
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' } | null>(null);
     const [riskGaps, setRiskGaps] = useState<RiskGap[]>([]);
     const [isRiskLoading, setIsRiskLoading] = useState(false);
     const [showSimulator, setShowSimulator] = useState(false);
     const filterRef = useRef<HTMLDivElement>(null);
+
+    const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
+    
+    const toggleCategoryGroup = (category: string) => {
+        setCollapsedCategories(prev => {
+            const next = new Set(prev);
+            if (next.has(category)) {
+                next.delete(category);
+            } else {
+                next.add(category);
+            }
+            return next;
+        });
+    };
+
+    const handleBulkLink = useCallback((proofIds: string[], itemIds: string[]) => {
+        const proofsToLink = unlinkedProofs.filter(p => proofIds.includes(p.id));
+        if (proofsToLink.length === 0) return;
+
+        // Add the proofs to all specified items
+        itemIds.forEach(itemId => {
+            dispatch({ type: 'ADD_PROOFS_TO_ITEM', payload: { itemId, proofs: proofsToLink } });
+        });
+        
+        // Remove the proofs from unlinked proofs
+        proofIds.forEach(proofId => {
+            dispatch({ type: 'REMOVE_UNLINKED_PROOF', payload: proofId });
+        });
+        
+        setShowBulkLink(false);
+    }, [dispatch, unlinkedProofs]);
 
     // Close filter dropdown when clicking outside
     useEffect(() => {
@@ -201,7 +250,7 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
     }, []);
 
     const activePolicy = policies.find(p => p.isActive);
-    const personalPropertyLimit = activePolicy?.coverage ? (activePolicy.coverage.find(c => c.type === 'main' && c.category === 'Personal Property')?.limit || 95000) : 95000;
+    const personalPropertyLimit = (activePolicy?.state?.aggregateLimits?.['Personal Property'] ?? (activePolicy?.coverage?.find(c => c.type === 'main' && c.category === 'Personal Property')?.limit || 0)) || 15000;
 
     useEffect(() => {
         const fetchRiskData = async () => {
@@ -230,6 +279,8 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
         setSortConfig({ key, direction });
     };
 
+    const activeFilterCount = selectedCategories.size + selectedStatuses.size + selectedConditions.size + (purchaseDateStart ? 1 : 0) + (purchaseDateEnd ? 1 : 0);
+
     const getSortValue = (item: InventoryItem, key: SortKey) => {
         if (key === 'replacementCostValueRCV') return item.replacementCostValueRCV || item.originalCost || 0;
         if (key === 'itemName') return item.itemName ? item.itemName.toLowerCase() : '';
@@ -247,6 +298,22 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
 
         if (selectedCategories.size > 0) {
             data = data.filter(item => selectedCategories.has(item.itemCategory));
+        }
+
+        if (selectedStatuses.size > 0) {
+            data = data.filter(item => item.status && selectedStatuses.has(item.status));
+        }
+
+        if (selectedConditions.size > 0) {
+            data = data.filter(item => item.condition && selectedConditions.has(item.condition));
+        }
+
+        if (purchaseDateStart) {
+            data = data.filter(item => item.purchaseDate && item.purchaseDate >= purchaseDateStart);
+        }
+
+        if (purchaseDateEnd) {
+            data = data.filter(item => item.purchaseDate && item.purchaseDate <= purchaseDateEnd);
         }
 
         if (sortConfig) {
@@ -269,6 +336,19 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
         }
         return data;
     }, [inventory, searchTerm, sortConfig]);
+
+    const groupedData = useMemo(() => {
+        const groups: Record<string, InventoryItem[]> = {};
+        for (const item of tableData) {
+            const cat = item.itemCategory || 'Other';
+            if (!groups[cat]) groups[cat] = [];
+            groups[cat].push(item);
+        }
+        return Object.keys(groups).sort().map(cat => ({
+            category: cat,
+            items: groups[cat]
+        }));
+    }, [tableData]);
 
     const stats = useMemo(() => {
         const totalVal = tableData.reduce((acc, item) => acc + (item.replacementCostValueRCV || item.originalCost || 0), 0);
@@ -322,7 +402,7 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
     };
 
     const handleExportCSV = () => {
-        const filename = `VeritasVault_Inventory_${new Date().toISOString().split('T')[0]}.csv`;
+        const filename = `Assert_Inventory_${new Date().toISOString().split('T')[0]}.csv`;
         exportToCSV(tableData, filename);
     };
 
@@ -363,7 +443,7 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                     value={stats.count} 
                     subtext="Individual assets in vault"
                     icon={CubeIcon} 
-                    colorClass="bg-indigo-500 text-indigo-600" 
+                    colorClass="bg-blue-500 text-blue-600" 
                 />
                 <StatCard 
                     title="Documentation Health" 
@@ -400,57 +480,134 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                         <button 
                             onClick={() => setShowFilterDropdown(!showFilterDropdown)}
                             className={`flex items-center gap-2 px-3 py-2.5 text-sm font-medium rounded-lg border transition-all ${
-                                selectedCategories.size > 0 || showFilterDropdown 
+                                activeFilterCount > 0 || showFilterDropdown 
                                 ? 'bg-primary/10 text-primary border-primary/20' 
                                 : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                             }`}
                         >
                             <FunnelIcon className="h-4 w-4" />
                             <span className="hidden sm:inline">Filter</span>
-                            {selectedCategories.size > 0 && (
+                            {activeFilterCount > 0 && (
                                 <span className="flex items-center justify-center bg-primary text-white text-[10px] font-bold h-5 w-5 rounded-full ml-1">
-                                    {selectedCategories.size}
+                                    {activeFilterCount}
                                 </span>
                             )}
                         </button>
 
                         {/* Dropdown Menu */}
                         {showFilterDropdown && (
-                            <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-100 p-2 z-50 animate-in fade-in zoom-in-95 duration-200 origin-top-left">
-                                <div className="flex justify-between items-center px-2 py-2 mb-1 border-b border-slate-100">
-                                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Categories</span>
-                                    {selectedCategories.size > 0 && (
+                            <div className="absolute top-full right-0 mt-2 w-80 max-w-[90vw] bg-white rounded-xl shadow-xl border border-slate-100 flex flex-col z-50 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
+                                <div className="flex justify-between items-center px-4 py-3 border-b border-slate-100 bg-slate-50 rounded-t-xl">
+                                    <span className="font-bold text-slate-700">Filters</span>
+                                    {activeFilterCount > 0 && (
                                         <button 
-                                            onClick={() => setSelectedCategories(new Set())}
-                                            className="text-xs text-primary hover:text-primary-dark font-medium"
+                                            onClick={() => {
+                                                setSelectedCategories(new Set());
+                                                setSelectedStatuses(new Set());
+                                                setSelectedConditions(new Set());
+                                                setPurchaseDateStart('');
+                                                setPurchaseDateEnd('');
+                                            }}
+                                            className="text-xs text-primary hover:text-primary-dark font-medium px-2 py-1 bg-primary/10 rounded-md transition-colors"
                                         >
-                                            Clear
+                                            Clear All
                                         </button>
                                     )}
                                 </div>
-                                <div className="max-h-60 overflow-y-auto space-y-1">
-                                    {CATEGORIES.map(category => (
-                                        <label 
-                                            key={category} 
-                                            className="flex items-center gap-3 px-2 py-2 hover:bg-slate-50 rounded-lg cursor-pointer transition-colors"
-                                        >
-                                            <input 
-                                                type="checkbox"
-                                                checked={selectedCategories.has(category)}
-                                                onChange={(e) => {
-                                                    const newSet = new Set(selectedCategories);
-                                                    if (e.target.checked) {
-                                                        newSet.add(category);
-                                                    } else {
-                                                        newSet.delete(category);
-                                                    }
-                                                    setSelectedCategories(newSet);
-                                                }}
-                                                className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                                            />
-                                            <span className="text-sm text-slate-700">{category}</span>
-                                        </label>
-                                    ))}
+                                <div className="max-h-[60vh] overflow-y-auto p-4 space-y-6">
+                                    {/* Categories */}
+                                    <div>
+                                        <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Categories</div>
+                                        <div className="space-y-1">
+                                            {CATEGORIES.map(category => (
+                                                <label key={category} className="flex items-center gap-3 px-2 py-1.5 hover:bg-slate-50 rounded-lg cursor-pointer transition-colors">
+                                                    <input 
+                                                        type="checkbox"
+                                                        checked={selectedCategories.has(category)}
+                                                        onChange={(e) => {
+                                                            const newSet = new Set(selectedCategories);
+                                                            if (e.target.checked) newSet.add(category);
+                                                            else newSet.delete(category);
+                                                            setSelectedCategories(newSet);
+                                                        }}
+                                                        className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                                                    />
+                                                    <span className="text-sm text-slate-700">{category}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Statuses */}
+                                    <div>
+                                        <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Statuses</div>
+                                        <div className="space-y-1">
+                                            {['needs-review', 'active', 'processing', 'clustering', 'enriching', 'claimed', 'archived', 'error', 'rejected'].map(status => (
+                                                <label key={status} className="flex items-center gap-3 px-2 py-1.5 hover:bg-slate-50 rounded-lg cursor-pointer transition-colors">
+                                                    <input 
+                                                        type="checkbox"
+                                                        checked={selectedStatuses.has(status)}
+                                                        onChange={(e) => {
+                                                            const newSet = new Set(selectedStatuses);
+                                                            if (e.target.checked) newSet.add(status);
+                                                            else newSet.delete(status);
+                                                            setSelectedStatuses(newSet);
+                                                        }}
+                                                        className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                                                    />
+                                                    <span className="text-sm text-slate-700 capitalize">{status.replace('-', ' ')}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Conditions */}
+                                    <div>
+                                        <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Condition</div>
+                                        <div className="space-y-1">
+                                            {ITEM_CONDITIONS.map(condition => (
+                                                <label key={condition} className="flex items-center gap-3 px-2 py-1.5 hover:bg-slate-50 rounded-lg cursor-pointer transition-colors">
+                                                    <input 
+                                                        type="checkbox"
+                                                        checked={selectedConditions.has(condition)}
+                                                        onChange={(e) => {
+                                                            const newSet = new Set(selectedConditions);
+                                                            if (e.target.checked) newSet.add(condition);
+                                                            else newSet.delete(condition);
+                                                            setSelectedConditions(newSet);
+                                                        }}
+                                                        className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                                                    />
+                                                    <span className="text-sm text-slate-700">{condition}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Date Range */}
+                                    <div>
+                                        <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Purchase Date</div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div>
+                                                <label className="text-[10px] text-slate-400 font-bold uppercase block mb-1">From</label>
+                                                <input 
+                                                    type="date" 
+                                                    value={purchaseDateStart}
+                                                    onChange={e => setPurchaseDateStart(e.target.value)}
+                                                    className="w-full text-sm border-slate-200 rounded-md p-1 focus:ring-primary focus:border-primary"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-slate-400 font-bold uppercase block mb-1">To</label>
+                                                <input 
+                                                    type="date" 
+                                                    value={purchaseDateEnd}
+                                                    onChange={e => setPurchaseDateEnd(e.target.value)}
+                                                    className="w-full text-sm border-slate-200 rounded-md p-1 focus:ring-primary focus:border-primary"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -469,7 +626,7 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                      {/* Cloud Discovery Button (New) */}
                      <button 
                         onClick={() => setShowDiscoveryModal(true)}
-                        className="hidden sm:flex items-center gap-2 px-4 py-2 text-purple-600 font-bold bg-purple-50 hover:bg-purple-100 rounded-lg border border-purple-100 transition text-sm"
+                        className="flex items-center gap-2 px-4 py-2 text-purple-600 font-bold bg-purple-50 hover:bg-purple-100 rounded-lg border border-purple-100 transition text-sm"
                     >
                         <CloudArrowUpIcon className="h-4 w-4"/> Digital Discovery
                     </button>
@@ -477,10 +634,28 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                     {/* Gallery Sync Button */}
                     <button 
                         onClick={() => setShowGallerySyncModal(true)}
-                        className="hidden sm:flex items-center gap-2 px-4 py-2 text-indigo-600 font-bold bg-indigo-50 hover:bg-indigo-100 rounded-lg border border-indigo-100 transition text-sm"
+                        className="hidden sm:flex items-center gap-2 px-4 py-2 text-blue-600 font-bold bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-100 transition text-sm"
                     >
                         <PhotoIcon className="h-4 w-4"/> Gallery Sync
                     </button>
+
+                    {/* Batch Conflict Check Button */}
+                    <button 
+                        onClick={() => setShowBatchConflict(true)}
+                        className="hidden sm:flex items-center gap-2 px-4 py-2 text-amber-600 font-bold bg-amber-50 hover:bg-amber-100 rounded-lg border border-amber-100 transition text-sm"
+                    >
+                        <ExclamationTriangleIcon className="h-4 w-4"/> Batch Conflict
+                    </button>
+
+                    {/* Bulk Link Evidence Button */}
+                    {unlinkedProofs.length > 0 && (
+                        <button 
+                            onClick={() => setShowBulkLink(true)}
+                            className="hidden sm:flex items-center gap-2 px-4 py-2 text-indigo-600 font-bold bg-indigo-50 hover:bg-indigo-100 rounded-lg border border-indigo-100 transition text-sm"
+                        >
+                            <LinkIcon className="h-4 w-4"/> Bulk Link
+                        </button>
+                    )}
 
                      <button 
                         onClick={() => setShowImportModal(true)}
@@ -490,15 +665,17 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                     </button>
                     <button 
                         onClick={handleExportCSV}
-                        className="hidden sm:flex items-center gap-2 px-3 py-2 text-slate-600 hover:text-dark hover:bg-slate-100 rounded-lg border border-transparent hover:border-slate-200 transition text-sm font-medium"
+                        className="hidden sm:flex items-center gap-2 px-3 py-2 text-slate-600 hover:text-dark hover:bg-slate-100 rounded-lg border border-transparent hover:border-slate-200 transition text-sm font-medium pt-tooltip"
+                        title="Export as ISO/Xactimate compatible CSV for Adjusters"
                     >
-                        <ArrowDownTrayIcon className="h-4 w-4"/> Export CSV
+                        <ArrowDownTrayIcon className="h-4 w-4"/> Adjuster CSV (ISO)
                     </button>
                     <button 
                         onClick={handleGenerateReport}
                         className="hidden sm:flex items-center gap-2 px-3 py-2 text-slate-600 hover:text-dark hover:bg-slate-100 rounded-lg border border-transparent hover:border-slate-200 transition text-sm font-medium"
+                        title="Generate standard Schedule of Loss Report"
                     >
-                        <DocumentTextIcon className="h-4 w-4"/> Report PDF
+                        <DocumentTextIcon className="h-4 w-4"/> Loss Schedule PDF
                     </button>
                     <div className="h-6 w-px bg-slate-200 hidden sm:block"></div>
                     <button 
@@ -577,7 +754,7 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                                     onClick={() => handleSort('status')}
                                 >
                                     <div className="flex items-center justify-center gap-1">
-                                        Status
+                                        Readiness & Status
                                         <SortIcon active={sortConfig?.key === 'status'} direction={sortConfig?.direction} />
                                     </div>
                                 </th>
@@ -585,85 +762,121 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                             </tr>
                         </thead>
                         <tbody>
-                            {tableData.map((item) => {
-                                const CategoryIcon = CATEGORY_ICONS[item.itemCategory] || CATEGORY_ICONS['Other'];
-                                const categoryColor = CATEGORY_COLORS[item.itemCategory] || '#94a3b8';
-                                const isSelected = selectedIds.has(item.id);
-                                
-                                // Prioritize showing an image proof if available
-                                const displayProof = (item.linkedProofs || []).find(p => p.type === 'image' || p.mimeType.startsWith('image/')) || (item.linkedProofs || [])[0];
-
-                                return (
-                                    <motion.tr 
-                                        initial={{ opacity: 0, y: 10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ duration: 0.2 }}
-                                        key={item.id} 
-                                        className={`group transition-all duration-300 cursor-pointer rounded-lg shadow-sm border border-transparent hover:shadow-md hover:border-slate-200 ${isSelected ? 'bg-indigo-50/50 hover:bg-indigo-50' : 'bg-white hover:bg-white'}`}
-                                        onClick={() => dispatch({ type: 'SELECT_ITEM', payload: item.id })}
+                            {groupedData.map((group) => (
+                                <React.Fragment key={group.category}>
+                                    <tr 
+                                        className="bg-slate-50 border-y border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors"
+                                        onClick={() => toggleCategoryGroup(group.category)}
                                     >
-                                        <td className="px-4 py-4 rounded-l-lg" onClick={(e) => e.stopPropagation()}>
-                                             <input 
-                                                type="checkbox" 
-                                                className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
-                                                checked={isSelected}
-                                                onChange={(e) => handleSelectRow(item.id, e)}
-                                             />
+                                        <td colSpan={8} className="px-6 py-3">
+                                            <div className="flex items-center gap-3">
+                                                {collapsedCategories.has(group.category) ? (
+                                                    <ChevronDownIcon className="h-4 w-4 text-slate-500" />
+                                                ) : (
+                                                    <ChevronUpIcon className="h-4 w-4 text-slate-500" />
+                                                )}
+                                                <span className="font-bold text-slate-800 text-sm tracking-wide">{group.category}</span>
+                                                <span className="bg-white text-slate-600 border border-slate-200 text-xs font-bold px-2.5 py-0.5 rounded-full shadow-sm">
+                                                    {group.items.length}
+                                                </span>
+                                            </div>
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center">
-                                                <div className="h-12 w-12 flex-shrink-0 bg-white rounded-lg overflow-hidden border border-slate-200 shadow-sm group-hover:shadow-md transition-shadow relative">
-                                                    {displayProof ? (
-                                                        <DashboardThumbnail proof={displayProof} categoryIcon={CategoryIcon} categoryColor={categoryColor} onZoom={onImageZoom} />
-                                                    ) : (
-                                                        <div className="h-full w-full flex items-center justify-center text-slate-300 bg-slate-50">
-                                                            <CategoryIcon className="h-6 w-6 opacity-50"/>
+                                    </tr>
+                                    {!collapsedCategories.has(group.category) && group.items.map((item) => {
+                                        const CategoryIcon = CATEGORY_ICONS[item.itemCategory] || CATEGORY_ICONS['Other'];
+                                        const categoryColor = CATEGORY_COLORS[item.itemCategory] || '#94a3b8';
+                                        const isSelected = selectedIds.has(item.id);
+                                        
+                                        // Prioritize showing an image proof if available
+                                        const displayProof = (item.linkedProofs || []).find(p => p.type === 'image' || p.mimeType.startsWith('image/')) || (item.linkedProofs || [])[0];
+
+                                        return (
+                                            <motion.tr 
+                                                initial={{ opacity: 0, y: 10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ duration: 0.2 }}
+                                                key={item.id} 
+                                                className={`group transition-all duration-300 cursor-pointer shadow-sm border-b border-transparent hover:shadow-md hover:border-slate-200 ${isSelected ? 'bg-blue-50/50 hover:bg-blue-50' : 'bg-white hover:bg-white'}`}
+                                                onClick={() => dispatch({ type: 'SELECT_ITEM', payload: item.id })}
+                                            >
+                                                <td className="px-4 py-4 rounded-l-lg" onClick={(e) => e.stopPropagation()}>
+                                                     <input 
+                                                        type="checkbox" 
+                                                        className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
+                                                        checked={isSelected}
+                                                        onChange={(e) => handleSelectRow(item.id, e)}
+                                                     />
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center">
+                                                        <div className="h-12 w-12 flex-shrink-0 bg-white rounded-lg overflow-hidden border border-slate-200 shadow-sm group-hover:shadow-md transition-shadow relative">
+                                                            {displayProof ? (
+                                                                <DashboardThumbnail proof={displayProof} categoryIcon={CategoryIcon} categoryColor={categoryColor} onZoom={onImageZoom} />
+                                                            ) : (
+                                                                <div className="h-full w-full flex items-center justify-center text-slate-300 bg-slate-50">
+                                                                    <CategoryIcon className="h-6 w-6 opacity-50"/>
+                                                                </div>
+                                                            )}
                                                         </div>
-                                                    )}
-                                                </div>
-                                                <div className="ml-4">
-                                                    <div className="flex items-center gap-2">
-                                                        <CategoryIcon className="h-4 w-4 flex-shrink-0" style={{ color: categoryColor }} />
-                                                        <div className="text-sm font-bold text-slate-800 font-heading">{item.itemName}</div>
+                                                        <div className="ml-4">
+                                                            <div className="flex items-center gap-2">
+                                                                <CategoryIcon className="h-4 w-4 flex-shrink-0" style={{ color: categoryColor }} />
+                                                                <div className="text-sm font-bold text-slate-800 font-heading">{item.itemName}</div>
+                                                            </div>
+                                                            <div className="text-xs text-slate-500 truncate max-w-[240px] pl-6">{item.brand} {item.model}</div>
+                                                        </div>
                                                     </div>
-                                                    <div className="text-xs text-slate-500 truncate max-w-[240px] pl-6">{item.brand} {item.model}</div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-slate-50 text-slate-700 border border-slate-100">
-                                                <CategoryIcon className="h-3.5 w-3.5 mr-1.5" style={{ color: categoryColor }}/>
-                                                {item.itemCategory}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-right whitespace-nowrap">
-                                            <div className="text-sm text-slate-700">${item.originalCost.toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
-                                            <div className="text-[10px] text-slate-400">{item.purchaseDate ? new Date(item.purchaseDate).toLocaleDateString() : 'Date Unknown'}</div>
-                                        </td>
-                                        <td className="px-6 py-4 text-right whitespace-nowrap">
-                                            <div className="text-sm font-bold text-slate-900">${(item.replacementCostValueRCV || item.originalCost).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-center">
-                                            <StatusBadge item={item} />
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium rounded-r-lg">
-                                            <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <span className="text-primary font-semibold text-xs uppercase tracking-wide bg-primary/5 px-3 py-1 rounded-full hover:bg-primary/10 transition-colors">Edit</span>
-                                                <button 
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        dispatch({ type: 'DELETE_ITEM', payload: { itemId: item.id } });
-                                                    }}
-                                                    className="text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 p-1.5 rounded-full transition-colors"
-                                                    title="Delete Item"
-                                                >
-                                                    <TrashIcon className="h-4 w-4" />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </motion.tr>
-                                );
-                            })}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-slate-50 text-slate-700 border border-slate-100">
+                                                        <CategoryIcon className="h-3.5 w-3.5 mr-1.5" style={{ color: categoryColor }}/>
+                                                        {item.itemCategory}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 text-right whitespace-nowrap">
+                                                    <div className="text-sm text-slate-700">${item.originalCost.toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
+                                                    <div className="text-[10px] text-slate-400">{item.purchaseDate ? new Date(item.purchaseDate).toLocaleDateString() : 'Date Unknown'}</div>
+                                                </td>
+                                                <td className="px-6 py-4 text-right whitespace-nowrap">
+                                                    <div className="text-sm font-bold text-slate-900">${(item.replacementCostValueRCV || item.originalCost).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                    <div className="flex flex-col items-center gap-1.5 min-w-[120px]">
+                                                        <StatusBadge item={item} />
+                                                        {(() => {
+                                                            const healthScore = calculateHealthMetric(item);
+                                                            const highRisk = isHighRiskOfDenial(healthScore);
+                                                            return (
+                                                                <div className="flex flex-col items-center gap-1 w-full mt-1">
+                                                                    <ScoreIndicator score={healthScore} size="sm" />
+                                                                    {highRisk && (
+                                                                        <span className="text-[9px] font-bold uppercase tracking-widest bg-rose-500 text-white px-1.5 py-0.5 rounded shadow-sm w-full block text-center">High Risk of Denial</span>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })()}
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium rounded-r-lg">
+                                                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <span className="text-primary font-semibold text-xs uppercase tracking-wide bg-primary/5 px-3 py-1 rounded-full hover:bg-primary/10 transition-colors">Edit</span>
+                                                        <button 
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                dispatch({ type: 'DELETE_ITEM', payload: { itemId: item.id } });
+                                                            }}
+                                                            className="text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 p-1.5 rounded-full transition-colors"
+                                                            title="Delete Item"
+                                                        >
+                                                            <TrashIcon className="h-4 w-4" />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </motion.tr>
+                                        );
+                                    })}
+                                </React.Fragment>
+                            ))}
                             {tableData.length === 0 && (
                                 <tr>
                                     <td colSpan={8} className="px-6 py-20 text-center">
@@ -672,7 +885,21 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                                                 <ClipboardDocumentListIcon className="h-8 w-8 text-slate-400" />
                                             </div>
                                             <h3 className="text-lg font-bold text-slate-900">Schedule is Empty</h3>
-                                            <p className="text-slate-500 mt-1 max-w-sm">Start by adding items manually, importing a CSV, or uploading evidence.</p>
+                                            <p className="text-slate-500 mt-1 max-w-sm mb-6">Start by adding items manually, importing a CSV, or discovering them digitally.</p>
+                                            <div className="flex flex-col sm:flex-row gap-3">
+                                                 <button 
+                                                    onClick={() => setShowDiscoveryModal(true)}
+                                                    className="flex items-center justify-center gap-2 px-6 py-3 text-purple-600 font-bold bg-purple-50 hover:bg-purple-100 rounded-xl border border-purple-100 transition shadow-sm"
+                                                >
+                                                    <CloudArrowUpIcon className="h-5 w-5"/> Auto-Discover from Cloud
+                                                </button>
+                                                <button 
+                                                    onClick={() => fileInputRef.current?.click()}
+                                                    className="flex items-center justify-center gap-2 px-6 py-3 border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 font-bold rounded-xl transition shadow-sm"
+                                                >
+                                                    <PhotoIcon className="h-5 w-5"/> Upload Photos / Receipts
+                                                </button>
+                                            </div>
                                         </div>
                                     </td>
                                 </tr>
@@ -758,6 +985,23 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
             {showGallerySyncModal && (
                 <GallerySyncModal 
                     onClose={() => setShowGallerySyncModal(false)}
+                />
+            )}
+            
+            {showBatchConflict && (
+                <BatchConflictCheckModal 
+                    inventory={inventory}
+                    onClose={() => setShowBatchConflict(false)}
+                />
+            )}
+
+            {showBulkLink && (
+                <BulkLinkEvidenceModal 
+                    unlinkedProofs={unlinkedProofs}
+                    inventory={inventory}
+                    initialSelectedItemIds={Array.from(selectedIds)}
+                    onClose={() => setShowBulkLink(false)}
+                    onBulkLink={handleBulkLink}
                 />
             )}
             

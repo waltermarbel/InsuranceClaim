@@ -7,13 +7,16 @@ import {
     ChevronDownIcon, ChevronUpIcon, PlusIcon,
     CurrencyDollarIcon, PhotoIcon, DocumentTextIcon,
     PencilSquareIcon, GlobeIcon, TrashIcon, CheckCircleIcon,
-    ArrowUpTrayIcon, MicrophoneIcon, XIcon, ArrowDownTrayIcon
+    ArrowUpTrayIcon, MicrophoneIcon, XIcon, ArrowDownTrayIcon,
+    ExclamationTriangleIcon, ClockIcon, MapPinIcon, BoltIcon, MagnifyingGlassIcon
 } from './icons.tsx';
 import * as geminiService from '../services/geminiService.ts';
 import { CurrencyInput } from './CurrencyInput.tsx';
 import { ScoreIndicator } from './ScoreIndicator.tsx';
-import { CATEGORIES, PROOF_PURPOSE_COLORS } from '../constants.ts';
+import { CATEGORIES, PROOF_PURPOSE_COLORS, ITEM_CONDITIONS } from '../constants.ts';
 import { useProofDataUrl } from '../hooks/useProofDataUrl.ts';
+
+import { calculateHealthMetric, isHighRiskOfDenial } from '../utils/healthMetric.ts';
 
 interface ItemDetailViewProps {
     onAddProof: (itemId: string, files: File[]) => void;
@@ -81,9 +84,14 @@ const ProofThumbnail: React.FC<{ proof: Proof, onZoom: (url: string) => void, on
             )}
             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                 {isImage && (
-                    <button onClick={onEdit} className="p-1.5 bg-white/90 rounded-full text-slate-700 hover:text-primary transition" title="Edit Image">
-                        <PencilSquareIcon className="h-4 w-4" />
-                    </button>
+                    <>
+                        <button onClick={() => onZoom(displayUrl!)} className="p-1.5 bg-white/90 rounded-full text-slate-700 hover:text-blue-500 transition" title="Zoom Image">
+                            <MagnifyingGlassIcon className="h-4 w-4" />
+                        </button>
+                        <button onClick={onEdit} className="p-1.5 bg-white/90 rounded-full text-slate-700 hover:text-primary transition" title="Edit Image">
+                            <PencilSquareIcon className="h-4 w-4" />
+                        </button>
+                    </>
                 )}
             </div>
         </div>
@@ -124,7 +132,9 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
 
     const handleBlur = (field: keyof InventoryItem) => {
         if (localItemState[field] !== item[field]) {
+            const reason = window.prompt(`Please enter the Reason for Change for updating ${field}:`, 'User manual correction') || 'System Auto-Generated';
             dispatch({ type: 'UPDATE_ITEM', payload: { ...item, [field]: localItemState[field] } });
+            dispatch({ type: 'LOG_ACTIVITY', payload: { action: 'MANUAL_UPDATE', details: `Updated ${field} for ${item.itemName}`, reasonForChange: reason, app: 'Assert' } });
         }
     };
 
@@ -135,6 +145,7 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
             const newItem = { ...item, ...updates };
             dispatch({ type: 'UPDATE_ITEM', payload: newItem });
             setLocalItemState(newItem);
+            dispatch({ type: 'LOG_ACTIVITY', payload: { action: 'AI_AUTOFILL', details: `Gemini enhanced details for ${item.itemName}`, reasonForChange: 'AI Valuation / Context Generation', app: 'Gemini' } });
         } catch (e) {
             console.error(e);
             alert("Failed to auto-fill details.");
@@ -151,6 +162,7 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
                 const newItem = { ...item, ...report.correctedAttributes };
                 dispatch({ type: 'UPDATE_ITEM', payload: newItem });
                 setLocalItemState(newItem);
+                dispatch({ type: 'LOG_ACTIVITY', payload: { action: 'AI_FORENSIC_HEAL', details: `Healed: ${report.summary}`, reasonForChange: 'AI Forensic Market Analysis', app: 'Gemini' } });
                 alert(`Forensic Heal Complete: ${report.summary}`);
             } else {
                 alert(`Audit Complete: ${report.summary}`);
@@ -164,9 +176,29 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
     };
 
     const handleDelete = () => {
+        const reason = window.prompt('Please enter the Reason for Change for deleting this item:', 'Item no longer relevant') || 'System Auto-Generated';
         dispatch({ type: 'DELETE_ITEM', payload: { itemId: item.id } });
+        dispatch({ type: 'LOG_ACTIVITY', payload: { action: 'DELETE_ITEM', details: `Deleted item ${item.itemName}`, reasonForChange: reason, app: 'Assert' } });
         dispatch({ type: 'SET_VIEW', payload: 'dashboard' });
     };
+
+    // Calculate EXIF Warnings
+    const purchaseDateMs = localItemState.purchaseDate ? new Date(localItemState.purchaseDate).getTime() : null;
+    const itemsWithExif = item.linkedProofs.filter(p => p.exif && Object.keys(p.exif).length > 0);
+    const exifWarnings: { proof: Proof, diffDays: number }[] = [];
+    
+    if (purchaseDateMs) {
+        itemsWithExif.forEach(proof => {
+            if (proof.exif?.dateTimeOriginal) {
+                const dateTakenMs = new Date(proof.exif.dateTimeOriginal).getTime();
+                const diffTime = Math.abs(dateTakenMs - purchaseDateMs);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                if (diffDays > 7) { // Flag items with > 7 days discrepancy
+                    exifWarnings.push({ proof, diffDays });
+                }
+            }
+        });
+    }
 
     return (
         <motion.div 
@@ -202,9 +234,14 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
                     </div>
                 </div>
                 <div className="flex items-center gap-6">
-                    <div className="text-center">
-                        <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Proof Strength</div>
-                        <ScoreIndicator score={item.proofStrengthScore || 0} size="sm" />
+                    <div className="text-center flex flex-col items-center">
+                        <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Claim Readiness</div>
+                        <div className="flex items-center gap-2">
+                            <ScoreIndicator score={calculateHealthMetric(item)} size="sm" />
+                            {isHighRiskOfDenial(calculateHealthMetric(item)) && (
+                                <span className="text-[10px] font-bold uppercase tracking-widest bg-rose-500 text-white px-2 py-1 rounded shadow-sm">High Risk of Denial</span>
+                            )}
+                        </div>
                     </div>
                     <div className="h-10 w-px bg-slate-200"></div>
                     <button onClick={handleDelete} className="text-slate-400 hover:text-rose-500 transition p-2 rounded-full hover:bg-rose-50">
@@ -220,7 +257,17 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
                     <Accordion title="Forensic Details" icon={<TagIcon className="h-5 w-5" />}>
                         <div className="space-y-6">
                             <div>
-                                <label className="block text-xs font-bold uppercase text-slate-400 mb-2">Detailed Description</label>
+                                <div className="flex justify-between items-center mb-2">
+                                    <label className="block text-xs font-bold uppercase text-slate-400">Detailed Description</label>
+                                    <button
+                                        onClick={handleAutoFill}
+                                        disabled={isAutoFilling}
+                                        className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded hover:bg-blue-100 transition flex items-center gap-1 disabled:opacity-50"
+                                    >
+                                        {isAutoFilling ? <SpinnerIcon className="h-3 w-3 animate-spin"/> : <SparklesIcon className="h-3 w-3"/>}
+                                        Auto-Fill Details
+                                    </button>
+                                </div>
                                 <textarea
                                     className="w-full p-4 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition shadow-inner"
                                     rows={4}
@@ -255,7 +302,7 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
                                 <button
                                     onClick={handleAutoFill}
                                     disabled={isAutoFilling}
-                                    className="p-3 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-100 transition shadow-sm disabled:opacity-50"
+                                    className="p-3 bg-blue-50 border border-blue-100 text-blue-700 rounded-lg hover:bg-blue-100 transition shadow-sm disabled:opacity-50"
                                     title="Auto-Fill Details from Web"
                                 >
                                     {isAutoFilling ? <SpinnerIcon className="h-5 w-5 animate-spin" /> : <SparklesIcon className="h-5 w-5" />}
@@ -300,6 +347,17 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
 
                     {/* 2. Valuation */}
                     <Accordion title="Valuation & Acquisition" icon={<CurrencyDollarIcon className="h-5 w-5" />}>
+                        {item.valuationHistory && item.valuationHistory.length > 0 && item.valuationHistory[0].isUnderclaiming && (
+                            <div className="mb-4 bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-lg flex gap-3 items-start">
+                                <ExclamationTriangleIcon className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                                <div>
+                                    <p className="font-bold text-sm">Under-claiming Risk Detected</p>
+                                    <p className="mt-1 text-xs opacity-90 leading-relaxed">
+                                        {item.valuationHistory[0].reasoning}
+                                    </p>
+                                </div>
+                            </div>
+                        )}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                             <div>
                                 <label className="block text-xs font-bold uppercase text-slate-400 mb-2">Original Cost</label>
@@ -334,9 +392,9 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
                                         className="w-full p-3 bg-white border border-slate-200 rounded-lg text-sm font-bold text-emerald-600 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition"
                                     />
                                     <button 
-                                        onClick={() => onEnrichItem(item)}
+                                        onClick={() => onEnrichItem({ ...item, valuationHistory: [] })}
                                         className="p-3 bg-emerald-50 text-emerald-600 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition"
-                                        title="Get Market Price"
+                                        title="Get Market Valuation (Recursive Engine)"
                                     >
                                         <CurrencyDollarIcon className="h-5 w-5"/>
                                     </button>
@@ -348,11 +406,11 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
                                     className="w-full p-3 bg-white border border-slate-200 rounded-lg text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition"
                                     value={localItemState.condition || 'Good'}
                                     onChange={e => {
-                                        handleLocalChange('condition', e.target.value);
+                                        handleLocalChange('condition', e.target.value as any);
                                         handleBlur('condition');
                                     }}
                                 >
-                                    {['New', 'Like New', 'Good', 'Fair', 'Poor'].map(c => <option key={c} value={c}>{c}</option>)}
+                                    {ITEM_CONDITIONS.map(c => <option key={c} value={c}>{c}</option>)}
                                 </select>
                             </div>
                         </div>
@@ -365,8 +423,31 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
                         <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
                             <h3 className="font-bold text-slate-700 flex items-center gap-2">
                                 <ShieldCheckIcon className="h-5 w-5 text-slate-400" /> Evidence Locker
+                                <span className="bg-slate-200 text-slate-600 text-xs font-bold px-2 py-0.5 rounded-full">{item.linkedProofs.length}</span>
                             </h3>
-                            <span className="bg-slate-200 text-slate-600 text-xs font-bold px-2 py-0.5 rounded-full">{item.linkedProofs.length}</span>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => onRecordAudio(item)}
+                                    className="flex items-center gap-1 px-3 py-1.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-md text-xs font-bold hover:bg-rose-100 transition shadow-sm"
+                                >
+                                    <MicrophoneIcon className="h-4 w-4" />
+                                    Record Audio
+                                </button>
+                                <button
+                                    onClick={onFindWebImage}
+                                    className="flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-md text-xs font-bold hover:bg-blue-100 transition shadow-sm"
+                                >
+                                    <GlobeIcon className="h-4 w-4" />
+                                    Web Image
+                                </button>
+                                <button 
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="flex items-center gap-1 px-3 py-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-md text-xs font-bold hover:bg-indigo-100 transition shadow-sm"
+                                >
+                                    <ArrowUpTrayIcon className="h-4 w-4" />
+                                    Upload
+                                </button>
+                            </div>
                         </div>
                         
                         <div className="p-4 flex-grow overflow-y-auto max-h-[500px]">
@@ -396,8 +477,45 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
                             </div>
                         </div>
 
+                        {itemsWithExif.length > 0 && (
+                            <div className="p-4 border-t border-slate-100 bg-slate-50/50 text-xs">
+                                <h4 className="font-bold text-slate-700 mb-2 uppercase tracking-wide">EXIF Metadata</h4>
+                                {exifWarnings.length > 0 && (
+                                    <div className="mb-3 bg-amber-50 border border-amber-200 text-amber-800 p-2 rounded flex gap-2 items-start">
+                                        <ExclamationTriangleIcon className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                                        <div>
+                                            <p className="font-bold">Date Anomaly Detected</p>
+                                            <p className="mt-0.5 opacity-90 text-[10px]">
+                                                {exifWarnings.length} image(s) have 'Date Taken' differing significantly from the set Acquisition Date.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+                                <div className="space-y-3 max-h-32 overflow-y-auto pr-2">
+                                    {itemsWithExif.map(proof => (
+                                        <div key={`exif-${proof.id}`} className="bg-white p-2 border border-slate-100 rounded text-[10px] text-slate-500 space-y-1">
+                                            <p className="font-bold text-slate-700 truncate">{proof.fileName}</p>
+                                            {proof.exif?.dateTimeOriginal && (
+                                                <p className="flex items-center gap-1"><ClockIcon className="h-3 w-3 inline text-slate-400" /> {new Date(proof.exif.dateTimeOriginal).toLocaleDateString()}</p>
+                                            )}
+                                            {proof.exif?.make && proof.exif?.model && (
+                                                <p className="flex items-center gap-1"><PhotoIcon className="h-3 w-3 inline text-slate-400" /> {proof.exif.make} {proof.exif.model}</p>
+                                            )}
+                                            {proof.exif?.latitude && proof.exif?.longitude && (
+                                                <p className="flex items-center gap-1"><MapPinIcon className="h-3 w-3 inline text-slate-400" /> {proof.exif.latitude.toFixed(4)}, {proof.exif.longitude.toFixed(4)}</p>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         {/* Quick Actions */}
                         <div className="p-4 border-t border-slate-100 bg-slate-50 grid grid-cols-2 gap-2">
+                            <button onClick={() => onEnrichItem(item)} className="flex flex-col items-center justify-center p-3 bg-white border border-slate-200 rounded-lg hover:shadow-md transition gap-1 group col-span-2">
+                                <BoltIcon className="h-5 w-5 text-amber-500 group-hover:scale-110 transition-transform" />
+                                <span className="text-[10px] font-bold text-slate-600">Run Forensic Enrichment</span>
+                            </button>
                             <button onClick={() => onGenerateImage(item)} className="flex flex-col items-center justify-center p-3 bg-white border border-slate-200 rounded-lg hover:shadow-md transition gap-1 group">
                                 <PhotoIcon className="h-5 w-5 text-purple-500 group-hover:scale-110 transition-transform" />
                                 <span className="text-[10px] font-bold text-slate-600">Gen Image</span>

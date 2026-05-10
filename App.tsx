@@ -7,11 +7,16 @@ import { Header } from './components/Header.tsx';
 import InventoryDashboard from './components/InventoryDashboard.tsx';
 import ItemDetailView from './components/ItemDetailView.tsx';
 import StrategicDashboard from './components/StrategicDashboard.tsx';
-import UploadPage from './components/UploadPage.tsx';
+import { EvidenceVault } from './components/EvidenceVault.tsx';
+import { TimelineView } from './components/TimelineView.tsx';
+import { CollaboratorsView } from './components/CollaboratorsView.tsx';
+import PolicyIngestorPage from './components/PolicyIngestorPage.tsx';
+import ScenarioSimulationPage from './components/ScenarioSimulationPage.tsx';
+import AuditLogPage from './components/AuditLogPage.tsx';
+import { ScribeModule } from './components/ScribeModule.tsx';
 import GeminiAssistant from './components/GeminiAssistant.tsx';
 import ProcessingPage from './components/ProcessingPage.tsx';
 import BulkReviewPage from './components/BulkReviewPage.tsx';
-import ArbitrageDashboard from './components/ArbitrageDashboard.tsx';
 import ImageZoomModal from './components/ImageZoomModal.tsx';
 import ImageEditorModal from './components/ImageEditorModal.tsx';
 import ImageGeneratorModal from './components/ImageGeneratorModal.tsx';
@@ -22,6 +27,7 @@ import { SpinnerIcon } from './components/icons.tsx';
 import * as geminiService from './services/geminiService.ts';
 import * as storageService from './services/storageService.ts';
 import { InventoryItem, Proof, AutonomousInventoryItem, ProcessingInference, PolicyAnalysisReport, PipelineItem } from './types.ts';
+import exifr from 'exifr';
 import { urlToDataUrl, dataUrlToBlob, sanitizeFileName, exportToZip, fileToDataUrl, blobToDataUrl } from './utils/fileUtils.ts';
 
 const App: React.FC = () => {
@@ -31,7 +37,7 @@ const App: React.FC = () => {
     const { inventory, isInitialized, currentView, selectedItemId, lastScrollPosition, processingQueue } = state;
     
     // Workflow State
-    const [activeTab, setActiveTab] = useState<'evidence' | 'inventory' | 'arbitrage'>('inventory');
+    const [activeTab, setActiveTab] = useState<'evidence' | 'timeline' | 'collaborators' | 'inventory' | 'claim' | 'policy-ingestor' | 'simulation' | 'audit' | 'scribe'>('claim');
     // New: Central search state for AI control
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -53,12 +59,103 @@ const App: React.FC = () => {
     // Processing State (Durable Ledger Logic)
     const [accumulatedReviewItems, setAccumulatedReviewItems] = useState<InventoryItem[]>([]);
 
-    const logActivity = useCallback((action: string, details: string, app: 'VeritasVault' | 'Gemini' = 'VeritasVault') => {
-        dispatch({ type: 'LOG_ACTIVITY', payload: { action, details, app } });
+    const logActivity = useCallback((action: string, details: string, reasonForChange?: string, app: 'Assert' | 'Gemini' = 'Assert') => {
+        dispatch({ type: 'LOG_ACTIVITY', payload: { action, details, reasonForChange, app } });
     }, [dispatch]);
 
     // --- INITIALIZATION SIDE EFFECTS ---
-    // Removed initStaticData as we no longer seed initial data
+    useEffect(() => {
+        const initStaticData = async () => {
+            if (!isInitialized) return;
+            
+            // Seed the MacBook receipt blob if missing (simulating the file existing on disk for the initial inventory item)
+            const proofId = 'proof-macbook-receipt';
+            const exists = await storageService.getProofBlob(proofId);
+            
+            if (!exists) {
+                // Minimal valid PDF structure for visualization/download
+                const pdfContent = `%PDF-1.4
+%âãÏÓ
+1 0 obj
+<<
+/Type /Catalog
+/Pages 2 0 R
+>>
+endobj
+2 0 obj
+<<
+/Type /Pages
+/Kids [3 0 R]
+/Count 1
+>>
+endobj
+3 0 obj
+<<
+/Type /Page
+/Parent 2 0 R
+/MediaBox [0 0 612 792]
+/Resources <<
+/Font <<
+/Type /Font
+/Subtype /Type1
+/BaseFont /Helvetica
+>>
+>>
+/Contents 4 0 R
+>>
+endobj
+4 0 obj
+<<
+/Length 68
+>>
+stream
+BT
+/F1 24 Tf
+50 700 Td
+(Official Receipt) Tj
+/F1 12 Tf
+50 650 Td
+(Item: MacBook Pro 16-inch) Tj
+50 630 Td
+(Date: 2019-02-21) Tj
+50 610 Td
+(Amount: $2,499.00) Tj
+ET
+endstream
+endobj
+xref
+0 5
+0000000000 65535 f 
+0000000010 00000 n 
+0000000060 00000 n 
+0000000117 00000 n 
+0000000220 00000 n 
+trailer
+<<
+/Size 5
+/Root 1 0 R
+>>
+startxref
+338
+%%EOF`;
+                const blob = new Blob([pdfContent], { type: 'application/pdf' });
+                
+                // We mock the Proof object just for the saveProof signature, only ID matters here
+                const proofMeta: Proof = {
+                    id: proofId,
+                    type: 'document',
+                    fileName: 'macbook_receipt.pdf',
+                    mimeType: 'application/pdf',
+                    createdBy: 'User'
+                };
+                
+                await storageService.saveProof(proofMeta, blob);
+                console.log('Seeded static proof blob:', proofId);
+            }
+        };
+        
+        initStaticData();
+    }, [isInitialized]);
 
     // --- SCROLL PERSISTENCE ---
     // Restore scroll position when view is mounted/initialized
@@ -89,7 +186,7 @@ const App: React.FC = () => {
 
 
     // --- NAVIGATION HANDLER ---
-    const handleNavigate = (tab: 'evidence' | 'inventory' | 'claim') => {
+    const handleNavigate = (tab: 'evidence' | 'timeline' | 'collaborators' | 'inventory' | 'claim' | 'policy-ingestor' | 'simulation' | 'audit') => {
         setActiveTab(tab);
         if (currentView !== 'dashboard') {
             dispatch({ type: 'SET_VIEW', payload: 'dashboard' });
@@ -119,14 +216,18 @@ const App: React.FC = () => {
                     } catch (e) { console.warn("Web enrich failed", e); }
                 }
 
-                // 2. Market Valuation
-                if (!item.replacementCostValueRCV || item.replacementCostValueRCV === 0) {
+                // 2. Market Valuation (Multi-pass recursive engine)
+                if (!item.valuationHistory || item.valuationHistory.length === 0 || !item.replacementCostValueRCV) {
                     try {
                         const pricing = await geminiService.findMarketPrice(updatedItem);
                         if (pricing) {
                             updatedItem.replacementCostValueRCV = pricing.rcv;
                             updatedItem.actualCashValueACV = pricing.acv;
                             updatedItem.valuationHistory = [pricing];
+                            
+                            if (pricing.isUnderclaiming) {
+                                logActivity('UNDERCLAIMING_DETECTED', `Identified under-valuation risk for ${item.itemName}. Market RCV: $${pricing.rcv}`, 'Recursive Valuation Engine', 'Gemini');
+                            }
                         }
                     } catch (e) { console.warn("Pricing failed", e); }
                 }
@@ -150,7 +251,7 @@ const App: React.FC = () => {
                                 batchClaimedProofIds.add(proof.id);
                                 dispatch({ type: 'REMOVE_UNLINKED_PROOF', payload: proof.id });
                                 
-                                logActivity('AUTO_LINKED_PROOF', `Linked ${proof.fileName} to ${updatedItem.itemName} (${bestMatch.confidence}% match)`, 'Gemini');
+                                logActivity('AUTO_LINKED_PROOF', `Linked ${proof.fileName} to ${updatedItem.itemName} (${bestMatch.confidence}% match)`, 'System Auto-Generated', 'Gemini');
                             }
                         } else if (matchResult.suggestions.length > 0) {
                             updatedItem.suggestedProofs = matchResult.suggestions;
@@ -212,11 +313,11 @@ const App: React.FC = () => {
                                     updatedItem.itemDescription = visualData.itemDescription;
                                 }
                                 
-                                logActivity('VISUAL_EXTRACTION', `AI extracted details from ${imageProof.fileName}`, 'Gemini');
+                                logActivity('VISUAL_EXTRACTION', `AI extracted details from ${imageProof.fileName}`, 'System Auto-Generated', 'Gemini');
                             }
                          } catch (e) {
                              console.error("Visual extraction failed", e);
-                             logActivity('VISUAL_EXTRACTION_ERROR', `Failed to extract details for ${updatedItem.itemName}`, 'Gemini');
+                             logActivity('VISUAL_EXTRACTION_ERROR', `Failed to extract details for ${updatedItem.itemName}`, 'System Auto-Generated', 'Gemini');
                          }
                     }
                 }
@@ -229,7 +330,7 @@ const App: React.FC = () => {
 
                 updatedItem.status = updatedItem.status === 'needs-review' ? 'needs-review' : 'active';
                 dispatch({ type: 'UPDATE_ITEM', payload: updatedItem });
-                logActivity('AUTO_ENRICHMENT_COMPLETE', `Fully processed ${item.itemName}`, 'Gemini');
+                logActivity('AUTO_ENRICHMENT_COMPLETE', `Fully processed ${item.itemName}`, 'System Auto-Generated', 'Gemini');
 
             } catch (e) {
                 console.error(`Enrichment failed for ${item.id}`, e);
@@ -251,15 +352,33 @@ const App: React.FC = () => {
                 // Generate ID first
                 const proofId = `proof-manual-${Date.now()}-${file.name}`;
                 
+                let exifData;
+                if (file.type.startsWith('image/')) {
+                    try {
+                        const parsedExif = await exifr.parse(file, { tiff: true, exif: true, gps: true });
+                        if (parsedExif) {
+                            exifData = {
+                                dateTimeOriginal: parsedExif.DateTimeOriginal ? new Date(parsedExif.DateTimeOriginal).toISOString() : undefined,
+                                make: parsedExif.Make,
+                                model: parsedExif.Model,
+                                latitude: parsedExif.latitude,
+                                longitude: parsedExif.longitude
+                            };
+                        }
+                    } catch (exifError) {
+                        console.warn("Failed to parse EXIF data", exifError);
+                    }
+                }
+
                 const newProof: Proof = {
                     id: proofId,
                     type: file.type.startsWith('image/') ? 'image' : 'document',
                     fileName: file.name,
-                    // dataUrl: undefined, // Do not store base64 in Redux state
                     mimeType: file.type,
                     createdBy: 'User',
                     purpose: 'Supporting Document',
-                    createdAt: new Date().toISOString()
+                    createdAt: new Date().toISOString(),
+                    exif: exifData
                 };
                 
                 // IMPORTANT: Persist the blob immediately to IndexedDB
@@ -273,7 +392,7 @@ const App: React.FC = () => {
 
         if (newProofs.length > 0) {
             dispatch({ type: 'ADD_PROOFS_TO_ITEM', payload: { itemId, proofs: newProofs } });
-            logActivity('MANUAL_PROOF_ADDED', `User added ${newProofs.length} proof(s) to ${item.itemName}`);
+            logActivity('MANUAL_PROOF_ADDED', `User added ${newProofs.length} proof(s) to ${item.itemName}`, 'User Evidence Upload', 'Assert');
             // Re-run enrichment to check if status/value can be updated with new proof
             runForensicEnrichment([item]); 
         }
@@ -304,7 +423,7 @@ const App: React.FC = () => {
                 await storageService.saveProof(newProof, blob);
                 
                 dispatch({ type: 'ADD_PROOFS_TO_ITEM', payload: { itemId: item.id, proofs: [newProof] } });
-                logActivity('WEB_IMAGE_FOUND', `AI found web image for ${item.itemName}`, 'Gemini');
+                logActivity('WEB_IMAGE_FOUND', `AI found web image for ${item.itemName}`, 'Gemini Agent Search', 'Gemini');
             } else {
                 alert("Could not find a suitable image on the web.");
             }
@@ -331,7 +450,7 @@ const App: React.FC = () => {
         
         dispatch({ type: 'ADD_PROOFS_TO_ITEM', payload: { itemId: selectedItemId, proofs: [newProof] } });
         setEditingProof(null);
-        logActivity('IMAGE_EDITED', `AI edited image for item.`, 'Gemini');
+        logActivity('IMAGE_EDITED', `AI edited image for item.`, 'System Auto-Generated', 'Gemini');
     }, [selectedItemId, dispatch, logActivity]);
 
     const handleSaveGeneratedImage = useCallback(async (item: InventoryItem, dataUrl: string) => {
@@ -351,7 +470,7 @@ const App: React.FC = () => {
         
         dispatch({ type: 'ADD_PROOFS_TO_ITEM', payload: { itemId: item.id, proofs: [newProof] } });
         setGeneratingImageItem(null);
-        logActivity('IMAGE_GENERATED', `AI generated visual for ${item.itemName}`, 'Gemini');
+        logActivity('IMAGE_GENERATED', `AI generated visual for ${item.itemName}`, 'System Auto-Generated', 'Gemini');
     }, [dispatch, logActivity]);
 
     const handleSaveAudioNote = useCallback(async (item: InventoryItem, audioBlob: Blob, transcription: string) => {
@@ -370,13 +489,13 @@ const App: React.FC = () => {
         
         dispatch({ type: 'ADD_PROOFS_TO_ITEM', payload: { itemId: item.id, proofs: [newProof] } });
         setRecordingAudioItem(null);
-        logActivity('AUDIO_NOTE_ADDED', `User recorded audio note for ${item.itemName}`);
+        logActivity('AUDIO_NOTE_ADDED', `User recorded audio note for ${item.itemName}`, 'User Evidence Upload', 'Assert');
     }, [dispatch, logActivity]);
 
     // New: Handle CSV Import by triggering forensic enrichment pipeline
     const handleImportInventory = useCallback((items: InventoryItem[]) => {
         dispatch({ type: 'ADD_INVENTORY_ITEMS', payload: items });
-        logActivity('CSV_IMPORT', `Imported ${items.length} items from CSV`, 'VeritasVault');
+        logActivity('CSV_IMPORT', `Imported ${items.length} items from CSV`, 'User Document Upload', 'Assert');
         // Immediately run enrichment to link proofs and find value
         runForensicEnrichment(items);
     }, [dispatch, runForensicEnrichment, logActivity]);
@@ -395,13 +514,33 @@ const App: React.FC = () => {
         // 1. Persist blobs immediately and create ledger entries
         for (const file of filesArray) {
             const proofId = `proof-auto-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+            
+            let exifData;
+            if (file.type.startsWith('image/')) {
+                try {
+                    const parsedExif = await exifr.parse(file, { tiff: true, exif: true, gps: true });
+                    if (parsedExif) {
+                        exifData = {
+                            dateTimeOriginal: parsedExif.DateTimeOriginal ? new Date(parsedExif.DateTimeOriginal).toISOString() : undefined,
+                            make: parsedExif.Make,
+                            model: parsedExif.Model,
+                            latitude: parsedExif.latitude,
+                            longitude: parsedExif.longitude
+                        };
+                    }
+                } catch (exifError) {
+                    console.warn("Failed to parse EXIF data", exifError);
+                }
+            }
+
             // Save raw blob
             const dummyProof: Proof = { 
                 id: proofId, 
                 fileName: file.name, 
                 mimeType: file.type, 
-                type: 'document', // placeholder
-                createdBy: 'AI'
+                type: file.type.startsWith('image/') ? 'image' : 'document', // placeholder
+                createdBy: 'AI',
+                exif: exifData
             };
             await storageService.saveProof(dummyProof, file);
 
@@ -416,8 +555,9 @@ const App: React.FC = () => {
         }
 
         dispatch({ type: 'ENQUEUE_PIPELINE_ITEMS', payload: newPipelineItems });
+        logActivity('BATCH_UPLOAD', `Enqueued ${filesArray.length} files for autonomous processing`, 'User Evidence Batch Upload', 'Assert');
         // The useEffect below will react to the queue change
-    }, [dispatch]);
+    }, [dispatch, logActivity]);
 
     // Pipeline Processor Effect
     useEffect(() => {
@@ -522,7 +662,7 @@ const App: React.FC = () => {
         const rejectedProofs = rejectedItems.flatMap(i => i.linkedProofs);
         if (rejectedProofs.length > 0) {
             dispatch({ type: 'ADD_UNLINKED_PROOFS', payload: rejectedProofs });
-            logActivity('AUTO_PIPELINE', `Archived ${rejectedProofs.length} proofs from rejected items to evidence locker`, 'VeritasVault');
+            logActivity('AUTO_PIPELINE', `Archived ${rejectedProofs.length} proofs from rejected items to evidence locker`, 'System Auto-Generated', 'Assert');
         }
 
         setAccumulatedReviewItems([]);
@@ -572,9 +712,10 @@ const App: React.FC = () => {
         dispatch({ type: 'SAVE_POLICY_FROM_REPORT', payload: report });
         setPolicyAnalysisReport(null);
         setActiveTab('claim');
-        logActivity('POLICY_INGESTED', `Analyzed and saved policy: ${report.parsedPolicy.policyNumber}`, 'Gemini');
+        logActivity('POLICY_INGESTED', `Analyzed and saved policy: ${report.parsedPolicy.policyNumber}`, 'System Auto-Generated', 'Gemini');
     }, [dispatch, logActivity]);
 
+    const activePolicy = useMemo(() => state.policies.find(p => p.isActive), [state.policies]);
 
     if (!isAuthReady || (user && !isInitialized)) {
         return (
@@ -596,7 +737,7 @@ const App: React.FC = () => {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                         </svg>
                     </div>
-                    <h1 className="text-3xl font-bold text-slate-900 mb-2 font-heading">VeritasVault</h1>
+                    <h1 className="text-3xl font-bold text-slate-900 mb-2 font-heading">Assert</h1>
                     <p className="text-slate-500 mb-8">Secure, AI-powered inventory and claims management.</p>
                     <button 
                         onClick={signIn}
@@ -648,11 +789,39 @@ const App: React.FC = () => {
             switch (activeTab) {
                 case 'evidence':
                     key = 'evidence';
-                    content = <UploadPage onFilesSelected={handleFileUploads} onPolicySelected={handlePolicyUpload} uploadProgress={uploadProgress} isAnalyzingPolicy={isAnalyzingPolicy} />;
+                    content = <EvidenceVault onImageZoom={setZoomedImageUrl} />;
                     break;
-                case 'arbitrage':
-                    key = 'arbitrage';
-                    content = <ArbitrageDashboard />;
+                case 'timeline':
+                    key = 'timeline';
+                    content = <TimelineView />;
+                    break;
+                case 'collaborators':
+                    key = 'collaborators';
+                    content = <CollaboratorsView />;
+                    break;
+                case 'policy-ingestor':
+                    key = 'policy-ingestor';
+                    content = <PolicyIngestorPage onPolicySelected={handlePolicyUpload} isAnalyzingPolicy={isAnalyzingPolicy} />;
+                    break;
+                case 'simulation':
+                    key = 'simulation';
+                    content = <ScenarioSimulationPage inventory={inventory} policies={state.policies} />;
+                    break;
+                case 'audit':
+                    key = 'audit';
+                    content = <AuditLogPage activityLog={state.activityLog} />;
+                    break;
+                case 'scribe':
+                    key = 'scribe';
+                    content = <ScribeModule />;
+                    break;
+                case 'claim':
+                    key = 'claim';
+                    content = <StrategicDashboard 
+                                onPolicyUpload={handlePolicyUpload}
+                                isPolicyAnalyzing={isAnalyzingPolicy}
+                                logActivity={logActivity}
+                            />;
                     break;
                 case 'inventory':
                 default:
