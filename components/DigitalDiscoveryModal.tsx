@@ -20,24 +20,43 @@ const DigitalDiscoveryModal: React.FC<DigitalDiscoveryModalProps> = ({ onClose, 
 
     const startDiscovery = async () => {
         setStep('scanning');
-        setScanLog([`Initiating secure connection to ${selectedSource === 'email' ? 'Email Provider' : 'Cloud Photos'}...`]);
+        const initialLogLine = `Initiating secure connection to ${selectedSource === 'email' ? 'Email Provider' : 'Cloud Photos'}...`;
+        setScanLog([initialLogLine]);
         
         try {
-            const { items, log } = await geminiService.performDigitalDiscovery(selectedSource);
+            const discoveryPromise = geminiService.performDigitalDiscovery(selectedSource);
             
-            // Simulate log streaming for UX
-            for (const line of log) {
-                setScanLog(prev => [...prev, line]);
-                await new Promise(r => setTimeout(r, 800)); // Fake delay
-            }
+            // Start streaming the initial setup logs while the AI is thinking
+            const setupLogs = [
+                `Connecting securely to ${selectedSource === 'email' ? 'Email Provider' : 'Cloud Photos'}...`,
+                `Authenticating digital signatures...`,
+                `Establishing neural bridge...`
+            ];
+
+            let currentLogIndex = 0;
+            const logStreamInterval = setInterval(() => {
+                if (currentLogIndex < setupLogs.length) {
+                    setScanLog(prev => [...prev, setupLogs[currentLogIndex]]);
+                    currentLogIndex++;
+                } else {
+                    clearInterval(logStreamInterval);
+                }
+            }, 600);
+
+            const { items, log } = await discoveryPromise;
+            clearInterval(logStreamInterval);
+
+            // Fast-stream the final discovery logs and then show results
+            setScanLog(prev => [...prev, ...log]); // Batch update to avoid O(N^2) state updates in a loop
             
             setDiscoveredItems(items);
             setSelectedIds(new Set(items.map(i => i.id))); // Select all by default
             setStep('review');
         } catch (error) {
+            // Ensure interval is cleared even on failure to avoid UI confusion
+            clearInterval(logStreamInterval!);
             console.error(error);
             setScanLog(prev => [...prev, "Error: Discovery failed. Please try again."]);
-            // Allow user to go back after error? For now, stuck in error state or close.
         }
     };
 
