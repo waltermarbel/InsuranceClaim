@@ -53,15 +53,11 @@ export interface FirestoreErrorInfo {
     path: string | null;
     authInfo: {
         userId?: string;
-        email?: string | null;
         emailVerified?: boolean;
         isAnonymous?: boolean;
         tenantId?: string | null;
         providerInfo: {
             providerId: string;
-            displayName: string | null;
-            email: string | null;
-            photoUrl: string | null;
         }[];
     }
 }
@@ -71,15 +67,11 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
         error: error instanceof Error ? error.message : String(error),
         authInfo: {
             userId: auth.currentUser?.uid,
-            email: auth.currentUser?.email,
             emailVerified: auth.currentUser?.emailVerified,
             isAnonymous: auth.currentUser?.isAnonymous,
             tenantId: auth.currentUser?.tenantId,
             providerInfo: auth.currentUser?.providerData.map(provider => ({
-                providerId: provider.providerId,
-                displayName: provider.displayName,
-                email: provider.email,
-                photoUrl: provider.photoURL
+                providerId: provider.providerId
             })) || []
         },
         operationType,
