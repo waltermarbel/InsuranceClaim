@@ -150,7 +150,6 @@ startxref
                 };
                 
                 await storageService.saveProof(proofMeta, blob);
-                console.log('Seeded static proof blob:', proofId);
             }
         };
         
