@@ -102,6 +102,8 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ filterItemId, title = "Tas
                             <div key={task.id} className="group flex items-start gap-3 p-3 rounded-lg border border-slate-100 hover:border-primary/30 hover:bg-slate-50/50 transition-all">
                                 <button 
                                     onClick={() => handleToggle(task.id)}
+                                    aria-label={task.isCompleted ? "Mark task as incomplete" : "Mark task as complete"}
+                                    title={task.isCompleted ? "Mark task as incomplete" : "Mark task as complete"}
                                     className={`flex-shrink-0 mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${task.isCompleted ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 hover:border-primary'}`}
                                 >
                                     {task.isCompleted && <CheckCircleIcon className="w-3.5 h-3.5" />}
@@ -124,6 +126,8 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ filterItemId, title = "Tas
                                 </div>
                                 <button 
                                     onClick={() => handleDelete(task.id)}
+                                    aria-label="Delete task"
+                                    title="Delete task"
                                     className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
                                 >
                                     <TrashIcon className="h-4 w-4"/>
@@ -160,6 +164,8 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ filterItemId, title = "Tas
                         <button 
                             type="submit" 
                             disabled={!newTaskDesc.trim()}
+                            aria-label="Add task"
+                            title="Add task"
                             className="bg-primary text-white p-2 rounded-lg hover:bg-primary-dark transition disabled:opacity-50 shadow-sm flex-shrink-0"
                         >
                             <PlusIcon className="h-5 w-5"/>
