@@ -110,7 +110,7 @@ const RecordEditor: React.FC<{
                         type="text"
                         className="flex-grow p-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-shadow"
                         value={key}
-                        onChange={(e) => updateKey(key, e.target.value, value)}
+                        onChange={(e) => updateKey(key, e.target.value, value as number)}
                         placeholder={keyPlaceholder}
                     />
                     <div className="relative w-48 shrink-0">
