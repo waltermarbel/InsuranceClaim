@@ -1,0 +1,1 @@
+## 2024-05-18 - [Derived State Anti-Pattern]\n**Learning:** Derived state calculated via `useState` and synchronized via `useEffect` was causing double-rendering loops in `EvidenceVault.tsx` and `ScribeModule.tsx`.\n**Action:** Use `useMemo` for derived states to compute synchronous operations in the same render cycle and eliminate unnecessary cascading re-renders.
