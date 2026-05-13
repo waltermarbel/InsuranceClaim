@@ -416,10 +416,15 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
     };
 
     const tableData = useMemo(() => {
-        let data = inventory.filter(item => 
-            (item.itemName && item.itemName.toLowerCase().includes(searchTerm?.toLowerCase() || '')) ||
-            (item.itemCategory && item.itemCategory.toLowerCase().includes(searchTerm?.toLowerCase() || ''))
-        );
+        let data = inventory;
+        const lowerSearchTerm = searchTerm?.toLowerCase() || '';
+
+        if (lowerSearchTerm) {
+            data = data.filter(item =>
+                (item.itemName && item.itemName.toLowerCase().includes(lowerSearchTerm)) ||
+                (item.itemCategory && item.itemCategory.toLowerCase().includes(lowerSearchTerm))
+            );
+        }
 
         if (selectedCategories.size > 0) {
             data = data.filter(item => selectedCategories.has(item.itemCategory));
