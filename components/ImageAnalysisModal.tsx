@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
+import DOMPurify from 'dompurify';
 import { XIcon, SparklesIcon, SpinnerIcon, UploadIcon } from './icons.tsx';
 import { fileToDataUrl } from '../utils/fileUtils.ts';
 
@@ -105,7 +106,8 @@ const ImageAnalysisModal: React.FC<ImageAnalysisModalProps> = ({ onClose, onAnal
                             )}
                             {error && <p className="text-sm text-danger">{error}</p>}
                             {analysisResult && (
-                                <div className="mt-2 text-sm text-dark whitespace-pre-wrap prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: analysisResult.replace(/\n/g, '<br />') }}/>
+                                /* 🛡️ Sentinel: Sanitize analysisResult with DOMPurify to prevent XSS attacks when using dangerouslySetInnerHTML */
+                                <div className="mt-2 text-sm text-dark whitespace-pre-wrap prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(analysisResult.replace(/\n/g, '<br />')) }}/>
                             )}
                         </div>
                     </div>
