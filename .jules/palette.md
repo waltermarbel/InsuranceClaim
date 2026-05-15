@@ -1,0 +1,3 @@
+## 2024-05-15 - Focus Visibility for Hover-Revealed Buttons
+**Learning:** In this application, many secondary actions (like delete buttons on task lists) use an `opacity-0 group-hover:opacity-100` pattern to remain hidden until hovered. This creates a critical accessibility issue for keyboard users, as they tab to invisible elements.
+**Action:** When working with hover-revealed UI elements, always pair hover opacity utilities with `focus-visible:opacity-100` and appropriate `focus-visible:ring` styles so the element appears and is clearly delineated when focused via keyboard navigation.
