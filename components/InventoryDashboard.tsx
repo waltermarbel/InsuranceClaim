@@ -416,30 +416,46 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
     };
 
     const tableData = useMemo(() => {
-        let data = inventory.filter(item => 
-            (item.itemName && item.itemName.toLowerCase().includes(searchTerm?.toLowerCase() || '')) ||
-            (item.itemCategory && item.itemCategory.toLowerCase().includes(searchTerm?.toLowerCase() || ''))
-        );
+        // Optimize: Convert searchTerm to lowercase once to avoid repeated conversions in the loop
+        const searchLower = searchTerm?.toLowerCase() || '';
 
-        if (selectedCategories.size > 0) {
-            data = data.filter(item => selectedCategories.has(item.itemCategory));
-        }
+        // Optimize: Use single-pass filter with short-circuiting to avoid multiple array allocations
+        // This resolves a known performance anti-pattern where chained .filter() creates O(k) arrays
+        let data = inventory.filter(item => {
+            // 1. Check Search Term
+            if (searchLower) {
+                const nameMatch = item.itemName && item.itemName.toLowerCase().includes(searchLower);
+                const catMatch = item.itemCategory && item.itemCategory.toLowerCase().includes(searchLower);
+                if (!nameMatch && !catMatch) return false;
+            }
 
-        if (selectedStatuses.size > 0) {
-            data = data.filter(item => item.status && selectedStatuses.has(item.status));
-        }
+            // 2. Check Categories
+            if (selectedCategories.size > 0 && (!item.itemCategory || !selectedCategories.has(item.itemCategory))) {
+                return false;
+            }
 
-        if (selectedConditions.size > 0) {
-            data = data.filter(item => item.condition && selectedConditions.has(item.condition));
-        }
+            // 3. Check Statuses
+            if (selectedStatuses.size > 0 && (!item.status || !selectedStatuses.has(item.status))) {
+                return false;
+            }
 
-        if (purchaseDateStart) {
-            data = data.filter(item => item.purchaseDate && item.purchaseDate >= purchaseDateStart);
-        }
+            // 4. Check Conditions
+            if (selectedConditions.size > 0 && (!item.condition || !selectedConditions.has(item.condition))) {
+                return false;
+            }
 
-        if (purchaseDateEnd) {
-            data = data.filter(item => item.purchaseDate && item.purchaseDate <= purchaseDateEnd);
-        }
+            // 5. Check Purchase Date Start
+            if (purchaseDateStart && (!item.purchaseDate || item.purchaseDate < purchaseDateStart)) {
+                return false;
+            }
+
+            // 6. Check Purchase Date End
+            if (purchaseDateEnd && (!item.purchaseDate || item.purchaseDate > purchaseDateEnd)) {
+                return false;
+            }
+
+            return true;
+        });
 
         if (sortConfig) {
             data.sort((a, b) => {
@@ -460,7 +476,16 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
             });
         }
         return data;
-    }, [inventory, searchTerm, sortConfig]);
+    }, [
+        inventory,
+        searchTerm,
+        sortConfig,
+        selectedCategories,
+        selectedStatuses,
+        selectedConditions,
+        purchaseDateStart,
+        purchaseDateEnd
+    ]);
 
     const groupedData = useMemo(() => {
         const groups: Record<string, InventoryItem[]> = {};

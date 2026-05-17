@@ -1,0 +1,3 @@
+## 2024-05-17 - Optimize Array Allocation in Chained Filters
+**Learning:** Chaining multiple `.filter()` operations consecutively inside React `useMemo` hooks allocates a new array in memory for each step. For operations like `tableData` in `InventoryDashboard` which processed potentially large numbers of array items via multiple filter arrays, this results in O(k) array creations that causes memory bloat and garbage collection pauses.
+**Action:** Always prefer a single-pass loop/iteration with short-circuit returns (returning `false` early) over chained array methods. This ensures O(n) runtime complexity and O(1) array allocation overhead when processing datasets within `useMemo`.
