@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality, Blob as GenaiBlob } from "@google/genai";
+import DOMPurify from 'dompurify';
 import { XIcon, SparklesIcon, CubeIcon, CheckIcon, ArrowDownTrayIcon, MagnifyingGlassIcon } from './icons.tsx';
 import { InventoryItem, ParsedPolicy, ChatMessage } from '../types.ts';
 import * as geminiService from '../services/geminiService.ts';
@@ -252,7 +253,8 @@ const GeminiAssistant: React.FC<GeminiAssistantProps> = ({ onClose, onNavigate, 
             <div key={msg.id} className={`flex items-start gap-3 ${msg.role === 'user' ? 'justify-end' : ''}`}>
               {msg.role === 'model' && <div className="flex-shrink-0 bg-primary/10 rounded-full p-2 mt-1"><SparklesIcon className="h-5 w-5 text-primary"/></div>}
               <div className={`max-w-md p-3 rounded-lg ${msg.role === 'user' ? 'bg-primary text-white' : 'bg-slate-100 text-dark'}`}>
-                {msg.isLoading ? <div className="animate-pulse">...</div> : <p className="text-sm" dangerouslySetInnerHTML={{ __html: msg.text.replace(/\n/g, '<br />') }} />}
+                {/* Security: Prevent XSS by sanitizing AI response HTML */}
+                {msg.isLoading ? <div className="animate-pulse">...</div> : <p className="text-sm" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(msg.text.replace(/\n/g, '<br />')) }} />}
               </div>
             </div>
           ))}
