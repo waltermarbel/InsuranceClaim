@@ -416,30 +416,33 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
     };
 
     const tableData = useMemo(() => {
-        let data = inventory.filter(item => 
-            (item.itemName && item.itemName.toLowerCase().includes(searchTerm?.toLowerCase() || '')) ||
-            (item.itemCategory && item.itemCategory.toLowerCase().includes(searchTerm?.toLowerCase() || ''))
-        );
+        const lowerSearchTerm = searchTerm?.toLowerCase() || '';
+        const hasCategories = selectedCategories.size > 0;
+        const hasStatuses = selectedStatuses.size > 0;
+        const hasConditions = selectedConditions.size > 0;
 
-        if (selectedCategories.size > 0) {
-            data = data.filter(item => selectedCategories.has(item.itemCategory));
-        }
+        let data = inventory.filter(item => {
+            // Text search
+            if (lowerSearchTerm && !(
+                (item.itemName && item.itemName.toLowerCase().includes(lowerSearchTerm)) ||
+                (item.itemCategory && item.itemCategory.toLowerCase().includes(lowerSearchTerm))
+            )) return false;
 
-        if (selectedStatuses.size > 0) {
-            data = data.filter(item => item.status && selectedStatuses.has(item.status));
-        }
+            // Categories
+            if (hasCategories && (!item.itemCategory || !selectedCategories.has(item.itemCategory))) return false;
 
-        if (selectedConditions.size > 0) {
-            data = data.filter(item => item.condition && selectedConditions.has(item.condition));
-        }
+            // Statuses
+            if (hasStatuses && (!item.status || !selectedStatuses.has(item.status))) return false;
 
-        if (purchaseDateStart) {
-            data = data.filter(item => item.purchaseDate && item.purchaseDate >= purchaseDateStart);
-        }
+            // Conditions
+            if (hasConditions && (!item.condition || !selectedConditions.has(item.condition))) return false;
 
-        if (purchaseDateEnd) {
-            data = data.filter(item => item.purchaseDate && item.purchaseDate <= purchaseDateEnd);
-        }
+            // Purchase Date
+            if (purchaseDateStart && (!item.purchaseDate || item.purchaseDate < purchaseDateStart)) return false;
+            if (purchaseDateEnd && (!item.purchaseDate || item.purchaseDate > purchaseDateEnd)) return false;
+
+            return true;
+        });
 
         if (sortConfig) {
             data.sort((a, b) => {
@@ -460,7 +463,7 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
             });
         }
         return data;
-    }, [inventory, searchTerm, sortConfig]);
+    }, [inventory, searchTerm, sortConfig, selectedCategories, selectedStatuses, selectedConditions, purchaseDateStart, purchaseDateEnd]);
 
     const groupedData = useMemo(() => {
         const groups: Record<string, InventoryItem[]> = {};
