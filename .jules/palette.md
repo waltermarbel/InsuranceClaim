@@ -1,0 +1,3 @@
+## 2026-05-20 - Keyboard Accessibility for Hover-Revealed UI Elements
+**Learning:** Hover-revealed elements (e.g., using `opacity-0 group-hover:opacity-100`) remain completely invisible during keyboard navigation unless explicitly paired with `focus-within:opacity-100` on the hover-revealed container, and `focus-visible:ring-*` / `outline-none` directly on the interactive elements to ensure visibility and usability via keyboard.
+**Action:** Always wrap hover-revealed elements with `focus-within:opacity-100` and provide robust `focus-visible` styling and `aria-label` attributes to inner buttons.

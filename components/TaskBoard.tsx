@@ -124,7 +124,9 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ filterItemId, title = "Tas
                                 </div>
                                 <button 
                                     onClick={() => handleDelete(task.id)}
-                                    className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity focus-visible:ring-2 focus-visible:ring-rose-500 outline-none rounded-md p-1"
+                                    aria-label="Delete task"
+                                    title="Delete task"
                                 >
                                     <TrashIcon className="h-4 w-4"/>
                                 </button>
