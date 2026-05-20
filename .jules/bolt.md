@@ -1,0 +1,3 @@
+## 2026-05-20 - Stale Closures and Incomplete Dependencies in useMemo
+**Learning:** The project's `pnpm lint` command is configured only to run `tsc --noEmit` and lacks linting rules for React hook dependencies (like `eslint-plugin-react-hooks`). This allowed bugs to silently exist where state variables (e.g., `selectedCategories`) were missing from `useMemo` dependency arrays, causing stale closures and missed recalculations.
+**Action:** When refactoring React hooks, manually verify the completeness of dependency arrays instead of relying solely on the build/lint tools to catch missing dependencies.
