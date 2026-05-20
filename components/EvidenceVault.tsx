@@ -221,7 +221,9 @@ const ViewableImage = ({ proof, onImageZoom }: { proof: Proof, onImageZoom: (url
             <img src={src} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" alt={proof.fileName} />
             <button 
                 onClick={(e) => { e.stopPropagation(); onImageZoom(src); }}
-                className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white"
+                className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity flex items-center justify-center text-white focus-visible:ring-2 focus-visible:ring-primary outline-none"
+                aria-label="View Image"
+                title="View Image"
             >
                 <EyeIcon className="h-8 w-8" />
             </button>

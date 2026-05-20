@@ -51,7 +51,7 @@ const ArrayEditor: React.FC<{
                         onChange={(e) => updateItem(i, e.target.value)}
                         placeholder={placeholder}
                     />
-                    <button onClick={() => deleteItem(i)} className="self-start mt-2 p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-md transition-colors opacity-0 group-hover:opacity-100">
+                    <button onClick={() => deleteItem(i)} className="self-start mt-2 p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-md transition-colors opacity-0 group-hover:opacity-100 focus-within:opacity-100 focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Delete item" title="Delete item">
                         <TrashIcon className="h-4 w-4"/>
                     </button>
                 </div>
@@ -123,7 +123,7 @@ const RecordEditor: React.FC<{
                             placeholder={valuePlaceholder}
                         />
                     </div>
-                    <button onClick={() => deleteItem(key)} className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-md transition-colors opacity-0 group-hover:opacity-100">
+                    <button onClick={() => deleteItem(key)} className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-md transition-colors opacity-0 group-hover:opacity-100 focus-within:opacity-100 focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Delete limit" title="Delete limit">
                         <TrashIcon className="h-4 w-4"/>
                     </button>
                 </div>
