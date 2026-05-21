@@ -105,7 +105,10 @@ const ImageAnalysisModal: React.FC<ImageAnalysisModalProps> = ({ onClose, onAnal
                             )}
                             {error && <p className="text-sm text-danger">{error}</p>}
                             {analysisResult && (
-                                <div className="mt-2 text-sm text-dark whitespace-pre-wrap prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: analysisResult.replace(/\n/g, '<br />') }}/>
+                                <div className="mt-2 text-sm text-dark whitespace-pre-wrap prose prose-sm max-w-none">
+                                    {/* SECURITY: Split and map newlines instead of dangerouslySetInnerHTML to prevent XSS */}
+                                    {analysisResult.split('\n').map((line, i) => <React.Fragment key={i}>{line}<br/></React.Fragment>)}
+                                </div>
                             )}
                         </div>
                     </div>
