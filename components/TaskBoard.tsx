@@ -33,12 +33,16 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ filterItemId, title = "Tas
     const [view, setView] = useState<'pending' | 'completed'>('pending');
 
     const filteredTasks = useMemo(() => {
-        let t = tasks;
-        if (filterItemId) {
-            t = t.filter(task => task.linkedItemId === filterItemId);
-        }
-        return t.filter(task => view === 'pending' ? !task.isCompleted : task.isCompleted)
-                .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        // Bolt ⚡: Single-pass iteration to prevent intermediate array allocations
+        return tasks.filter(task => {
+            if (filterItemId && task.linkedItemId !== filterItemId) {
+                return false;
+            }
+            if (view === 'pending') {
+                return !task.isCompleted;
+            }
+            return task.isCompleted;
+        }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }, [tasks, filterItemId, view]);
 
     const handleAddTask = (e: React.FormEvent) => {
