@@ -491,7 +491,7 @@ const StrategicDashboard: React.FC<StrategicDashboardProps> = ({ onPolicyUpload,
                                 claims.map(claim => (
                                     <div 
                                         key={claim.id} 
-                                        className={`p-3 border-b last:border-b-0 cursor-pointer transition-all hover:bg-slate-50 relative group ${currentClaimId === claim.id ? 'bg-primary/5 border-l-4 border-l-primary' : 'border-l-4 border-l-transparent'}`}
+                                        className={`p-3 border-b last:border-b-0 cursor-pointer transition-all hover:bg-slate-50 relative group focus-within:opacity-100 ${currentClaimId === claim.id ? 'bg-primary/5 border-l-4 border-l-primary' : 'border-l-4 border-l-transparent'}`}
                                         onClick={() => handleSwitchClaim(claim.id)}
                                     >
                                         <div className="flex justify-between items-start">
@@ -507,9 +507,10 @@ const StrategicDashboard: React.FC<StrategicDashboardProps> = ({ onPolicyUpload,
                                         </div>
                                         <button 
                                             onClick={(e) => { e.stopPropagation(); handleDeleteClaim(claim.id); }}
-                                            className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 transition-opacity p-1"
+                                            aria-label="Delete Claim"
+                                            className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:outline-none text-slate-300 hover:text-rose-500 transition-opacity p-1"
                                         >
-                                            <TrashIcon className="h-3 w-3"/>
+                                            <TrashIcon className="h-3 w-3" aria-hidden="true" />
                                         </button>
                                     </div>
                                 ))
