@@ -1,0 +1,3 @@
+## 2024-05-23 - Focus Management for Hover-Revealed Actions
+**Learning:** Hover-revealed UI elements (using `opacity-0 group-hover:opacity-100`) are invisible during keyboard navigation. In this app's list components (like TaskBoard), focusing on inner elements without `group-focus-within` on the container makes the action buttons unseeable but focusable, creating a confusing experience.
+**Action:** Pair hover-revealed containers with `focus-within` utility (e.g. `group-focus-within:opacity-100`) and ensure interactive elements have clear `focus-visible:ring-*` alongside `outline-none` so they become fully visible and distinct when navigating by keyboard.
