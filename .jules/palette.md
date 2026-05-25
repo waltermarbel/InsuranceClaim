@@ -1,0 +1,3 @@
+## 2026-05-25 - Keyboard Accessibility for Hover-Revealed Actions
+**Learning:** Hover-revealed interactive elements (like delete buttons or image actions using `opacity-0 group-hover:opacity-100`) become completely invisible and functionally unusable for keyboard-only users who navigate via Tab. Without `focus-visible` or `focus-within`, users cannot see what action they are about to trigger.
+**Action:** Always pair `group-hover:opacity-100` on the container with `focus-within:opacity-100`. Ensure the interactive buttons themselves have `focus-visible:ring-2 focus-visible:outline-none focus-visible:opacity-100` and a clear `aria-label`.
