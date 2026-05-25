@@ -1,0 +1,4 @@
+## 2025-05-25 - Prevent XSS in LLM response rendering
+**Vulnerability:** XSS vulnerability in LLM response rendering. `dangerouslySetInnerHTML` was used to render raw text from an LLM. While `\n` to `<br/>` substitution was intended just to preserve line breaks, doing this via innerHTML execution means any raw HTML or injected scripts from the LLM prompt could be evaluated by the client's browser.
+**Learning:** Using `dangerouslySetInnerHTML` to handle line breaks in simple textual content is a risky anti-pattern that exposes the application to XSS attacks, especially when the source is un-sanitized external input like LLM generated text.
+**Prevention:** Instead of using `dangerouslySetInnerHTML`, use the CSS `whitespace-pre-wrap` property to preserve whitespace and line breaks when rendering plain text from untrusted or un-sanitized sources. This safely displays line breaks natively without evaluating any potentially harmful code within the string.
