@@ -416,30 +416,30 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
     };
 
     const tableData = useMemo(() => {
-        let data = inventory.filter(item => 
-            (item.itemName && item.itemName.toLowerCase().includes(searchTerm?.toLowerCase() || '')) ||
-            (item.itemCategory && item.itemCategory.toLowerCase().includes(searchTerm?.toLowerCase() || ''))
-        );
+        // ⚡ Bolt: Performance optimization
+        // Combine multiple .filter() calls into a single-pass O(N) iteration
+        // to prevent unnecessary memory allocation and reduce CPU cycles
+        let data = inventory.filter(item => {
+            // 1. Text Search Filter
+            const searchMatch = (item.itemName && item.itemName.toLowerCase().includes(searchTerm?.toLowerCase() || '')) ||
+                                (item.itemCategory && item.itemCategory.toLowerCase().includes(searchTerm?.toLowerCase() || ''));
+            if (!searchMatch) return false;
 
-        if (selectedCategories.size > 0) {
-            data = data.filter(item => selectedCategories.has(item.itemCategory));
-        }
+            // 2. Category Filter
+            if (selectedCategories.size > 0 && (!item.itemCategory || !selectedCategories.has(item.itemCategory))) return false;
 
-        if (selectedStatuses.size > 0) {
-            data = data.filter(item => item.status && selectedStatuses.has(item.status));
-        }
+            // 3. Status Filter
+            if (selectedStatuses.size > 0 && (!item.status || !selectedStatuses.has(item.status))) return false;
 
-        if (selectedConditions.size > 0) {
-            data = data.filter(item => item.condition && selectedConditions.has(item.condition));
-        }
+            // 4. Condition Filter
+            if (selectedConditions.size > 0 && (!item.condition || !selectedConditions.has(item.condition))) return false;
 
-        if (purchaseDateStart) {
-            data = data.filter(item => item.purchaseDate && item.purchaseDate >= purchaseDateStart);
-        }
+            // 5. Purchase Date Range Filter
+            if (purchaseDateStart && (!item.purchaseDate || item.purchaseDate < purchaseDateStart)) return false;
+            if (purchaseDateEnd && (!item.purchaseDate || item.purchaseDate > purchaseDateEnd)) return false;
 
-        if (purchaseDateEnd) {
-            data = data.filter(item => item.purchaseDate && item.purchaseDate <= purchaseDateEnd);
-        }
+            return true;
+        });
 
         if (sortConfig) {
             data.sort((a, b) => {
