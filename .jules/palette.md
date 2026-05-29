@@ -1,0 +1,3 @@
+## 2024-05-29 - Hover-revealed UI Actions Accessibility Pattern
+**Learning:** Hover-revealed UI elements (like delete buttons appearing on row hover) are invisible during keyboard navigation. This specific app uses Tailwind `group` classes frequently for list items. Relying only on `group-hover:opacity-100` makes actions completely inaccessible to keyboard users as they tab through the interface.
+**Action:** Always pair `group-hover:opacity-100` with `focus-within:bg-[color]` on the parent container (to highlight the row) and `focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-none` directly on the interactive elements to ensure they become visible and usable via keyboard navigation.
