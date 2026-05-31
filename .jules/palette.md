@@ -1,0 +1,3 @@
+## 2024-11-20 - Keyboard Accessibility for Hover-Revealed UI Elements
+**Learning:** Hover-revealed UI elements (e.g., using `opacity-0 group-hover:opacity-100`) are completely invisible to keyboard users unless explicitly handled. This is a common pattern in the app's components (like `ItemDetailView` thumbnails and `InventoryDashboard` rows).
+**Action:** When creating or modifying hover-revealed containers, always pair `group-hover:opacity-100` with `focus-within:opacity-100` on the container. Additionally, ensure interactive elements inside have `focus-visible:ring-2 focus-visible:outline-none focus-visible:opacity-100` so their focus state is clear and visible.
