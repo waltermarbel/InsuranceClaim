@@ -416,30 +416,42 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
     };
 
     const tableData = useMemo(() => {
-        let data = inventory.filter(item => 
-            (item.itemName && item.itemName.toLowerCase().includes(searchTerm?.toLowerCase() || '')) ||
-            (item.itemCategory && item.itemCategory.toLowerCase().includes(searchTerm?.toLowerCase() || ''))
-        );
+        // ⚡ Bolt: Performance optimization
+        // Combine multiple .filter() passes into a single pass to reduce O(n) array allocations
+        // from O(k*n) to O(1) allocation using short-circuit evaluation.
+        let data = inventory.filter(item => {
+            // Search term filter
+            const matchesSearch = (item.itemName && item.itemName.toLowerCase().includes(searchTerm?.toLowerCase() || '')) ||
+                                  (item.itemCategory && item.itemCategory.toLowerCase().includes(searchTerm?.toLowerCase() || ''));
+            if (!matchesSearch) return false;
 
-        if (selectedCategories.size > 0) {
-            data = data.filter(item => selectedCategories.has(item.itemCategory));
-        }
+            // Categories filter
+            if (selectedCategories.size > 0 && !selectedCategories.has(item.itemCategory)) {
+                return false;
+            }
 
-        if (selectedStatuses.size > 0) {
-            data = data.filter(item => item.status && selectedStatuses.has(item.status));
-        }
+            // Statuses filter
+            if (selectedStatuses.size > 0 && (!item.status || !selectedStatuses.has(item.status))) {
+                return false;
+            }
 
-        if (selectedConditions.size > 0) {
-            data = data.filter(item => item.condition && selectedConditions.has(item.condition));
-        }
+            // Conditions filter
+            if (selectedConditions.size > 0 && (!item.condition || !selectedConditions.has(item.condition))) {
+                return false;
+            }
 
-        if (purchaseDateStart) {
-            data = data.filter(item => item.purchaseDate && item.purchaseDate >= purchaseDateStart);
-        }
+            // Purchase date start filter
+            if (purchaseDateStart && (!item.purchaseDate || item.purchaseDate < purchaseDateStart)) {
+                return false;
+            }
 
-        if (purchaseDateEnd) {
-            data = data.filter(item => item.purchaseDate && item.purchaseDate <= purchaseDateEnd);
-        }
+            // Purchase date end filter
+            if (purchaseDateEnd && (!item.purchaseDate || item.purchaseDate > purchaseDateEnd)) {
+                return false;
+            }
+
+            return true;
+        });
 
         if (sortConfig) {
             data.sort((a, b) => {
