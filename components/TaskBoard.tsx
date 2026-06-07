@@ -99,10 +99,12 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ filterItemId, title = "Tas
                             : null;
 
                         return (
-                            <div key={task.id} className="group flex items-start gap-3 p-3 rounded-lg border border-slate-100 hover:border-primary/30 hover:bg-slate-50/50 transition-all">
+                            <div key={task.id} className="group flex items-start gap-3 p-3 rounded-lg border border-slate-100 hover:border-primary/30 hover:bg-slate-50/50 transition-all focus-within:bg-slate-50/50 focus-within:border-primary/30">
                                 <button 
                                     onClick={() => handleToggle(task.id)}
-                                    className={`flex-shrink-0 mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${task.isCompleted ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 hover:border-primary'}`}
+                                    aria-label={task.isCompleted ? "Mark task as incomplete" : "Mark task as complete"}
+                                    title={task.isCompleted ? "Mark task as incomplete" : "Mark task as complete"}
+                                    className={`flex-shrink-0 mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-primary ${task.isCompleted ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 hover:border-primary'}`}
                                 >
                                     {task.isCompleted && <CheckCircleIcon className="w-3.5 h-3.5" />}
                                 </button>
@@ -124,7 +126,9 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ filterItemId, title = "Tas
                                 </div>
                                 <button 
                                     onClick={() => handleDelete(task.id)}
-                                    className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    aria-label="Delete task"
+                                    title="Delete task"
+                                    className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 focus-within:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-rose-500 rounded transition-opacity"
                                 >
                                     <TrashIcon className="h-4 w-4"/>
                                 </button>
@@ -160,7 +164,9 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ filterItemId, title = "Tas
                         <button 
                             type="submit" 
                             disabled={!newTaskDesc.trim()}
-                            className="bg-primary text-white p-2 rounded-lg hover:bg-primary-dark transition disabled:opacity-50 shadow-sm flex-shrink-0"
+                            aria-label="Add task"
+                            title="Add task"
+                            className="bg-primary text-white p-2 rounded-lg hover:bg-primary-dark transition disabled:opacity-50 shadow-sm flex-shrink-0 focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-primary focus-visible:ring-offset-1"
                         >
                             <PlusIcon className="h-5 w-5"/>
                         </button>
