@@ -99,10 +99,12 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ filterItemId, title = "Tas
                             : null;
 
                         return (
-                            <div key={task.id} className="group flex items-start gap-3 p-3 rounded-lg border border-slate-100 hover:border-primary/30 hover:bg-slate-50/50 transition-all">
+                            <div key={task.id} className="group focus-within:opacity-100 flex items-start gap-3 p-3 rounded-lg border border-slate-100 hover:border-primary/30 hover:bg-slate-50/50 transition-all">
                                 <button 
                                     onClick={() => handleToggle(task.id)}
                                     className={`flex-shrink-0 mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${task.isCompleted ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 hover:border-primary'}`}
+                                    aria-label={task.isCompleted ? "Mark task as pending" : "Mark task as completed"}
+                                    title={task.isCompleted ? "Mark task as pending" : "Mark task as completed"}
                                 >
                                     {task.isCompleted && <CheckCircleIcon className="w-3.5 h-3.5" />}
                                 </button>
@@ -124,7 +126,9 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ filterItemId, title = "Tas
                                 </div>
                                 <button 
                                     onClick={() => handleDelete(task.id)}
-                                    className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-none transition-opacity"
+                                    aria-label="Delete task"
+                                    title="Delete task"
                                 >
                                     <TrashIcon className="h-4 w-4"/>
                                 </button>
@@ -150,6 +154,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ filterItemId, title = "Tas
                                     value={newTaskPriority}
                                     onChange={(e) => setNewTaskPriority(e.target.value as any)}
                                     className="text-[10px] font-bold bg-slate-100 border-none rounded py-1 pl-2 pr-1 cursor-pointer focus:ring-0 text-slate-600 h-7"
+                                    aria-label="Task priority"
                                 >
                                     <option value="High">High</option>
                                     <option value="Medium">Medium</option>
@@ -161,6 +166,8 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ filterItemId, title = "Tas
                             type="submit" 
                             disabled={!newTaskDesc.trim()}
                             className="bg-primary text-white p-2 rounded-lg hover:bg-primary-dark transition disabled:opacity-50 shadow-sm flex-shrink-0"
+                            aria-label="Add Task"
+                            title="Add Task"
                         >
                             <PlusIcon className="h-5 w-5"/>
                         </button>
