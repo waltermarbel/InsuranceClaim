@@ -1,0 +1,1 @@
+## 2024-05-24 - Performance Guidelines Created\n**Learning:** Chaining multiple .filter() inside useMemo creates multiple intermediate arrays, causing memory churn and performance drops on large datasets.\n**Action:** Use a single .filter() pass with short-circuit returns.
