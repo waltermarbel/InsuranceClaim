@@ -1,0 +1,3 @@
+## 2025-03-09 - Chained .filter() Array Allocations Anti-Pattern
+**Learning:** Chaining multiple `.filter()` operations inside React `useMemo` hooks is an anti-pattern in this codebase. For large datasets, this consecutive filtering process creates O(N * filters) array allocations in memory, causing performance regressions and unnecessary garbage collection overhead.
+**Action:** Replace chained `.filter()` calls with a single-pass iteration (using a single `.filter()` or `.reduce()`) that utilizes short-circuit early returns to achieve O(N) complexity and O(1) allocation overhead. Ensure all dependencies accessed within the iteration are explicitly listed in the hook dependency array to avoid stale closures.
