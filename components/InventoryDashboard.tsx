@@ -416,30 +416,42 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
     };
 
     const tableData = useMemo(() => {
-        let data = inventory.filter(item => 
-            (item.itemName && item.itemName.toLowerCase().includes(searchTerm?.toLowerCase() || '')) ||
-            (item.itemCategory && item.itemCategory.toLowerCase().includes(searchTerm?.toLowerCase() || ''))
-        );
+        // Optimize: Single-pass iteration to prevent intermediate array allocations
+        const searchLower = searchTerm?.toLowerCase() || '';
 
-        if (selectedCategories.size > 0) {
-            data = data.filter(item => selectedCategories.has(item.itemCategory));
-        }
+        let data = inventory.filter(item => {
+            // Text search
+            const matchesSearch =
+                (item.itemName && item.itemName.toLowerCase().includes(searchLower)) ||
+                (item.itemCategory && item.itemCategory.toLowerCase().includes(searchLower));
 
-        if (selectedStatuses.size > 0) {
-            data = data.filter(item => item.status && selectedStatuses.has(item.status));
-        }
+            if (!matchesSearch) return false;
 
-        if (selectedConditions.size > 0) {
-            data = data.filter(item => item.condition && selectedConditions.has(item.condition));
-        }
+            // Categories
+            if (selectedCategories.size > 0 && (!item.itemCategory || !selectedCategories.has(item.itemCategory))) {
+                return false;
+            }
 
-        if (purchaseDateStart) {
-            data = data.filter(item => item.purchaseDate && item.purchaseDate >= purchaseDateStart);
-        }
+            // Statuses
+            if (selectedStatuses.size > 0 && (!item.status || !selectedStatuses.has(item.status))) {
+                return false;
+            }
 
-        if (purchaseDateEnd) {
-            data = data.filter(item => item.purchaseDate && item.purchaseDate <= purchaseDateEnd);
-        }
+            // Conditions
+            if (selectedConditions.size > 0 && (!item.condition || !selectedConditions.has(item.condition))) {
+                return false;
+            }
+
+            // Purchase Date
+            if (purchaseDateStart && (!item.purchaseDate || item.purchaseDate < purchaseDateStart)) {
+                return false;
+            }
+            if (purchaseDateEnd && (!item.purchaseDate || item.purchaseDate > purchaseDateEnd)) {
+                return false;
+            }
+
+            return true;
+        });
 
         if (sortConfig) {
             data.sort((a, b) => {
@@ -460,7 +472,7 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
             });
         }
         return data;
-    }, [inventory, searchTerm, sortConfig]);
+    }, [inventory, searchTerm, sortConfig, selectedCategories, selectedStatuses, selectedConditions, purchaseDateStart, purchaseDateEnd]);
 
     const groupedData = useMemo(() => {
         const groups: Record<string, InventoryItem[]> = {};
