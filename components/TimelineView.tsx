@@ -247,11 +247,21 @@ export const TimelineView: React.FC = () => {
                                         </div>
                                     </div>
                                 </div>
-                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity self-start">
-                                    <button onClick={() => handleEdit(event)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
+                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity self-start">
+                                    <button
+                                        onClick={() => handleEdit(event)}
+                                        className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg focus-visible:ring-2 focus-visible:outline-none focus-visible:opacity-100 focus-visible:ring-slate-400"
+                                        aria-label="Edit event"
+                                        title="Edit event"
+                                    >
                                         <PencilIcon className="h-4 w-4" />
                                     </button>
-                                    <button onClick={() => handleDelete(event.id)} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg">
+                                    <button
+                                        onClick={() => handleDelete(event.id)}
+                                        className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg focus-visible:ring-2 focus-visible:outline-none focus-visible:opacity-100 focus-visible:ring-rose-400"
+                                        aria-label="Delete event"
+                                        title="Delete event"
+                                    >
                                         <TrashIcon className="h-4 w-4" />
                                     </button>
                                 </div>

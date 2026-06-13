@@ -1,0 +1,3 @@
+## 2024-10-24 - Accessible Hover-Revealed Actions
+**Learning:** Hover-revealed UI elements (`opacity-0 group-hover:opacity-100`) in this app's list components (like TimelineView and TaskBoard) are completely invisible during keyboard navigation. This prevents screen reader and keyboard-only users from discovering or using essential item actions (Edit, Delete).
+**Action:** When creating or modifying hover-revealed action containers, strictly pair `group-hover:opacity-100` with `focus-within:opacity-100` on the container. Furthermore, apply `focus-visible:ring-2 focus-visible:outline-none focus-visible:opacity-100` alongside `aria-label` and `title` directly to the interactive icon-only elements to guarantee visibility and semantic meaning during tab navigation.
