@@ -1,0 +1,3 @@
+## 2024-06-15 - TaskBoard Icon-only Buttons Hover Accessibility
+**Learning:** Hover-revealed UI elements (`opacity-0 group-hover:opacity-100`) inside lists (like tasks or policies) are completely invisible to keyboard users unless paired with `focus-visible:opacity-100` and focus rings. State-toggling buttons must use `aria-pressed` to semantically indicate their current state to screen readers.
+**Action:** Always append `focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-none` when applying `group-hover:opacity-100` to interactive elements. For toggle buttons, ensure `aria-pressed` reflects the active boolean state.

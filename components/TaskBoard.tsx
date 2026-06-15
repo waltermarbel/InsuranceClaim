@@ -102,7 +102,10 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ filterItemId, title = "Tas
                             <div key={task.id} className="group flex items-start gap-3 p-3 rounded-lg border border-slate-100 hover:border-primary/30 hover:bg-slate-50/50 transition-all">
                                 <button 
                                     onClick={() => handleToggle(task.id)}
-                                    className={`flex-shrink-0 mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${task.isCompleted ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 hover:border-primary'}`}
+                                    className={`flex-shrink-0 mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 ${task.isCompleted ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 hover:border-primary'}`}
+                                    aria-label={task.isCompleted ? "Mark as pending" : "Mark as completed"}
+                                    title={task.isCompleted ? "Mark as pending" : "Mark as completed"}
+                                    aria-pressed={task.isCompleted}
                                 >
                                     {task.isCompleted && <CheckCircleIcon className="w-3.5 h-3.5" />}
                                 </button>
@@ -124,7 +127,9 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ filterItemId, title = "Tas
                                 </div>
                                 <button 
                                     onClick={() => handleDelete(task.id)}
-                                    className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-rose-500/50 rounded"
+                                    aria-label="Delete task"
+                                    title="Delete task"
                                 >
                                     <TrashIcon className="h-4 w-4"/>
                                 </button>
