@@ -1,0 +1,4 @@
+## 2024-10-25 - Fix PII data exposure in error logs
+**Vulnerability:** The `FirestoreErrorInfo` interface and `handleFirestoreError` function in `firebase.ts` captured and logged Personally Identifiable Information (PII) including user `email`, `emailVerified`, `displayName`, and `photoUrl` alongside errors.
+**Learning:** This exposes sensitive user data within logs (which could be captured by monitoring tools) when a Firestore operation fails. The original structure of `authInfo` mirrored typical `User` object structures without sanitization.
+**Prevention:** Explicitly filter out PII when constructing error payload objects. Only necessary identifiers like `userId`, `tenantId`, and `providerId` (which are less sensitive but sufficient for debugging) should be retained. Always sanitize data going into generic error tracking structures.
