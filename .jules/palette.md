@@ -1,0 +1,3 @@
+## 2024-05-18 - Hover-Revealed UI Keyboard Accessibility Pattern
+**Learning:** Hover-revealed UI elements (like a "Delete" trash can icon that only appears when hovering over a task row) are invisible and inaccessible to users navigating via keyboard unless specific focus management classes are added to both the container and the element itself.
+**Action:** When creating hover-revealed elements (e.g., `opacity-0 group-hover:opacity-100`), always pair them with `focus-within:opacity-100` on the container (`group`) and apply `focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-none` directly to the interactive element to ensure it becomes visible and distinctly highlighted during keyboard tab navigation.
