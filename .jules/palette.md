@@ -1,0 +1,3 @@
+## 2024-06-18 - Keyboard Navigation for Hover-Revealed Elements
+**Learning:** Hover-revealed UI elements (like the trash icon on the task row) remain completely invisible and sometimes undiscoverable during keyboard navigation if we only use `opacity-0 group-hover:opacity-100`. Additionally, stateful view selectors need `aria-pressed` to announce their active state correctly.
+**Action:** Always combine `group-hover:opacity-100` with `focus-within:bg-slate-50` / `focus-within:border-primary` on the parent group, and `focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2` on the hover-revealed button itself. Use `aria-pressed={condition}` for stateful toggle buttons.
