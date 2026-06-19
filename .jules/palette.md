@@ -1,0 +1,3 @@
+## 2025-01-22 - Keyboard Accessibility for Hover-Revealed Actions
+**Learning:** Elements hidden behind hover states (e.g., using `opacity-0 group-hover:opacity-100`) are inherently inaccessible to keyboard users as they never become visible during tab navigation unless specifically accounted for.
+**Action:** When using hover-revealed action elements in lists or tables, always pair the hover classes with `focus-within:opacity-100` on the container, and ensure interactive elements have clear focus indicators (e.g., `focus-visible:ring-2 focus-visible:outline-none focus-visible:opacity-100`) and appropriate ARIA attributes.
