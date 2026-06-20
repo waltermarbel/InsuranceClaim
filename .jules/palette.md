@@ -1,0 +1,3 @@
+## 2026-06-20 - Keyboard Navigation for Hover-Revealed Actions
+**Learning:** Hover-revealed UI elements (e.g., elements using opacity-0 group-hover:opacity-100) are invisible during keyboard navigation unless paired with focus-within:opacity-100 on the hover-revealed container, and focus-visible:ring-2 focus-visible:outline-none focus-visible:opacity-100 directly on the interactive elements to ensure visibility and usability via keyboard navigation.
+**Action:** Always add focus-within:opacity-100 to the container and focus-visible:ring-2 focus-visible:outline-none focus-visible:opacity-100 to the interactive elements when using opacity-0 group-hover:opacity-100.
