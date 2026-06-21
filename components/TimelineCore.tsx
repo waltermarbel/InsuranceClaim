@@ -98,7 +98,7 @@ export const TimelineCore: React.FC<TimelineCoreProps> = ({ claimDetails, onUpda
             <div className="lg:col-span-1 space-y-4">
                 <div className="flex justify-between items-center bg-white p-3 rounded-lg shadow-sm">
                     <h3 className="font-bold text-slate-800 uppercase tracking-tight text-sm">Timeline Core</h3>
-                    <button onClick={handleAddEvent} className="p-1 bg-primary text-white rounded hover:bg-primary-dark transition"><PlusIcon className="h-4 w-4"/></button>
+                    <button onClick={handleAddEvent} aria-label="Add event" title="Add event" className="p-1 bg-primary text-white rounded hover:bg-primary-dark transition"><PlusIcon className="h-4 w-4"/></button>
                 </div>
                 
                 <div className="relative border-l-2 border-slate-300 ml-4 pl-4 space-y-6 flex flex-col">
@@ -114,8 +114,8 @@ export const TimelineCore: React.FC<TimelineCoreProps> = ({ claimDetails, onUpda
                                 <div className="flex justify-between items-start mb-1">
                                     <div className="text-xs font-bold text-primary">{evt.date}</div>
                                     <div className="flex flex-col gap-1">
-                                        <button onClick={(e) => { e.stopPropagation(); handleMoveEvent(idx, 'up'); }} className="text-slate-300 hover:text-slate-600"><ChevronUpIcon className="h-3 w-3"/></button>
-                                        <button onClick={(e) => { e.stopPropagation(); handleMoveEvent(idx, 'down'); }} className="text-slate-300 hover:text-slate-600"><ChevronDownIcon className="h-3 w-3"/></button>
+                                        <button onClick={(e) => { e.stopPropagation(); handleMoveEvent(idx, 'up'); }} aria-label="Move event up" title="Move event up" className="text-slate-300 hover:text-slate-600"><ChevronUpIcon className="h-3 w-3"/></button>
+                                        <button onClick={(e) => { e.stopPropagation(); handleMoveEvent(idx, 'down'); }} aria-label="Move event down" title="Move event down" className="text-slate-300 hover:text-slate-600"><ChevronDownIcon className="h-3 w-3"/></button>
                                     </div>
                                 </div>
                                 <div className="font-bold text-slate-800 text-sm mb-1">{evt.title}</div>
@@ -139,7 +139,7 @@ export const TimelineCore: React.FC<TimelineCoreProps> = ({ claimDetails, onUpda
                     <div className="bg-white p-6 justify-between rounded-xl shadow-sm border border-slate-200">
                         <div className="flex justify-between items-start mb-4 pb-4 border-b border-slate-100">
                             <h3 className="font-bold text-slate-800 text-lg">Edit Event Node</h3>
-                            <button onClick={() => handleRemoveEvent(selectedEvent.id)} className="text-rose-500 hover:bg-rose-50 p-1.5 rounded transition"><TrashIcon className="h-4 w-4"/></button>
+                            <button onClick={() => handleRemoveEvent(selectedEvent.id)} aria-label="Delete event node" title="Delete event node" className="text-rose-500 hover:bg-rose-50 p-1.5 rounded transition"><TrashIcon className="h-4 w-4"/></button>
                         </div>
                         
                         <div className="grid grid-cols-2 gap-4 mb-4">
@@ -168,7 +168,7 @@ export const TimelineCore: React.FC<TimelineCoreProps> = ({ claimDetails, onUpda
                                         return d ? (
                                             <div key={docId} className="flex justify-between items-center text-xs bg-white border border-slate-200 p-2 rounded">
                                                 <span className="truncate">{d.fileName}</span>
-                                                <button onClick={() => handleUpdateEvent(selectedEvent.id, { linkedDocumentIds: selectedEvent.linkedDocumentIds.filter(id => id !== docId) })} className="text-slate-400 hover:text-rose-500">&times;</button>
+                                                <button onClick={() => handleUpdateEvent(selectedEvent.id, { linkedDocumentIds: selectedEvent.linkedDocumentIds.filter(id => id !== docId) })} aria-label="Remove document" title="Remove document" className="text-slate-400 hover:text-rose-500">&times;</button>
                                             </div>
                                         ) : null;
                                     })}
@@ -198,7 +198,7 @@ export const TimelineCore: React.FC<TimelineCoreProps> = ({ claimDetails, onUpda
                                         return item ? (
                                             <div key={itemId} className="flex justify-between items-center text-xs bg-white border border-slate-200 p-2 rounded">
                                                 <span className="truncate">{item.claimDescription || item.category}</span>
-                                                <button onClick={() => handleUpdateEvent(selectedEvent.id, { linkedItemIds: (selectedEvent.linkedItemIds || []).filter(id => id !== itemId) })} className="text-slate-400 hover:text-rose-500">&times;</button>
+                                                <button onClick={() => handleUpdateEvent(selectedEvent.id, { linkedItemIds: (selectedEvent.linkedItemIds || []).filter(id => id !== itemId) })} aria-label="Remove item" title="Remove item" className="text-slate-400 hover:text-rose-500">&times;</button>
                                             </div>
                                         ) : null;
                                     })}
@@ -230,7 +230,7 @@ export const TimelineCore: React.FC<TimelineCoreProps> = ({ claimDetails, onUpda
                                                 const newPersons = [...selectedEvent.involvedPersons];
                                                 newPersons.splice(idx, 1);
                                                 handleUpdateEvent(selectedEvent.id, { involvedPersons: newPersons });
-                                            }} className="text-slate-400 hover:text-rose-500 font-bold ml-1">&times;</button>
+                                            }} aria-label="Remove person" title="Remove person" className="text-slate-400 hover:text-rose-500 font-bold ml-1">&times;</button>
                                         </span>
                                     ))}
                                 </div>
