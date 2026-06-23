@@ -1,0 +1,3 @@
+## 2025-06-23 - Hover-revealed Keyboard Accessibility
+**Learning:** Hover-revealed UI elements (like the action buttons on timeline events) are completely inaccessible via keyboard navigation if they are only revealed via `group-hover`. Even if they are focusable, the user can't see what they are focusing on.
+**Action:** Use `focus-within:opacity-100` on the parent container (the one with `group-hover`) and add `focus-visible:ring-2 focus-visible:outline-none focus-visible:opacity-100` directly to the inner buttons to ensure they become fully visible and have clear focus rings during keyboard navigation.
