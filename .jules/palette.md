@@ -1,0 +1,3 @@
+## 2024-06-24 - TaskBoard Keyboard Accessibility & Screen Reader Polish
+**Learning:** Hover-revealed UI elements (like the trash icon in `TaskBoard.tsx` that uses `opacity-0 group-hover:opacity-100`) are invisible during keyboard navigation. Additionally, stateful filter buttons ("Pending" / "Done") lack semantic active state indication for screen readers, and icon-only buttons often lack accessible names.
+**Action:** Always pair `group-hover:opacity-100` with `focus-within:opacity-100` on the container and `focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-none` on the interactive element. Use `aria-pressed` for stateful toggle buttons, and ensure all icon-only buttons have an `aria-label` and `title`.
