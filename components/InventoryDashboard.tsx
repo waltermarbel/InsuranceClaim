@@ -246,14 +246,14 @@ const DashboardRow = React.memo<{
                 </div>
             </td>
             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium rounded-r-lg">
-                <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
                     <span className="text-primary font-semibold text-xs uppercase tracking-wide bg-primary/5 px-3 py-1 rounded-full hover:bg-primary/10 transition-colors">Edit</span>
                     <button 
                         onClick={(e) => {
                             e.stopPropagation();
                             onDelete(item.id);
                         }}
-                        className="text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 p-1.5 rounded-full transition-colors"
+                        className="text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 p-1.5 rounded-full transition-colors focus-visible:ring-2 focus-visible:outline-none focus-visible:opacity-100 focus-visible:ring-rose-500"
                         title="Delete Item"
                     >
                         <TrashIcon className="h-4 w-4" />
