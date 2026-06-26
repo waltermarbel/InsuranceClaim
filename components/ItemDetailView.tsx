@@ -248,7 +248,7 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
                         </div>
                     </div>
                     <div className="h-10 w-px bg-slate-200"></div>
-                    <button onClick={handleDelete} className="text-slate-400 hover:text-rose-500 transition p-2 rounded-full hover:bg-rose-50">
+                    <button onClick={handleDelete} className="text-slate-400 hover:text-rose-500 transition p-2 rounded-full hover:bg-rose-50" title="Delete Item" aria-label="Delete Item">
                         <TrashIcon className="h-6 w-6" />
                     </button>
                 </div>
