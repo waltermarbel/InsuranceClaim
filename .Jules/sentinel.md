@@ -1,0 +1,4 @@
+## 2026-06-29 - Fix XSS Vulnerability in React Components
+**Vulnerability:** React components were using `dangerouslySetInnerHTML` to render LLM responses. This exposed the application to Cross-Site Scripting (XSS) if the LLM output contained malicious HTML or scripts.
+**Learning:** Using `dangerouslySetInnerHTML` purely to preserve line breaks (by replacing `\n` with `<br />`) is an insecure anti-pattern. Standard React text rendering combined with the CSS `whitespace-pre-wrap` property achieves the exact same visual formatting securely without risk of XSS.
+**Prevention:** Avoid `dangerouslySetInnerHTML` whenever possible. For rendering text that requires newlines, use `whitespace-pre-wrap`. For rendering rich text, use a dedicated library like `react-markdown` or a sanitization library like DOMPurify.
