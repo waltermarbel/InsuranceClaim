@@ -72,12 +72,14 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ filterItemId, title = "Tas
                 <div className="flex bg-white rounded-lg p-0.5 border border-slate-200">
                     <button 
                         onClick={() => setView('pending')} 
+                        aria-pressed={view === 'pending'}
                         className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${view === 'pending' ? 'bg-slate-100 text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                     >
                         Pending
                     </button>
                     <button 
                         onClick={() => setView('completed')} 
+                        aria-pressed={view === 'completed'}
                         className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${view === 'completed' ? 'bg-slate-100 text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                     >
                         Done
@@ -102,7 +104,9 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ filterItemId, title = "Tas
                             <div key={task.id} className="group flex items-start gap-3 p-3 rounded-lg border border-slate-100 hover:border-primary/30 hover:bg-slate-50/50 transition-all">
                                 <button 
                                     onClick={() => handleToggle(task.id)}
-                                    className={`flex-shrink-0 mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${task.isCompleted ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 hover:border-primary'}`}
+                                    aria-label={task.isCompleted ? "Mark task as pending" : "Mark task as completed"}
+                                    title={task.isCompleted ? "Mark task as pending" : "Mark task as completed"}
+                                    className={`flex-shrink-0 mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none ${task.isCompleted ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 hover:border-primary'}`}
                                 >
                                     {task.isCompleted && <CheckCircleIcon className="w-3.5 h-3.5" />}
                                 </button>
@@ -124,7 +128,9 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ filterItemId, title = "Tas
                                 </div>
                                 <button 
                                     onClick={() => handleDelete(task.id)}
-                                    className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    aria-label="Delete task"
+                                    title="Delete task"
+                                    className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:outline-none transition-opacity rounded"
                                 >
                                     <TrashIcon className="h-4 w-4"/>
                                 </button>
@@ -160,7 +166,9 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ filterItemId, title = "Tas
                         <button 
                             type="submit" 
                             disabled={!newTaskDesc.trim()}
-                            className="bg-primary text-white p-2 rounded-lg hover:bg-primary-dark transition disabled:opacity-50 shadow-sm flex-shrink-0"
+                            aria-label="Add new task"
+                            title="Add new task"
+                            className="bg-primary text-white p-2 rounded-lg hover:bg-primary-dark focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:outline-none transition disabled:opacity-50 shadow-sm flex-shrink-0"
                         >
                             <PlusIcon className="h-5 w-5"/>
                         </button>
