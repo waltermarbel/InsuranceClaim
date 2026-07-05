@@ -1,0 +1,3 @@
+## 2024-07-05 - Avoid multiple `.filter()` chained calls and static computations in loops
+**Learning:** Performance Anti-Pattern: Chaining multiple `.filter()` operations consecutively inside React `useMemo` hooks allocates a new array in memory for each step, causing performance regressions for large datasets (e.g. `tableData` in `InventoryDashboard.tsx`). Similarly, executing static conversions like `searchTerm?.toLowerCase()` inside the loop multiplies O(1) operations by N elements unnecessarily.
+**Action:** Use a single-pass iteration (a single `.filter()`) with short-circuit returns to ensure O(n) complexity and O(1) array allocation overhead. Hoist static operations outside of iteration loops to reduce redundant operations.
