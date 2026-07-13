@@ -1,0 +1,3 @@
+## 2025-03-05 - Accessible Task Board
+**Learning:** Stateful view toggles in the TaskBoard component lacked `aria-pressed`, breaking semantic states for screen readers. Furthermore, hover-revealed delete buttons were completely inaccessible to keyboard users because they lacked `focus-visible` opacity and ring styles.
+**Action:** Always apply `aria-pressed` on filter/view toggles. For any hover-revealed UI, explicitly add `focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-none` on the interactive element to ensure it's visible and usable when focused via keyboard navigation.
