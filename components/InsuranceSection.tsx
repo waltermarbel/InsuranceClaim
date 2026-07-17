@@ -83,10 +83,12 @@ const PolicyDetails: React.FC<{ policy: ParsedPolicy; onUpdate: (p: ParsedPolicy
     };
 
     // Filter helper
+    // ⚡ Bolt Optimization: Hoist searchTerm lowercase out of loop to prevent redundant conversion
     const filterClauses = (clauses: string[] | undefined) => {
         if (!clauses) return [];
         if (!searchTerm) return clauses;
-        return clauses.filter(c => c.toLowerCase().includes(searchTerm.toLowerCase()));
+        const lowerTerm = searchTerm.toLowerCase();
+        return clauses.filter(c => c.toLowerCase().includes(lowerTerm));
     };
 
     const handleVerify = async () => {
