@@ -142,17 +142,22 @@ export const TimelineView: React.FC = () => {
 
     // Calculate contradictions locally
     const getContradictions = () => {
-        const facts = timeline.filter(t => t.type === 'FACT');
+        const facts = timeline.filter(t => t.type === 'FACT').map(f => ({
+            ...f,
+            lowerDesc: f.description.toLowerCase(),
+            time: new Date(f.date).getTime()
+        }));
         const alerts: string[] = [];
 
         timeline.forEach(event => {
+            const eventDescLower = event.description.toLowerCase();
+            const eventDate = new Date(event.date).getTime();
+
             facts.forEach(fact => {
                 if (event.id !== fact.id) {
-                    const eventHasBeforeKeyword = event.description.toLowerCase().includes('before ' + fact.description.toLowerCase());
-                    const factDate = new Date(fact.date).getTime();
-                    const eventDate = new Date(event.date).getTime();
+                    const eventHasBeforeKeyword = eventDescLower.includes('before ' + fact.lowerDesc);
                     
-                    if (eventHasBeforeKeyword && eventDate > factDate) {
+                    if (eventHasBeforeKeyword && eventDate > fact.time) {
                          alerts.push(`Event "${event.description}" claims to happen before fact "${fact.description}", but its timestamp is later.`);
                     }
                 }

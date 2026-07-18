@@ -47,10 +47,14 @@ export const generateClaimInventory = (
 
     // Check if Incident Type itself is excluded by policy
     const incidentTypeLower = incident.incidentType.toLowerCase();
-    const isIncidentExcluded = policy.exclusions.some(ex => incidentTypeLower.includes(ex.toLowerCase()));
+    const lowerCaseExclusions = policy.exclusions.map(ex => ex.toLowerCase());
+    const isIncidentExcluded = lowerCaseExclusions.some(ex => incidentTypeLower.includes(ex));
 
     // Identify active sub-limits from policy
     const subLimits = policy.coverage.filter(c => c.type === 'sub-limit');
+    const lowerCaseSubLimits = subLimits.map(sl => ({ ...sl, categoryLower: sl.category.toLowerCase() }));
+
+    const lowerCaseInferredCategories = inferredItemCategories?.map(cat => cat.toLowerCase()) || [];
 
     const claimItems: ClaimItem[] = [];
     let totalValue = 0;
@@ -60,14 +64,16 @@ export const generateClaimInventory = (
         if (!isTemporallyEligible(masterItem, incident.dateOfLoss)) return;
         if (!isPhysicallyPlausible(masterItem)) return;
         
+        const masterItemCategoryLower = masterItem.itemCategory.toLowerCase();
+
         // Use inferred categories to pre-filter items to include. If inferredCategories array is provided and not empty, include only those items.
         // Also include items with 'unknown' category just in case.
-        if (inferredItemCategories && inferredItemCategories.length > 0) {
-            const isCategoryMatching = inferredItemCategories.some(cat => 
-                masterItem.itemCategory.toLowerCase().includes(cat.toLowerCase()) || 
-                cat.toLowerCase().includes(masterItem.itemCategory.toLowerCase())
+        if (lowerCaseInferredCategories.length > 0) {
+            const isCategoryMatching = lowerCaseInferredCategories.some(catLower =>
+                masterItemCategoryLower.includes(catLower) ||
+                catLower.includes(masterItemCategoryLower)
             );
-            if (!isCategoryMatching && masterItem.itemCategory.toLowerCase() !== 'unknown') {
+            if (!isCategoryMatching && masterItemCategoryLower !== 'unknown') {
                 return; // skip if doesn't match inferred category
             }
         }
@@ -82,7 +88,7 @@ export const generateClaimInventory = (
             exclusionReason = `Incident type '${incident.incidentType}' matches policy exclusion.`;
         } else {
             // 2. Check Item Category Exclusion
-            const isCategoryExcluded = policy.exclusions.some(ex => masterItem.itemCategory.toLowerCase().includes(ex.toLowerCase()));
+            const isCategoryExcluded = lowerCaseExclusions.some(ex => masterItemCategoryLower.includes(ex));
             if (isCategoryExcluded) {
                 status = 'excluded';
                 exclusionReason = `Category '${masterItem.itemCategory}' is listed in policy exclusions.`;
@@ -91,9 +97,9 @@ export const generateClaimInventory = (
 
         // 3. Check Sub-Limits (Soft Flag)
         if (status === 'included') {
-            const applicableSubLimit = subLimits.find(sl => 
-                masterItem.itemCategory.toLowerCase().includes(sl.category.toLowerCase()) || 
-                sl.category.toLowerCase().includes(masterItem.itemCategory.toLowerCase())
+            const applicableSubLimit = lowerCaseSubLimits.find(sl =>
+                masterItemCategoryLower.includes(sl.categoryLower) ||
+                sl.categoryLower.includes(masterItemCategoryLower)
             );
             
             if (applicableSubLimit) {
