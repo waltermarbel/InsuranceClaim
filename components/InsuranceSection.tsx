@@ -20,9 +20,9 @@ const ClauseTag: React.FC<{
     borderClass: string; 
     textClass: string; 
 }> = ({ text, onDelete, colorClass, borderClass, textClass }) => (
-    <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold border shadow-sm transition-all group ${colorClass} ${borderClass} ${textClass}`}>
+    <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold border shadow-sm transition-all group focus-within:opacity-100 ${colorClass} ${borderClass} ${textClass}`}>
         {text}
-        <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="ml-1.5 opacity-0 group-hover:opacity-100 hover:text-red-600 transition-opacity focus:opacity-100">
+        <button onClick={(e) => { e.stopPropagation(); onDelete(); }} aria-label="Remove clause" title="Remove clause" className="ml-1.5 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-none hover:text-red-600 transition-opacity focus:opacity-100">
             <XCircleIcon className="h-3 w-3" />
         </button>
     </span>
