@@ -86,14 +86,14 @@ const ProofThumbnail: React.FC<{ proof: Proof, onZoom: (url: string) => void, on
                     <span className="text-[10px] w-full truncate font-medium">{proof.fileName}</span>
                 </div>
             )}
-            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity flex items-center justify-center gap-2">
                 {displayUrl && (
-                    <button onClick={() => onZoom(displayUrl!)} className="p-1.5 bg-white/90 rounded-full text-slate-700 hover:text-blue-500 transition" title={isImage ? "Zoom Image" : "View Document"}>
+                    <button onClick={() => onZoom(displayUrl!)} aria-label={isImage ? "Zoom Image" : "View Document"} className="p-1.5 bg-white/90 rounded-full text-slate-700 hover:text-blue-500 focus-visible:ring-2 focus-visible:outline-none focus-visible:opacity-100 transition" title={isImage ? "Zoom Image" : "View Document"}>
                         <MagnifyingGlassIcon className="h-4 w-4" />
                     </button>
                 )}
                 {isImage && (
-                    <button onClick={onEdit} className="p-1.5 bg-white/90 rounded-full text-slate-700 hover:text-primary transition" title="Edit Image">
+                    <button onClick={onEdit} aria-label="Edit Image" className="p-1.5 bg-white/90 rounded-full text-slate-700 hover:text-primary focus-visible:ring-2 focus-visible:outline-none focus-visible:opacity-100 transition" title="Edit Image">
                         <PencilSquareIcon className="h-4 w-4" />
                     </button>
                 )}
