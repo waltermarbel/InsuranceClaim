@@ -478,11 +478,27 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
     }, [tableData]);
 
     const stats = useMemo(() => {
-        const totalVal = tableData.reduce((acc, item) => acc + (item.replacementCostValueRCV || item.originalCost || 0), 0);
-        const readyCount = tableData.filter(i => 
-            (i.linkedProofs || []).some(p => p.type === 'image') && 
-            (i.linkedProofs || []).some(p => p.type === 'document' || p.purpose === 'Proof of Purchase')
-        ).length;
+        let totalVal = 0;
+        let readyCount = 0;
+
+        for (const i of tableData) {
+            totalVal += (i.replacementCostValueRCV || i.originalCost || 0);
+
+            const proofs = i.linkedProofs || [];
+            let hasImage = false;
+            let hasDoc = false;
+
+            for (const p of proofs) {
+                if (p.type === 'image') hasImage = true;
+                if (p.type === 'document' || p.purpose === 'Proof of Purchase') hasDoc = true;
+                if (hasImage && hasDoc) break;
+            }
+
+            if (hasImage && hasDoc) {
+                readyCount++;
+            }
+        }
+
         return {
             totalRCV: totalVal,
             count: tableData.length,
