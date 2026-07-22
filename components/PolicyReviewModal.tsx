@@ -43,7 +43,7 @@ const ArrayEditor: React.FC<{
         <div className="space-y-3">
             {items.length === 0 && <p className="text-sm text-slate-400 italic py-4 text-center border-2 border-dashed border-slate-100 rounded-lg">{emptyText}</p>}
             {items.map((item, i) => (
-                <div key={i} className="flex gap-2 group">
+                <div key={i} className="flex gap-2 group focus-within:opacity-100">
                     <textarea 
                         className="w-full p-3 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-shadow resize-none"
                         rows={2}
@@ -51,7 +51,7 @@ const ArrayEditor: React.FC<{
                         onChange={(e) => updateItem(i, e.target.value)}
                         placeholder={placeholder}
                     />
-                    <button onClick={() => deleteItem(i)} className="self-start mt-2 p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-md transition-colors opacity-0 group-hover:opacity-100">
+                    <button onClick={() => deleteItem(i)} aria-label="Delete Item" className="self-start mt-2 p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-md transition-colors opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-none">
                         <TrashIcon className="h-4 w-4"/>
                     </button>
                 </div>
@@ -105,7 +105,7 @@ const RecordEditor: React.FC<{
         <div className="space-y-3">
             {entries.length === 0 && <p className="text-sm text-slate-400 italic py-4 text-center border-2 border-dashed border-slate-100 rounded-lg">{emptyText}</p>}
             {entries.map(([key, value], i) => (
-                <div key={i} className="flex gap-2 group items-center">
+                <div key={i} className="flex gap-2 group items-center focus-within:opacity-100">
                     <input 
                         type="text"
                         className="flex-grow p-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-shadow"
@@ -123,7 +123,7 @@ const RecordEditor: React.FC<{
                             placeholder={valuePlaceholder}
                         />
                     </div>
-                    <button onClick={() => deleteItem(key)} className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-md transition-colors opacity-0 group-hover:opacity-100">
+                    <button onClick={() => deleteItem(key)} aria-label="Delete Item" className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-md transition-colors opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-none">
                         <TrashIcon className="h-4 w-4"/>
                     </button>
                 </div>
