@@ -478,11 +478,22 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
     }, [tableData]);
 
     const stats = useMemo(() => {
-        const totalVal = tableData.reduce((acc, item) => acc + (item.replacementCostValueRCV || item.originalCost || 0), 0);
-        const readyCount = tableData.filter(i => 
-            (i.linkedProofs || []).some(p => p.type === 'image') && 
-            (i.linkedProofs || []).some(p => p.type === 'document' || p.purpose === 'Proof of Purchase')
-        ).length;
+        // Performance optimization: Replaced chained .reduce() and .filter().length with a single-pass loop.
+        // This reduces O(N) redundant iterations and eliminates intermediate array memory allocations.
+        let totalVal = 0;
+        let readyCount = 0;
+
+        for (const item of tableData) {
+            totalVal += (item.replacementCostValueRCV || item.originalCost || 0);
+
+            const hasImage = (item.linkedProofs || []).some(p => p.type === 'image');
+            const hasDoc = (item.linkedProofs || []).some(p => p.type === 'document' || p.purpose === 'Proof of Purchase');
+
+            if (hasImage && hasDoc) {
+                readyCount++;
+            }
+        }
+
         return {
             totalRCV: totalVal,
             count: tableData.length,
