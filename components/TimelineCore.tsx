@@ -98,7 +98,7 @@ export const TimelineCore: React.FC<TimelineCoreProps> = ({ claimDetails, onUpda
             <div className="lg:col-span-1 space-y-4">
                 <div className="flex justify-between items-center bg-white p-3 rounded-lg shadow-sm">
                     <h3 className="font-bold text-slate-800 uppercase tracking-tight text-sm">Timeline Core</h3>
-                    <button onClick={handleAddEvent} className="p-1 bg-primary text-white rounded hover:bg-primary-dark transition"><PlusIcon className="h-4 w-4"/></button>
+                    <button aria-label="Add event node" onClick={handleAddEvent} className="p-1 bg-primary text-white rounded hover:bg-primary-dark transition focus-visible:ring-2 focus-visible:outline-none"><PlusIcon className="h-4 w-4"/></button>
                 </div>
                 
                 <div className="relative border-l-2 border-slate-300 ml-4 pl-4 space-y-6 flex flex-col">
@@ -114,8 +114,8 @@ export const TimelineCore: React.FC<TimelineCoreProps> = ({ claimDetails, onUpda
                                 <div className="flex justify-between items-start mb-1">
                                     <div className="text-xs font-bold text-primary">{evt.date}</div>
                                     <div className="flex flex-col gap-1">
-                                        <button onClick={(e) => { e.stopPropagation(); handleMoveEvent(idx, 'up'); }} className="text-slate-300 hover:text-slate-600"><ChevronUpIcon className="h-3 w-3"/></button>
-                                        <button onClick={(e) => { e.stopPropagation(); handleMoveEvent(idx, 'down'); }} className="text-slate-300 hover:text-slate-600"><ChevronDownIcon className="h-3 w-3"/></button>
+                                        <button aria-label="Move event up" onClick={(e) => { e.stopPropagation(); handleMoveEvent(idx, 'up'); }} className="text-slate-300 hover:text-slate-600 focus-visible:ring-2 focus-visible:outline-none"><ChevronUpIcon className="h-3 w-3"/></button>
+                                        <button aria-label="Move event down" onClick={(e) => { e.stopPropagation(); handleMoveEvent(idx, 'down'); }} className="text-slate-300 hover:text-slate-600 focus-visible:ring-2 focus-visible:outline-none"><ChevronDownIcon className="h-3 w-3"/></button>
                                     </div>
                                 </div>
                                 <div className="font-bold text-slate-800 text-sm mb-1">{evt.title}</div>
@@ -139,7 +139,7 @@ export const TimelineCore: React.FC<TimelineCoreProps> = ({ claimDetails, onUpda
                     <div className="bg-white p-6 justify-between rounded-xl shadow-sm border border-slate-200">
                         <div className="flex justify-between items-start mb-4 pb-4 border-b border-slate-100">
                             <h3 className="font-bold text-slate-800 text-lg">Edit Event Node</h3>
-                            <button onClick={() => handleRemoveEvent(selectedEvent.id)} className="text-rose-500 hover:bg-rose-50 p-1.5 rounded transition"><TrashIcon className="h-4 w-4"/></button>
+                            <button aria-label="Delete event node" onClick={() => handleRemoveEvent(selectedEvent.id)} className="text-rose-500 hover:bg-rose-50 p-1.5 rounded transition focus-visible:ring-2 focus-visible:outline-none"><TrashIcon className="h-4 w-4"/></button>
                         </div>
                         
                         <div className="grid grid-cols-2 gap-4 mb-4">
