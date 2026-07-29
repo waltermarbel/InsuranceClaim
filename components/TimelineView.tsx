@@ -248,10 +248,10 @@ export const TimelineView: React.FC = () => {
                                     </div>
                                 </div>
                                 <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity self-start">
-                                    <button onClick={() => handleEdit(event)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
+                                    <button onClick={() => handleEdit(event)} aria-label="Edit event" className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
                                         <PencilIcon className="h-4 w-4" />
                                     </button>
-                                    <button onClick={() => handleDelete(event.id)} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg">
+                                    <button onClick={() => handleDelete(event.id)} aria-label="Delete event" className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg">
                                         <TrashIcon className="h-4 w-4" />
                                     </button>
                                 </div>
