@@ -295,7 +295,11 @@ const appReducer = (state: AppState, action: Action): AppState => {
                 if (claim.id !== claimId) return claim;
                 
                 const updatedItems = claim.claimItems.map(i => i.id === item.id ? item : i);
-                const totalValue = updatedItems.filter(i => i.status === 'included').reduce((acc, i) => acc + i.claimedValue, 0);
+                // ⚡ Bolt: Single-pass iteration to calculate totalValue. Prevents redundant loop iteration and O(N) intermediate array allocation.
+                let totalValue = 0;
+                for (const i of updatedItems) {
+                    if (i.status === 'included') totalValue += i.claimedValue;
+                }
                 return { ...claim, claimItems: updatedItems, totalClaimValue: totalValue };
             });
             return { ...state, claims: updatedClaims };
