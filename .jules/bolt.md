@@ -1,0 +1,3 @@
+## 2025-02-28 - Avoid Array Manipulation Micro-Optimizations in React Renders
+**Learning:** Attempting to optimize chained `.filter().length` calculations into a single `for` loop within a React component body without wrapping it in `useMemo` is a micro-optimization that degrades readability without measurable benefit, as the O(N) calculation still runs on every render. Furthermore, always verify staged files before committing to prevent build artifacts like `dist/` or `pnpm-lock.yaml` from polluting the PR.
+**Action:** Prioritize memoizing expensive calculations with `useMemo` over manual loop optimizations for standard array operations. Always inspect `git status` and use specific `git add <file>` commands to stage changes.
