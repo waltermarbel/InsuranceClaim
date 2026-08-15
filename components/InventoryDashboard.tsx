@@ -199,6 +199,7 @@ const DashboardRow = React.memo<{
                     className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
                     checked={isSelected}
                     onChange={(e) => onSelectRow(item.id, e)}
+                    aria-label={`Select ${item.itemName || 'item'}`}
                  />
             </td>
             <td className="px-6 py-4">
@@ -255,6 +256,7 @@ const DashboardRow = React.memo<{
                         }}
                         className="text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 p-1.5 rounded-full transition-colors"
                         title="Delete Item"
+                        aria-label={`Delete ${item.itemName || 'item'}`}
                     >
                         <TrashIcon className="h-4 w-4" />
                     </button>
@@ -849,6 +851,7 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
                                         className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
                                         checked={isAllSelected}
                                         onChange={handleSelectAll}
+                                        aria-label="Select all items"
                                      />
                                 </th>
                                 <th 
