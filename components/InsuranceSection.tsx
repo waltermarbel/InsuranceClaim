@@ -22,7 +22,7 @@ const ClauseTag: React.FC<{
 }> = ({ text, onDelete, colorClass, borderClass, textClass }) => (
     <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold border shadow-sm transition-all group ${colorClass} ${borderClass} ${textClass}`}>
         {text}
-        <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="ml-1.5 opacity-0 group-hover:opacity-100 hover:text-red-600 transition-opacity focus:opacity-100">
+        <button onClick={(e) => { e.stopPropagation(); onDelete(); }} aria-label="Delete" className="ml-1.5 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-red-600 focus-visible:ring-2 focus-visible:outline-none transition-opacity focus:opacity-100">
             <XCircleIcon className="h-3 w-3" />
         </button>
     </span>
@@ -291,7 +291,7 @@ const PolicyDetails: React.FC<{ policy: ParsedPolicy; onUpdate: (p: ParsedPolicy
                                     <option value="main">Main</option>
                                     <option value="sub-limit">Sub</option>
                                 </select>
-                                <button onClick={() => removeCoverage(index)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1">
+                                <button onClick={() => removeCoverage(index)} aria-label="Remove Coverage" className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-none transition-opacity p-1">
                                     <TrashIcon className="h-4 w-4"/>
                                 </button>
                             </div>
@@ -367,10 +367,10 @@ const PolicyDetails: React.FC<{ policy: ParsedPolicy; onUpdate: (p: ParsedPolicy
                         </div>
                         <ul className="space-y-2">
                             {filterClauses(policy.conditions).map((condition, i) => (
-                                <li key={i} className="text-xs text-slate-700 bg-amber-50 p-2 rounded border border-amber-100 flex items-start gap-2 group">
+                                <li key={i} className="text-xs text-slate-700 bg-amber-50 p-2 rounded border border-amber-100 flex items-start gap-2 group focus-within:opacity-100">
                                     <div className="mt-1 w-1.5 h-1.5 bg-amber-500 rounded-full flex-shrink-0"></div>
                                     <span className="leading-snug flex-grow">{condition}</span>
-                                    <button onClick={() => removeClause('conditions', (policy.conditions || []).indexOf(condition))} className="opacity-0 group-hover:opacity-100 text-amber-400 hover:text-amber-600"><XCircleIcon className="h-3 w-3"/></button>
+                                    <button onClick={() => removeClause('conditions', (policy.conditions || []).indexOf(condition))} aria-label="Remove Clause" className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-none text-amber-400 hover:text-amber-600"><XCircleIcon className="h-3 w-3"/></button>
                                 </li>
                             ))}
                             {addingClause === 'conditions' && (
