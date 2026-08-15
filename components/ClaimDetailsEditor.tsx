@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { ClaimDetails } from '../types.ts';
+import DOMPurify from 'dompurify';
 import { PencilIcon, CheckIcon, MapPinIcon, CalendarIcon, DocumentTextIcon, ExclamationTriangleIcon, SparklesIcon } from './icons.tsx';
 
 interface ClaimDetailsEditorProps {
@@ -30,13 +31,15 @@ const RichTextEditor: React.FC<{ value: string; onBlur: (val: string) => void }>
 
     useEffect(() => {
         if (editorRef.current && editorRef.current.innerHTML !== value) {
-            editorRef.current.innerHTML = value || '';
+            // Sanitize input to prevent XSS
+            editorRef.current.innerHTML = DOMPurify.sanitize(value || '');
         }
     }, [value]);
 
     const handleBlur = () => {
         if (editorRef.current) {
-            onBlur(editorRef.current.innerHTML);
+            // Sanitize output to prevent XSS
+            onBlur(DOMPurify.sanitize(editorRef.current.innerHTML));
         }
     };
 
