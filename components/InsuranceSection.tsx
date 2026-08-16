@@ -312,7 +312,7 @@ const PolicyDetails: React.FC<{ policy: ParsedPolicy; onUpdate: (p: ParsedPolicy
                                 <span className="bg-indigo-100 text-indigo-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">Trigger</span>
                                 Covered Perils
                             </h4>
-                            <button onClick={() => setAddingClause('triggers')} className="text-xs text-indigo-600 hover:text-indigo-800"><PlusIcon className="h-3 w-3"/></button>
+                            <button aria-label="Add Trigger" title="Add Trigger" onClick={() => setAddingClause('triggers')} className="text-xs text-indigo-600 hover:text-indigo-800"><PlusIcon className="h-3 w-3"/></button>
                         </div>
                         <div className="flex flex-wrap gap-2">
                             {filterClauses(policy.triggers).map((trigger, i) => (
@@ -336,7 +336,7 @@ const PolicyDetails: React.FC<{ policy: ParsedPolicy; onUpdate: (p: ParsedPolicy
                                 <span className="bg-slate-100 text-slate-600 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">Limit</span>
                                 Special Limits & Clauses
                             </h4>
-                            <button onClick={() => setAddingClause('limits')} className="text-xs text-slate-600 hover:text-slate-800"><PlusIcon className="h-3 w-3"/></button>
+                            <button aria-label="Add Limit" title="Add Limit" onClick={() => setAddingClause('limits')} className="text-xs text-slate-600 hover:text-slate-800"><PlusIcon className="h-3 w-3"/></button>
                         </div>
                         <div className="flex flex-wrap gap-2">
                             {filterClauses(policy.limits).map((limit, i) => (
@@ -363,14 +363,14 @@ const PolicyDetails: React.FC<{ policy: ParsedPolicy; onUpdate: (p: ParsedPolicy
                                 <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">Condition</span>
                                 Duties & Requirements
                             </h4>
-                            <button onClick={() => setAddingClause('conditions')} className="text-xs text-amber-600 hover:text-amber-800"><PlusIcon className="h-3 w-3"/></button>
+                            <button aria-label="Add Condition" title="Add Condition" onClick={() => setAddingClause('conditions')} className="text-xs text-amber-600 hover:text-amber-800"><PlusIcon className="h-3 w-3"/></button>
                         </div>
                         <ul className="space-y-2">
                             {filterClauses(policy.conditions).map((condition, i) => (
                                 <li key={i} className="text-xs text-slate-700 bg-amber-50 p-2 rounded border border-amber-100 flex items-start gap-2 group">
                                     <div className="mt-1 w-1.5 h-1.5 bg-amber-500 rounded-full flex-shrink-0"></div>
                                     <span className="leading-snug flex-grow">{condition}</span>
-                                    <button onClick={() => removeClause('conditions', (policy.conditions || []).indexOf(condition))} className="opacity-0 group-hover:opacity-100 text-amber-400 hover:text-amber-600"><XCircleIcon className="h-3 w-3"/></button>
+                                    <button aria-label="Remove Condition" title="Remove Condition" onClick={() => removeClause('conditions', (policy.conditions || []).indexOf(condition))} className="opacity-0 group-hover:opacity-100 text-amber-400 hover:text-amber-600"><XCircleIcon className="h-3 w-3"/></button>
                                 </li>
                             ))}
                             {addingClause === 'conditions' && (
@@ -389,7 +389,7 @@ const PolicyDetails: React.FC<{ policy: ParsedPolicy; onUpdate: (p: ParsedPolicy
                                 <span className="bg-rose-100 text-rose-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">Exclusion</span>
                                 Policy Exclusions
                             </h4>
-                            <button onClick={() => setAddingClause('exclusions')} className="text-xs text-rose-600 hover:text-rose-800"><PlusIcon className="h-3 w-3"/></button>
+                            <button aria-label="Add Exclusion" title="Add Exclusion" onClick={() => setAddingClause('exclusions')} className="text-xs text-rose-600 hover:text-rose-800"><PlusIcon className="h-3 w-3"/></button>
                         </div>
                         <div className="max-h-40 overflow-y-auto bg-white border border-slate-200 rounded-lg p-3 custom-scrollbar">
                             <div className="flex flex-wrap gap-2">
