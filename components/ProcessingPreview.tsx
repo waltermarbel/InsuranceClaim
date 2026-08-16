@@ -82,8 +82,14 @@ const ProcessingPreview: React.FC<ProcessingPreviewProps> = ({ proofs, onFinaliz
         ));
     };
 
-    const completedCount = inferences.filter(inf => inf.status === 'complete' || inf.status === 'error').length;
-    const approvedCount = inferences.filter(inf => inf.userSelection === 'approved').length;
+    // Prevent redundant O(N) array allocation overhead from chained filters on every render
+    const { completedCount, approvedCount } = useMemo(() => {
+        return {
+            completedCount: inferences.filter(inf => inf.status === 'complete' || inf.status === 'error').length,
+            approvedCount: inferences.filter(inf => inf.userSelection === 'approved').length
+        };
+    }, [inferences]);
+
     const progressPercentage = proofs.length > 0 ? (completedCount / proofs.length) * 100 : 0;
     
     const currentStep = useMemo(() => {
