@@ -289,7 +289,7 @@ const GeminiAssistant: React.FC<GeminiAssistantProps> = ({ onClose, onNavigate, 
             <button
                 onClick={startLiveSession}
                 className={`p-2 rounded-full border transition-colors ${isLive ? 'bg-danger text-white border-danger' : 'bg-white text-medium border-slate-300'}`}
-                title={isLive ? 'Stop Voice Session' : 'Start Voice Session'}
+                title={isLive ? 'Stop Voice Session' : 'Start Voice Session'} aria-label={isLive ? 'Stop Voice Session' : 'Start Voice Session'}
             >
                 <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3zm0 12.5a4.5 4.5 0 0 1-4.5-4.5H6a6 6 0 0 0 5.25 5.95V21h1.5v-2.55A6 6 0 0 0 18 10h-1.5a4.5 4.5 0 0 1-4.5 4.5z" /></svg>
             </button>

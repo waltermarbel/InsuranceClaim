@@ -307,7 +307,7 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
                                     onClick={handleAutoFill}
                                     disabled={isAutoFilling}
                                     className="p-3 bg-blue-50 border border-blue-100 text-blue-700 rounded-lg hover:bg-blue-100 transition shadow-sm disabled:opacity-50"
-                                    title="Auto-Fill Details from Web"
+                                    title="Auto-Fill Details from Web" aria-label="Auto-Fill Details from Web"
                                 >
                                     {isAutoFilling ? <SpinnerIcon className="h-5 w-5 animate-spin" /> : <SparklesIcon className="h-5 w-5" />}
                                 </button>
@@ -315,7 +315,7 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
                                     onClick={handleForensicHeal}
                                     disabled={isHealing}
                                     className="p-3 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-100 transition shadow-sm disabled:opacity-50"
-                                    title="Run Forensic Validation"
+                                    title="Run Forensic Validation" aria-label="Run Forensic Validation"
                                 >
                                     {isHealing ? <SpinnerIcon className="h-5 w-5 animate-spin" /> : <ShieldCheckIcon className="h-5 w-5" />}
                                 </button>
