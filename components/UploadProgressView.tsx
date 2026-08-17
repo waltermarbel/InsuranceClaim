@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { SpinnerIcon, DocumentTextIcon, CheckCircleIcon, ExclamationIcon } from './icons';
 
 export interface UploadProgress {
@@ -14,7 +14,8 @@ interface UploadProgressViewProps {
 }
 
 const UploadProgressView: React.FC<UploadProgressViewProps> = ({ files, onDone, onCancel }) => {
-  const completedCount = files.filter(f => f.status === 'success' || f.status === 'error').length;
+  // Optimization: Memoize count calculation to prevent redundant O(N) array allocations on every render
+  const completedCount = useMemo(() => files.filter(f => f.status === 'success' || f.status === 'error').length, [files]);
   const totalCount = files.length;
   const isComplete = completedCount === totalCount;
 
