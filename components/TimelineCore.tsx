@@ -168,7 +168,7 @@ export const TimelineCore: React.FC<TimelineCoreProps> = ({ claimDetails, onUpda
                                         return d ? (
                                             <div key={docId} className="flex justify-between items-center text-xs bg-white border border-slate-200 p-2 rounded">
                                                 <span className="truncate">{d.fileName}</span>
-                                                <button onClick={() => handleUpdateEvent(selectedEvent.id, { linkedDocumentIds: selectedEvent.linkedDocumentIds.filter(id => id !== docId) })} className="text-slate-400 hover:text-rose-500">&times;</button>
+                                                <button aria-label="Remove document" title="Remove document" onClick={() => handleUpdateEvent(selectedEvent.id, { linkedDocumentIds: selectedEvent.linkedDocumentIds.filter(id => id !== docId) })} className="text-slate-400 hover:text-rose-500">&times;</button>
                                             </div>
                                         ) : null;
                                     })}
@@ -198,7 +198,7 @@ export const TimelineCore: React.FC<TimelineCoreProps> = ({ claimDetails, onUpda
                                         return item ? (
                                             <div key={itemId} className="flex justify-between items-center text-xs bg-white border border-slate-200 p-2 rounded">
                                                 <span className="truncate">{item.claimDescription || item.category}</span>
-                                                <button onClick={() => handleUpdateEvent(selectedEvent.id, { linkedItemIds: (selectedEvent.linkedItemIds || []).filter(id => id !== itemId) })} className="text-slate-400 hover:text-rose-500">&times;</button>
+                                                <button aria-label="Remove item" title="Remove item" onClick={() => handleUpdateEvent(selectedEvent.id, { linkedItemIds: (selectedEvent.linkedItemIds || []).filter(id => id !== itemId) })} className="text-slate-400 hover:text-rose-500">&times;</button>
                                             </div>
                                         ) : null;
                                     })}
@@ -226,7 +226,7 @@ export const TimelineCore: React.FC<TimelineCoreProps> = ({ claimDetails, onUpda
                                     {selectedEvent.involvedPersons.map((person, idx) => (
                                         <span key={idx} className="flex items-center gap-1 text-xs bg-white border border-slate-200 px-2 py-1 rounded-full text-slate-700 font-medium">
                                             {person}
-                                            <button onClick={() => {
+                                            <button aria-label="Remove person" title="Remove person" onClick={() => {
                                                 const newPersons = [...selectedEvent.involvedPersons];
                                                 newPersons.splice(idx, 1);
                                                 handleUpdateEvent(selectedEvent.id, { involvedPersons: newPersons });
