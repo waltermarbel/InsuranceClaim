@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { useAppState, useAppDispatch } from '../context/AppContext.tsx';
 import { TimelineEvent } from '../types.ts';
 import { PlusIcon, TrashIcon, PencilIcon, ClockIcon, DocumentTextIcon, ExclamationTriangleIcon, SparklesIcon, PhotoIcon } from './icons.tsx';
@@ -141,9 +141,10 @@ export const TimelineView: React.FC = () => {
     };
 
     // Calculate contradictions locally
-    const getContradictions = () => {
+    // Optimization: Wrapped O(N^2) contradiction check in useMemo to prevent redundant recalculation on every render
+    const alerts = useMemo(() => {
         const facts = timeline.filter(t => t.type === 'FACT');
-        const alerts: string[] = [];
+        const calculatedAlerts: string[] = [];
 
         timeline.forEach(event => {
             facts.forEach(fact => {
@@ -153,15 +154,13 @@ export const TimelineView: React.FC = () => {
                     const eventDate = new Date(event.date).getTime();
                     
                     if (eventHasBeforeKeyword && eventDate > factDate) {
-                         alerts.push(`Event "${event.description}" claims to happen before fact "${fact.description}", but its timestamp is later.`);
+                         calculatedAlerts.push(`Event "${event.description}" claims to happen before fact "${fact.description}", but its timestamp is later.`);
                     }
                 }
             });
         });
-        return alerts;
-    };
-
-    const alerts = getContradictions();
+        return calculatedAlerts;
+    }, [timeline]);
 
     return (
         <div className="flex flex-col h-full bg-slate-50 relative p-6">
