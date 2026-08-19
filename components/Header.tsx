@@ -105,6 +105,7 @@ export const Header = React.memo<HeaderProps>(({
              <div className="relative group hidden lg:block w-48">
                  <input
                      type="text"
+                     aria-label="Search"
                      placeholder="Search..."
                      value={searchTerm}
                      onChange={(e) => {
@@ -124,6 +125,7 @@ export const Header = React.memo<HeaderProps>(({
                     disabled={!canUndo}
                     className={`p-2 rounded-full transition-all duration-200 ${canUndo ? 'text-slate-500 hover:text-indigo-600 hover:bg-slate-100 cursor-pointer' : 'text-slate-300 opacity-40 cursor-not-allowed bg-slate-50 grayscale'}`}
                     title="Undo"
+                    aria-label="Undo"
                  >
                     <ArrowUturnLeftIcon className="h-5 w-5"/>
                  </button>
@@ -132,6 +134,7 @@ export const Header = React.memo<HeaderProps>(({
                     disabled={!canRedo}
                     className={`p-2 rounded-full transition-all duration-200 ${canRedo ? 'text-slate-500 hover:text-indigo-600 hover:bg-slate-100 cursor-pointer' : 'text-slate-300 opacity-40 cursor-not-allowed bg-slate-50 grayscale'}`}
                     title="Redo"
+                    aria-label="Redo"
                  >
                     <ArrowUturnRightIcon className="h-5 w-5"/>
                  </button>
@@ -139,6 +142,7 @@ export const Header = React.memo<HeaderProps>(({
                     onClick={() => setShowVision(true)}
                     className="p-2 rounded-full transition-colors text-slate-500 hover:text-indigo-600 hover:bg-indigo-50"
                     title="System Vision & Evolution"
+                    aria-label="System Vision & Evolution"
                  >
                     <DocumentTextIcon className="h-5 w-5"/>
                  </button>
