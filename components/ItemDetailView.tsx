@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAppState, useAppDispatch } from '../context/AppContext.tsx';
 import { InventoryItem, Proof, UploadProgress } from '../types.ts';
@@ -188,7 +188,8 @@ const ItemDetailView: React.FC<ItemDetailViewProps> = ({
 
     // Calculate EXIF Warnings
     const purchaseDateMs = localItemState.purchaseDate ? new Date(localItemState.purchaseDate).getTime() : null;
-    const itemsWithExif = item.linkedProofs.filter(p => p.exif && Object.keys(p.exif).length > 0);
+    // OPTIMIZATION: Wrapped .filter().length in useMemo to prevent O(N) redundant array allocations on every render.
+    const itemsWithExif = useMemo(() => item.linkedProofs.filter(p => p.exif && Object.keys(p.exif).length > 0), [item.linkedProofs]);
     const exifWarnings: { proof: Proof, diffDays: number }[] = [];
     
     if (purchaseDateMs) {

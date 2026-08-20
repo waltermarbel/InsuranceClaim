@@ -40,7 +40,8 @@ const AuditLogPage: React.FC<AuditLogPageProps> = ({ activityLog }) => {
             const result = await runAuditorAnalysis(claims, inventory, accountHolder, timelineEvents);
             setAnalysisResult(result);
             
-            const totalWarnings = result.priceWarnings.filter(w => w.type === 'warning').length + result.lifestyleWarnings.length;
+            // OPTIMIZATION: Replacing .filter().length with a simple reduce to avoid O(N) array allocation overhead
+            const totalWarnings = result.priceWarnings.reduce((acc, w) => acc + (w.type === 'warning' ? 1 : 0), 0) + result.lifestyleWarnings.length;
             dispatch({
                 type: 'LOG_ACTIVITY',
                 payload: {
