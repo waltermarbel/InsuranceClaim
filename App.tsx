@@ -683,7 +683,8 @@ startxref
     // Calculate progress for UI
     const queueProgress = useMemo(() => {
         if (!processingQueue.length) return { current: 0, total: 0, fileName: '' };
-        const completed = processingQueue.filter(i => i.status === 'complete' || i.status === 'error').length;
+        // OPTIMIZATION: Replaced .filter().length with a simple reduce to avoid O(N) array allocation overhead
+        const completed = processingQueue.reduce((acc, i) => acc + (i.status === 'complete' || i.status === 'error' ? 1 : 0), 0);
         const processingItem = processingQueue.find(i => i.status === 'processing');
         return {
             current: completed + (processingItem ? 1 : 0),
