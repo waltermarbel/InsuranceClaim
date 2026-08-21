@@ -86,7 +86,9 @@ const PolicyDetails: React.FC<{ policy: ParsedPolicy; onUpdate: (p: ParsedPolicy
     const filterClauses = (clauses: string[] | undefined) => {
         if (!clauses) return [];
         if (!searchTerm) return clauses;
-        return clauses.filter(c => c.toLowerCase().includes(searchTerm.toLowerCase()));
+        // Performance Optimization: Hoist static operation outside of O(N) iteration loop
+        const lowerSearchTerm = searchTerm.toLowerCase();
+        return clauses.filter(c => c.toLowerCase().includes(lowerSearchTerm));
     };
 
     const handleVerify = async () => {
