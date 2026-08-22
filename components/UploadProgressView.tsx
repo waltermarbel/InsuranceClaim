@@ -14,7 +14,9 @@ interface UploadProgressViewProps {
 }
 
 const UploadProgressView: React.FC<UploadProgressViewProps> = ({ files, onDone, onCancel }) => {
-  const completedCount = files.filter(f => f.status === 'success' || f.status === 'error').length;
+  // Bolt Optimization: Calculate completedCount directly using reduce to avoid
+  // intermediate array allocation from files.filter() on every render.
+  const completedCount = files.reduce((count, f) => count + (f.status === 'success' || f.status === 'error' ? 1 : 0), 0);
   const totalCount = files.length;
   const isComplete = completedCount === totalCount;
 
