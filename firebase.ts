@@ -75,9 +75,6 @@ export interface FirestoreErrorInfo {
         tenantId?: string | null;
         providerInfo: {
             providerId: string;
-            displayName: string | null;
-            email: string | null;
-            photoUrl: string | null;
         }[];
     }
 }
@@ -91,11 +88,9 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
             emailVerified: auth.currentUser?.emailVerified,
             isAnonymous: auth.currentUser?.isAnonymous,
             tenantId: auth.currentUser?.tenantId,
+            // Security: Explicitly exclude PII (email, displayName, photoUrl) from providerData in error logs
             providerInfo: auth.currentUser?.providerData.map(provider => ({
-                providerId: provider.providerId,
-                displayName: provider.displayName,
-                email: provider.email,
-                photoUrl: provider.photoURL
+                providerId: provider.providerId
             })) || []
         },
         operationType,
