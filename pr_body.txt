@@ -1,0 +1,4 @@
+💡 What: Added `aria-label` and `focus-visible` styling (`focus-visible:opacity-100`, `focus-visible:ring-2`, `focus-visible:outline-none`, etc.) to multiple hover-revealed interactive elements across the application, and paired them with `focus-within:opacity-100` on parent containers where applicable.
+🎯 Why: Elements hidden via `opacity-0 group-hover:opacity-100` were invisible when receiving keyboard focus, making them inaccessible for keyboard and screen reader users.
+📸 Before/After: Visual changes only apply to keyboard focus state (buttons become visible and show focus rings).
+♿ Accessibility: Improved screen reader context with `aria-label`s for icon-only buttons and restored keyboard navigation visibility for hover-revealed actions.

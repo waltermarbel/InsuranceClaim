@@ -235,15 +235,15 @@ const GeminiAssistant: React.FC<GeminiAssistantProps> = ({ onClose, onNavigate, 
                 <div className="flex flex-col gap-2 w-full max-w-sm">
                   <button onClick={() => handleSend('Summarize my active claim')} className="px-4 py-3 bg-white border border-slate-200 rounded-lg shadow-sm hover:bg-slate-50 hover:border-primary transition text-sm text-dark font-medium text-left flex items-center justify-between group">
                     Summarize my active claim
-                    <span className="text-primary opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+                    <span className="text-primary opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity">→</span>
                   </button>
                   <button onClick={() => handleSend('Find evidence for item ID ABC')} className="px-4 py-3 bg-white border border-slate-200 rounded-lg shadow-sm hover:bg-slate-50 hover:border-primary transition text-sm text-dark font-medium text-left flex items-center justify-between group">
                     Find evidence for item ID ABC
-                    <span className="text-primary opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+                    <span className="text-primary opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity">→</span>
                   </button>
                   <button onClick={() => handleSend('Navigate to my inventory')} className="px-4 py-3 bg-white border border-slate-200 rounded-lg shadow-sm hover:bg-slate-50 hover:border-primary transition text-sm text-dark font-medium text-left flex items-center justify-between group">
                     Navigate to my inventory
-                    <span className="text-primary opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+                    <span className="text-primary opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity">→</span>
                   </button>
                 </div>
               </div>
