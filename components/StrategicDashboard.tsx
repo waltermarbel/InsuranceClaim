@@ -506,8 +506,9 @@ const StrategicDashboard: React.FC<StrategicDashboardProps> = ({ onPolicyUpload,
                                             <p className="text-[10px] text-slate-400">{new Date(claim.generatedAt).toLocaleDateString()}</p>
                                         </div>
                                         <button 
+                                            aria-label="Delete claim"
                                             onClick={(e) => { e.stopPropagation(); handleDeleteClaim(claim.id); }}
-                                            className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 transition-opacity p-1"
+                                            className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 transition-opacity p-1 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-none rounded"
                                         >
                                             <TrashIcon className="h-3 w-3"/>
                                         </button>
