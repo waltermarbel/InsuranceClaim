@@ -1,0 +1,4 @@
+## 2025-02-28 - Removed dangerouslySetInnerHTML from Message Renderers
+**Vulnerability:** XSS vulnerability through usage of `dangerouslySetInnerHTML` for rendering newlines from unsanitized model and user text outputs in `components/GeminiAssistant.tsx` and `components/ImageAnalysisModal.tsx`.
+**Learning:** `dangerouslySetInnerHTML` was used just to preserve line breaks (`\n` to `<br />`). React can handle line breaks safely natively without exposing XSS vectors by simply rendering plain text elements combined with CSS classes like `whitespace-pre-wrap`.
+**Prevention:** Avoid `dangerouslySetInnerHTML` altogether. When preserving formatting is needed, rely on CSS (e.g. `whitespace-pre-wrap`) or sanitized parsing libraries (e.g. `react-markdown` or `dompurify` if strictly rendering rich HTML).
