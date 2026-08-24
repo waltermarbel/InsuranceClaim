@@ -98,7 +98,7 @@ export const TimelineCore: React.FC<TimelineCoreProps> = ({ claimDetails, onUpda
             <div className="lg:col-span-1 space-y-4">
                 <div className="flex justify-between items-center bg-white p-3 rounded-lg shadow-sm">
                     <h3 className="font-bold text-slate-800 uppercase tracking-tight text-sm">Timeline Core</h3>
-                    <button onClick={handleAddEvent} className="p-1 bg-primary text-white rounded hover:bg-primary-dark transition"><PlusIcon className="h-4 w-4"/></button>
+                    <button onClick={handleAddEvent} className="p-1 bg-primary text-white rounded hover:bg-primary-dark transition" aria-label="Add event"><PlusIcon className="h-4 w-4"/></button>
                 </div>
                 
                 <div className="relative border-l-2 border-slate-300 ml-4 pl-4 space-y-6 flex flex-col">
@@ -139,7 +139,7 @@ export const TimelineCore: React.FC<TimelineCoreProps> = ({ claimDetails, onUpda
                     <div className="bg-white p-6 justify-between rounded-xl shadow-sm border border-slate-200">
                         <div className="flex justify-between items-start mb-4 pb-4 border-b border-slate-100">
                             <h3 className="font-bold text-slate-800 text-lg">Edit Event Node</h3>
-                            <button onClick={() => handleRemoveEvent(selectedEvent.id)} className="text-rose-500 hover:bg-rose-50 p-1.5 rounded transition"><TrashIcon className="h-4 w-4"/></button>
+                            <button onClick={() => handleRemoveEvent(selectedEvent.id)} className="text-rose-500 hover:bg-rose-50 p-1.5 rounded transition" aria-label="Delete event"><TrashIcon className="h-4 w-4"/></button>
                         </div>
                         
                         <div className="grid grid-cols-2 gap-4 mb-4">
