@@ -14,7 +14,10 @@ interface UploadProgressViewProps {
 }
 
 const UploadProgressView: React.FC<UploadProgressViewProps> = ({ files, onDone, onCancel }) => {
-  const completedCount = files.filter(f => f.status === 'success' || f.status === 'error').length;
+  // ⚡ Bolt Performance Optimization:
+  // Wrap count calculation in useMemo to prevent redundant O(N) array allocations on every render.
+  // This optimizes performance by avoiding array recreation on subsequent re-renders.
+  const completedCount = React.useMemo(() => files.filter(f => f.status === 'success' || f.status === 'error').length, [files]);
   const totalCount = files.length;
   const isComplete = completedCount === totalCount;
 
