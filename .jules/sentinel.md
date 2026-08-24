@@ -1,0 +1,4 @@
+## 2025-02-28 - Information Exposure in Firebase Error Handling
+**Vulnerability:** Personally Identifiable Information (PII) including emails, displayName, and photoUrl from `auth.currentUser` were being collected, logged to the console, and thrown directly in `Error` objects by the `handleFirestoreError` function in `firebase.ts`. This was a high-priority risk because error messages often bubble up to outer systems, API wrappers, or external logging systems.
+**Learning:** Developers often stringify the entire context payload to make debugging easier without realizing that logging context might contain raw PII or tokens from the authentication provider.
+**Prevention:** Always implement an explicit allow-list for error logging objects, specifically omitting fields like `email`, `displayName`, and `photoUrl`. Furthermore, intercept and rewrite the actual thrown `Error` payload to use a generic, safe string instead of a stringified object of internal state.
