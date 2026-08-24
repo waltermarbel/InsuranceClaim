@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion } from 'motion/react';
 // Fix: Added .ts extension to file path
 import { InventoryItem } from '../types.ts';
@@ -48,7 +48,10 @@ const BulkReviewPage: React.FC<BulkReviewPageProps> = ({ items, onFinalize }) =>
     onFinalize(approvedItems, rejectedItems);
   };
 
-  const approvedCount = Object.values(selection).filter(s => s === 'approved').length;
+  // ⚡ Bolt Performance Optimization:
+  // Wrap count calculation in useMemo to prevent redundant O(N) array allocations on every render.
+  // This avoids unneeded processing when selections change in the bulk review list.
+  const approvedCount = useMemo(() => Object.values(selection).filter(s => s === 'approved').length, [selection]);
   const rejectedCount = items.length - approvedCount;
 
   return (
