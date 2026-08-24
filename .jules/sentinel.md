@@ -1,0 +1,4 @@
+## 2025-03-05 - [PII Leakage in Error Logs]
+**Vulnerability:** Personally Identifiable Information (PII) including user emails, display names, and photo URLs were being exposed in error logs when catching and throwing exceptions in `firebase.ts` (`handleFirestoreError`).
+**Learning:** Error handling structures, especially central ones that append user context for debugging, often unintentionally collect and broadcast sensitive data. In environments storing PII, error payloads must be strictly sanitized before being stringified and outputted to the console or returned.
+**Prevention:** Only log anonymous identifiers like `userId`, `tenantId`, and `providerId`. Explicitly exclude fields like `email`, `displayName`, and `photoUrl` from log payloads and interfaces. Always review central error handlers for accidental data aggregation.
