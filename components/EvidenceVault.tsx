@@ -17,12 +17,10 @@ export const EvidenceVault: React.FC<EvidenceVaultProps> = ({ onImageZoom }) => 
     
     const [isDraggedOver, setIsDraggedOver] = useState(false);
     const [processingFiles, setProcessingFiles] = useState<{ id: string, name: string, status: string }[]>([]);
-    const [vaultProofs, setVaultProofs] = useState<Proof[]>([]);
-
     const activeClaim = currentClaimId ? claims.find(c => c.id === currentClaimId) : claims[0];
     const dateOfLoss = activeClaim ? activeClaim.incidentDetails?.dateOfLoss : null;
 
-    useEffect(() => {
+    const vaultProofs = useMemo(() => {
         const uniqueProofs = new Map<string, Proof>();
         
         unlinkedProofs.forEach(p => uniqueProofs.set(p.id, p));
@@ -34,7 +32,7 @@ export const EvidenceVault: React.FC<EvidenceVaultProps> = ({ onImageZoom }) => 
             claim.incidentDetails?.claimDocuments?.forEach(p => uniqueProofs.set(p.id, p));
         });
         
-        setVaultProofs(Array.from(uniqueProofs.values()));
+        return Array.from(uniqueProofs.values());
     }, [unlinkedProofs, inventory, claims]);
 
     const handleFiles = async (files: File[]) => {

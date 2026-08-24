@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAppState, useAppDispatch } from '../context/AppContext.tsx';
 import { generateScribeDocument, suggestScribeDocuments } from '../services/geminiService.ts';
 import { DocumentTextIcon, SparklesIcon, ClipboardDocumentListIcon, CloudArrowUpIcon, ShieldCheckIcon, LightBulbIcon } from './icons.tsx';
@@ -29,8 +29,7 @@ export const ScribeModule: React.FC = () => {
     const activePolicy = activeClaim ? policies.find(p => p.id === activeClaim.linkedPolicyId) : null;
     
     // Deduce vault proofs (all available evidence)
-    const [vaultProofs, setVaultProofs] = useState<any[]>([]);
-    useEffect(() => {
+    const vaultProofs = useMemo(() => {
         const uniqueProofs = new Map<string, any>();
         unlinkedProofs.forEach(p => uniqueProofs.set(p.id, p));
         inventory.forEach(item => item.linkedProofs.forEach(p => uniqueProofs.set(p.id, p)));
@@ -38,7 +37,7 @@ export const ScribeModule: React.FC = () => {
             claim.incidentDetails?.aleProofs?.forEach(p => uniqueProofs.set(p.id, p));
             claim.incidentDetails?.claimDocuments?.forEach(p => uniqueProofs.set(p.id, p));
         });
-        setVaultProofs(Array.from(uniqueProofs.values()));
+        return Array.from(uniqueProofs.values());
     }, [unlinkedProofs, inventory, claims]);
 
     useEffect(() => {
