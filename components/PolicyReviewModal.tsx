@@ -51,7 +51,11 @@ const ArrayEditor: React.FC<{
                         onChange={(e) => updateItem(i, e.target.value)}
                         placeholder={placeholder}
                     />
-                    <button onClick={() => deleteItem(i)} className="self-start mt-2 p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-md transition-colors opacity-0 group-hover:opacity-100">
+                    <button
+                        onClick={() => deleteItem(i)}
+                        aria-label="Delete item"
+                        className="self-start mt-2 p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-md transition-colors opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:outline-none"
+                    >
                         <TrashIcon className="h-4 w-4"/>
                     </button>
                 </div>
@@ -123,7 +127,11 @@ const RecordEditor: React.FC<{
                             placeholder={valuePlaceholder}
                         />
                     </div>
-                    <button onClick={() => deleteItem(key)} className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-md transition-colors opacity-0 group-hover:opacity-100">
+                    <button
+                        onClick={() => deleteItem(key)}
+                        aria-label="Delete entry"
+                        className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-md transition-colors opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:outline-none"
+                    >
                         <TrashIcon className="h-4 w-4"/>
                     </button>
                 </div>
@@ -193,7 +201,13 @@ const PolicyReviewModal: React.FC<PolicyReviewModalProps> = ({ report, onSave, o
                   {warnings.length > 0 && <span className="text-xs font-semibold bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full">{warnings.length} Warnings</span>}
               </div>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-2 rounded-full transition"><XIcon className="h-6 w-6" /></button>
+          <button
+            onClick={onClose}
+            aria-label="Close modal"
+            className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-2 rounded-full transition focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:outline-none"
+          >
+            <XIcon className="h-6 w-6" />
+          </button>
         </div>
 
         {/* Tabs */}
