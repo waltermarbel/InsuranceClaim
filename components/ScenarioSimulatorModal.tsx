@@ -89,7 +89,7 @@ const ScenarioSimulatorModal: React.FC<ScenarioSimulatorModalProps> = ({ invento
                     <h2 className="text-xl font-bold text-dark font-heading flex items-center gap-2">
                         <CalculatorIcon className="h-6 w-6 text-primary"/> Scenario Simulator
                     </h2>
-                    <button onClick={onClose} className="text-medium rounded-full p-1 hover:text-dark hover:bg-slate-200 transition"><XIcon className="h-6 w-6" /></button>
+                    <button aria-label="Close modal" onClick={onClose} className="text-medium rounded-full p-1 hover:text-dark hover:bg-slate-200 transition"><XIcon className="h-6 w-6" /></button>
                 </div>
 
                 <div className="flex-grow overflow-y-auto p-6 md:p-8 bg-slate-50/50">

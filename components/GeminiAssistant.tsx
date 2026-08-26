@@ -224,7 +224,7 @@ const GeminiAssistant: React.FC<GeminiAssistantProps> = ({ onClose, onNavigate, 
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl h-[80vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="flex justify-between items-center p-4 border-b bg-slate-50">
           <h2 className="text-xl font-bold text-dark font-heading flex items-center gap-2"><SparklesIcon className="h-6 w-6 text-primary"/> AI Assistant</h2>
-          <button onClick={onClose} className="text-medium rounded-full p-1 hover:text-dark hover:bg-slate-200 transition"><XIcon className="h-6 w-6" /></button>
+          <button aria-label="Close modal" onClick={onClose} className="text-medium rounded-full p-1 hover:text-dark hover:bg-slate-200 transition"><XIcon className="h-6 w-6" /></button>
         </div>
         
         <div className="flex-grow p-4 overflow-y-auto space-y-4">

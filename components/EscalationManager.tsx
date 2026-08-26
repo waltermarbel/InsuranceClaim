@@ -43,7 +43,7 @@ const EscalationManager: React.FC<EscalationManagerProps> = ({ claim, policy, on
                         <ShieldExclamationIcon className="h-6 w-6 text-rose-600"/> 
                         Automated Escalation Protocol
                     </h2>
-                    <button onClick={onClose} className="p-1 hover:bg-slate-200 rounded-full text-slate-500 transition"><XIcon className="h-6 w-6"/></button>
+                    <button aria-label="Close modal" onClick={onClose} className="p-1 hover:bg-slate-200 rounded-full text-slate-500 transition"><XIcon className="h-6 w-6"/></button>
                 </div>
 
                 <div className="flex-grow flex flex-col md:flex-row overflow-hidden">

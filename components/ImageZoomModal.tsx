@@ -71,7 +71,7 @@ const ImageZoomModal: React.FC<ImageZoomModalProps> = ({ imageUrl, onClose }) =>
                      <button onClick={(e) => { e.stopPropagation(); handleReset(); }} className="text-white p-2 hover:bg-white/20 rounded-md">Reset</button>
                     </>
                  )}
-                 <button onClick={(e) => { e.stopPropagation(); onClose(); }} className="text-white p-2 hover:bg-white/20 rounded-md"><XIcon className="h-6 w-6" /></button>
+                 <button aria-label="Close modal" onClick={(e) => { e.stopPropagation(); onClose(); }} className="text-white p-2 hover:bg-white/20 rounded-md"><XIcon className="h-6 w-6" /></button>
             </div>
             
             <div 

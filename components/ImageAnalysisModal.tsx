@@ -59,7 +59,7 @@ const ImageAnalysisModal: React.FC<ImageAnalysisModalProps> = ({ onClose, onAnal
                     <h2 className="text-xl font-bold text-dark font-heading flex items-center gap-2">
                         <SparklesIcon className="h-6 w-6 text-primary"/> AI Image Analysis
                     </h2>
-                    <button onClick={onClose} className="text-medium rounded-full p-1 hover:text-dark hover:bg-slate-200 transition"><XIcon className="h-6 w-6" /></button>
+                    <button aria-label="Close modal" onClick={onClose} className="text-medium rounded-full p-1 hover:text-dark hover:bg-slate-200 transition"><XIcon className="h-6 w-6" /></button>
                 </div>
                 <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 overflow-y-auto">
                     {/* Left Column: Upload & Prompt */}

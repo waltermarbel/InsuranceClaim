@@ -171,7 +171,7 @@ const ImportCSVModal: React.FC<ImportCSVModalProps> = ({ onClose, onImport }) =>
                     <h2 className="text-xl font-bold text-dark font-heading flex items-center gap-2">
                         <ArrowUpTrayIcon className="h-6 w-6 text-primary"/> Bulk Import Inventory
                     </h2>
-                    <button onClick={onClose} className="text-medium rounded-full p-1 hover:text-dark hover:bg-slate-200 transition"><XIcon className="h-6 w-6" /></button>
+                    <button aria-label="Close modal" onClick={onClose} className="text-medium rounded-full p-1 hover:text-dark hover:bg-slate-200 transition"><XIcon className="h-6 w-6" /></button>
                 </div>
 
                 <div className="p-6 overflow-y-auto flex-grow bg-slate-50/50">
