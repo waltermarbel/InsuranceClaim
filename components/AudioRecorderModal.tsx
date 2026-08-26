@@ -85,7 +85,7 @@ const AudioRecorderModal: React.FC<AudioRecorderModalProps> = ({ item, onClose, 
             <div className="bg-white rounded-lg shadow-2xl w-full max-w-lg flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
                 <div className="flex justify-between items-center p-4 border-b bg-slate-50">
                     <h2 className="text-xl font-bold text-dark font-heading">Record Audio Note for {item.itemName}</h2>
-                    <button onClick={onClose} className="text-medium rounded-full p-1 hover:text-dark hover:bg-slate-200 transition"><XIcon className="h-6 w-6" /></button>
+                    <button aria-label="Close modal" onClick={onClose} className="text-medium rounded-full p-1 hover:text-dark hover:bg-slate-200 transition"><XIcon className="h-6 w-6" /></button>
                 </div>
                 <div className="p-6 space-y-4">
                     <div className="flex flex-col items-center justify-center space-y-4 p-8 bg-slate-100 rounded-md">

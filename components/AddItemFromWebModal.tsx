@@ -56,7 +56,7 @@ const AddItemFromWebModal: React.FC<AddItemFromWebModalProps> = ({ onClose }) =>
             <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
                 <div className="flex justify-between items-center p-4 border-b bg-slate-50">
                     <h2 className="text-xl font-bold text-dark font-heading">Add Item from Web</h2>
-                    <button onClick={onClose} className="text-medium rounded-full p-1 hover:text-dark hover:bg-slate-200 transition"><XIcon className="h-6 w-6" /></button>
+                    <button aria-label="Close modal" onClick={onClose} className="text-medium rounded-full p-1 hover:text-dark hover:bg-slate-200 transition"><XIcon className="h-6 w-6" /></button>
                 </div>
                 <div className="p-6 space-y-4">
                     <p className="text-sm text-medium">Enter a URL to a product page. The AI will attempt to extract the item's details and create a new inventory asset.</p>

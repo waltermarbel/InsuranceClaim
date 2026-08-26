@@ -158,7 +158,7 @@ const ClaimReportGenerator: React.FC<ClaimReportGeneratorProps> = ({ onClose }) 
                 <div className="bg-white rounded-lg shadow-2xl w-full max-w-lg my-8 flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
                     <div className="flex justify-between items-center p-4 md:p-5 border-b bg-slate-50">
                         <h2 className="text-xl font-bold text-dark font-heading">Error</h2>
-                        <button onClick={onClose} className="text-medium rounded-full p-1 hover:text-dark hover:bg-slate-200 transition"><XIcon className="h-6 w-6" /></button>
+                        <button aria-label="Close modal" onClick={onClose} className="text-medium rounded-full p-1 hover:text-dark hover:bg-slate-200 transition"><XIcon className="h-6 w-6" /></button>
                     </div>
                     <div className="p-8 text-center text-medium">
                         <p>An active insurance policy and a selected claim are required to generate a claim report. Please check your settings.</p>

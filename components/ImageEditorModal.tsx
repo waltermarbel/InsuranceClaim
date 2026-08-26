@@ -34,7 +34,7 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ proof, onClose, onS
             <div className="bg-white rounded-lg shadow-2xl w-full max-w-xl flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
                 <div className="flex justify-between items-center p-4 border-b bg-slate-50">
                     <h2 className="text-xl font-bold text-dark font-heading">Edit Image with AI</h2>
-                    <button onClick={onClose} className="text-medium rounded-full p-1 hover:text-dark hover:bg-slate-200 transition"><XIcon className="h-6 w-6" /></button>
+                    <button aria-label="Close modal" onClick={onClose} className="text-medium rounded-full p-1 hover:text-dark hover:bg-slate-200 transition"><XIcon className="h-6 w-6" /></button>
                 </div>
                 <div className="p-6 space-y-4">
                     <div className="relative aspect-square w-full bg-slate-100 rounded-md overflow-hidden">
