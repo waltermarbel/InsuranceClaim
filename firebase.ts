@@ -69,15 +69,13 @@ export interface FirestoreErrorInfo {
     path: string | null;
     authInfo: {
         userId?: string;
-        email?: string | null;
+        // SECURITY: Excluded email to prevent PII leakage in logs
         emailVerified?: boolean;
         isAnonymous?: boolean;
         tenantId?: string | null;
         providerInfo: {
             providerId: string;
-            displayName: string | null;
-            email: string | null;
-            photoUrl: string | null;
+            // SECURITY: Excluded displayName, email, photoUrl to prevent PII leakage in logs
         }[];
     }
 }
@@ -87,15 +85,13 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
         error: error instanceof Error ? error.message : String(error),
         authInfo: {
             userId: auth.currentUser?.uid,
-            email: auth.currentUser?.email,
+            // SECURITY: Excluded email to prevent PII leakage in logs
             emailVerified: auth.currentUser?.emailVerified,
             isAnonymous: auth.currentUser?.isAnonymous,
             tenantId: auth.currentUser?.tenantId,
             providerInfo: auth.currentUser?.providerData.map(provider => ({
-                providerId: provider.providerId,
-                displayName: provider.displayName,
-                email: provider.email,
-                photoUrl: provider.photoURL
+                providerId: provider.providerId
+                // SECURITY: Excluded displayName, email, photoURL to prevent PII leakage in logs
             })) || []
         },
         operationType,
