@@ -1,0 +1,3 @@
+## 2024-03-20 - Prevent O(N) array allocations from redundant array length calculations
+**Learning:** Calculating counts or totals by chaining `.filter().length` inside React components causes redundant O(N) array allocations on every render.
+**Action:** Optimize by wrapping the calculation in a `useMemo` hook to prevent redundant recalculations on every render, rather than replacing it with an imperative `for...of` loop which degrades readability and acts as a micro-optimization. When optimizing inside an already memoized callback, use native JavaScript methods like `.reduce()` instead of nesting `useMemo`.

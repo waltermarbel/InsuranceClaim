@@ -48,7 +48,10 @@ const BulkReviewPage: React.FC<BulkReviewPageProps> = ({ items, onFinalize }) =>
     onFinalize(approvedItems, rejectedItems);
   };
 
-  const approvedCount = Object.values(selection).filter(s => s === 'approved').length;
+  // Use useMemo to prevent redundant O(N) array allocations on every render
+  const approvedCount = React.useMemo(() =>
+    Object.values(selection).filter(s => s === 'approved').length
+  , [selection]);
   const rejectedCount = items.length - approvedCount;
 
   return (

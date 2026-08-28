@@ -479,10 +479,12 @@ const InventoryDashboard: React.FC<InventoryDashboardProps> = ({
 
     const stats = useMemo(() => {
         const totalVal = tableData.reduce((acc, item) => acc + (item.replacementCostValueRCV || item.originalCost || 0), 0);
-        const readyCount = tableData.filter(i => 
+        // Use reduce instead of filter().length inside an existing useMemo to avoid O(N) array allocation overhead
+        const readyCount = tableData.reduce((count, i) =>
             (i.linkedProofs || []).some(p => p.type === 'image') && 
             (i.linkedProofs || []).some(p => p.type === 'document' || p.purpose === 'Proof of Purchase')
-        ).length;
+            ? count + 1 : count
+        , 0);
         return {
             totalRCV: totalVal,
             count: tableData.length,
